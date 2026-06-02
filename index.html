@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>KEEL Token — Boat Share</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Outfit:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
 :root {
   --bg: #020912;
@@ -29,8 +28,8 @@
   --muted: #3a607a;
   --muted2: #6090b0;
   --mono: 'Space Mono', monospace;
-  --sans: 'Outfit', sans-serif;
-  --display: 'Playfair Display', serif;
+  --sans: 'Inter', sans-serif;
+  --display: 'Space Grotesk', sans-serif;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -132,8 +131,9 @@ body::before {
   display: flex; align-items: center; justify-content: center;
   font-family: var(--mono); font-weight: 700; font-size: 16px; color: #fff;
   box-shadow: 0 0 24px rgba(212,168,64,0.5), 0 0 60px rgba(212,168,64,0.15), inset 0 -8px 16px rgba(0,0,0,0.3);
-  position: relative; flex-shrink: 0;
+  position: relative; flex-shrink: 0; overflow: hidden;
 }
+.logo-emblem svg { width: 100%; height: 100%; }
 .logo-emblem::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 1px solid rgba(212,168,64,0.4); }
 .logo-text-wrap {}
 .logo-name { font-family: var(--display); font-size: 22px; font-weight: 700; color: var(--foam); line-height: 1; letter-spacing: 2px; }
@@ -238,7 +238,7 @@ body::before {
   pointer-events: none;
 }
 .hero-text { flex:1; position:relative; z-index:1; }
-.hero-title { font-family: var(--display); font-size: 38px; font-weight: 700; line-height: 1.15; margin-bottom: 10px; color: var(--foam); }
+.hero-title { font-family: var(--display); font-size: 38px; font-weight: 700; line-height: 1.12; margin-bottom: 10px; color: var(--foam); letter-spacing: -0.2px; }
 .hero-title span { color: var(--accent); }
 .hero-sub { font-size: 14px; color: var(--muted2); }
 .hero-coords { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 10px; letter-spacing: 1px; }
@@ -289,6 +289,8 @@ body::before {
 .form-group label { font-size:11px; font-weight:600; color:var(--muted2); text-transform:uppercase; letter-spacing:0.8px; }
 .inp { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:11px 14px; color:var(--text); font-family:var(--sans); font-size:14px; font-weight:500; outline:none; transition:border 0.2s, box-shadow 0.2s; width:100%; }
 .inp:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-glow); }
+.inp-readonly { background:rgba(20,40,70,0.4); color:var(--muted2); cursor:default; border-style:dashed; }
+.inp-readonly:focus { border-color:var(--border); box-shadow:none; }
 select.inp option { background:#0b1d30; }
 
 /* SWITCH */
@@ -318,6 +320,7 @@ select.inp option { background:#0b1d30; }
   padding:20px; background:var(--surface2); border-radius:14px; border:1px solid var(--border);
   position:relative; z-index:1;
 }
+.burn-stats-2 { grid-template-columns:1fr 1fr; }
 /* Nautical dashes on stats box */
 .burn-stats::before {
   content:'';
@@ -492,7 +495,22 @@ select.inp option { background:#0b1d30; }
 <!-- SIDEBAR -->
 <div class="sidebar">
   <div class="sidebar-logo">
-    <div class="logo-emblem">K</div>
+    <div class="logo-emblem">
+      <svg viewBox="0 0 44 44" width="44" height="44" xmlns="http://www.w3.org/2000/svg">
+        <!-- mast -->
+        <line x1="22" y1="8" x2="22" y2="30" stroke="#3a2400" stroke-width="1.4" stroke-linecap="round"/>
+        <!-- main sail (big, billowing) -->
+        <path d="M22 9 C30 14 31 23 30 29 L22 29 Z" fill="#fffefb" stroke="#3a2400" stroke-width="0.8" stroke-linejoin="round"/>
+        <!-- jib sail (front, curved) -->
+        <path d="M22 11 C16 16 14 24 14 29 L22 29 Z" fill="#f3e3c0" stroke="#3a2400" stroke-width="0.8" stroke-linejoin="round"/>
+        <!-- hull -->
+        <path d="M11 30 L33 30 L29 36 Q22 38 15 36 Z" fill="#3a2400" stroke="#2a1900" stroke-width="0.6" stroke-linejoin="round"/>
+        <!-- little flag -->
+        <path d="M22 8 L26 9.5 L22 11 Z" fill="#b8121e"/>
+        <!-- water lines -->
+        <path d="M9 39 Q15 37.5 22 39 Q29 40.5 35 39" stroke="#3a2400" stroke-width="0.8" fill="none" opacity="0.5" stroke-linecap="round"/>
+      </svg>
+    </div>
     <div class="logo-text-wrap">
       <div class="logo-name">KEEL</div>
       <div class="logo-tagline">Boat Share Token</div>
@@ -563,8 +581,8 @@ select.inp option { background:#0b1d30; }
       <!-- HERO -->
       <div class="hero">
         <div class="hero-text">
-          <div class="hero-title">Calculate your<br><span>Keel Token</span> burn</div>
-          <div class="hero-sub">Estimate usage, review credits, then settle from your wallet</div>
+          <div class="hero-title">Log your voyage,<br>settle your <span>Keel</span></div>
+          <div class="hero-sub">Estimate usage, review the breakdown, then settle from your wallet</div>
           <div class="hero-coords">⚓ 25°46′N · 80°11′W · Atlantic Coast · All times ET</div>
           <div class="tide-bar" style="margin-top:10px;max-width:280px">
             <span>LOW</span>
@@ -633,22 +651,19 @@ select.inp option { background:#0b1d30; }
             <input type="date" class="inp" id="trip-date" onchange="calculate()">
           </div>
           <div class="form-group">
-            <label>⏱ Hours Underway</label>
-            <input type="number" class="inp" id="trip-hours" min="0.5" max="24" step="0.5" value="6" onchange="calculate()">
+            <label>🕐 Departure Time</label>
+            <input type="time" class="inp" id="start-time" value="09:00" onchange="calculate()">
           </div>
         </div>
 
         <div class="form-row form-row-2">
           <div class="form-group">
-            <label>🕐 Departure Time</label>
-            <input type="time" class="inp" id="start-time" value="09:00" onchange="calculate()">
+            <label>⏱ Hours Underway</label>
+            <input type="number" class="inp" id="trip-hours" min="0.5" max="24" step="0.5" value="6" onchange="calculate()">
           </div>
           <div class="form-group">
-            <label>🏆 Competitive Use</label>
-            <label class="switch">
-              <input type="checkbox" id="is-competitive" onchange="calculate()">
-              <span class="slider"></span>
-            </label>
+            <label>🧭 Est. Disembarkation</label>
+            <input type="text" class="inp inp-readonly" id="end-time-display" value="—" readonly tabindex="-1">
           </div>
         </div>
 
@@ -660,7 +675,7 @@ select.inp option { background:#0b1d30; }
         </div>
 
         <!-- BURN STATS -->
-        <div class="burn-stats">
+        <div class="burn-stats burn-stats-2">
           <div class="stat-item">
             <div class="stat-label">Estimated Burn</div>
             <div class="stat-value blue" id="stat-burn">0.00 <span style="font-size:13px">KEEL</span></div>
@@ -668,14 +683,6 @@ select.inp option { background:#0b1d30; }
           <div class="stat-item">
             <div class="stat-label">Remaining Balance</div>
             <div class="stat-value green" id="stat-remaining">-- <span style="font-size:13px">KEEL</span></div>
-          </div>
-          <div class="stat-item donut-wrap">
-            <div class="stat-label">Cap Status</div>
-            <canvas class="donut-canvas" id="donut-chart"></canvas>
-            <div class="donut-center">
-              <div class="donut-pct" id="donut-pct">0%</div>
-            </div>
-            <div class="cap-label" id="cap-label">-- / 300 KEEL</div>
           </div>
         </div>
 
@@ -689,14 +696,6 @@ select.inp option { background:#0b1d30; }
           <div class="breakdown-total">
             <span>Total burn</span>
             <span id="breakdown-total-val">0.00 KEEL</span>
-          </div>
-        </div>
-
-        <!-- CALCULATE -->
-        <div id="section-calculate">
-          <div class="btn-row">
-            <button class="btn btn-estimate" onclick="goToReview()">⬡ Estimate Burn</button>
-            <button class="btn btn-continue" onclick="goToReview()">Continue to Wallet →</button>
           </div>
         </div>
 
@@ -714,36 +713,22 @@ select.inp option { background:#0b1d30; }
         <div class="status-msg" id="status-msg"></div>
       </div>
 
-      <!-- PRICING GRID + CHARTS -->
+      <!-- PRICING GRID -->
       <div class="charts-row">
-        <div class="chart-card">
+        <div class="chart-card" style="grid-column:1 / -1">
           <div class="chart-title">Pricing grid</div>
-          <div class="chart-sub">KEEL per hour · daytime 7am–6pm · evening 6pm–7am</div>
+          <div class="chart-sub">KEEL per hour · daytime 7am–6pm · evening 6pm–7am (half rate)</div>
           <table class="price-table">
             <thead>
               <tr><th>Period</th><th>Daytime</th><th>Evening</th></tr>
             </thead>
             <tbody>
-              <tr><td><span class="dot weekday"></span>Weekday</td><td>2.0</td><td>2.5</td></tr>
-              <tr><td><span class="dot weekend"></span>Weekend</td><td>4.0</td><td>5.0</td></tr>
-              <tr><td><span class="dot holiday"></span>Federal holiday</td><td>8.0</td><td>9.0</td></tr>
+              <tr><td><span class="dot weekday"></span>Weekday</td><td>2.0</td><td>1.0</td></tr>
+              <tr><td><span class="dot weekend"></span>Weekend</td><td>4.0</td><td>2.0</td></tr>
+              <tr><td><span class="dot holiday"></span>Holiday</td><td>8.0</td><td>4.0</td></tr>
             </tbody>
           </table>
-          <div class="price-note">+1.0 KEEL/hr for competitive use · Holiday rate always wins · Black Friday is billed as a holiday · A Fri or Mon federal holiday extends the holiday rate across the adjacent Sat & Sun · Weekends are Sat 12:00am–Sun 11:59pm ET</div>
-        </div>
-        <div class="chart-card">
-          <div class="chart-title">Cap utilization</div>
-          <div class="chart-sub">300 KEEL monthly cap</div>
-          <canvas class="chart-canvas" id="cap-chart"></canvas>
-        </div>
-      </div>
-
-      <!-- USAGE TREND -->
-      <div class="charts-row">
-        <div class="chart-card" style="grid-column:1 / -1">
-          <div class="chart-title">Keel Token usage trend</div>
-          <div class="chart-sub">Issued · Used · Available — last 8 weeks</div>
-          <canvas class="chart-canvas" id="trend-chart"></canvas>
+          <div class="price-note">+1.0 KEEL/hr for competitive use · Holiday rate always wins · Black Friday is billed as a holiday · A Fri or Mon holiday extends the holiday rate across the adjacent Sat & Sun · Weekends are Sat 12:00am–Sun 11:59pm ET</div>
         </div>
       </div>
 
@@ -776,7 +761,7 @@ select.inp option { background:#0b1d30; }
               <div class="ms-bar" style="width:80px"><div class="ms-bar-fill" id="used-bar" style="width:6%;background:var(--brass)"></div></div>
             </div>
           </div>
-          <div class="ms-val gold" id="ms-used">6 KEEL</div>
+          <div class="ms-val gold" id="ms-used">— KEEL</div>
         </div>
         <div class="month-stat">
           <div class="ms-left">
@@ -786,7 +771,7 @@ select.inp option { background:#0b1d30; }
               <div class="ms-bar" style="width:80px"><div class="ms-bar-fill" id="avail-bar" style="width:31%;background:var(--teal)"></div></div>
             </div>
           </div>
-          <div class="ms-val green" id="ms-avail">94 KEEL</div>
+          <div class="ms-val green" id="ms-avail">— KEEL</div>
         </div>
         <div class="month-stat">
           <div class="ms-left">
@@ -829,14 +814,17 @@ select.inp option { background:#0b1d30; }
 
 <script>
 const KEEL_TOKEN_ADDRESS  = "0x9cd72e3d13AdAd360A2e944A2BB84cf901893D15";
-const KEEL_LEDGER_ADDRESS = "0xPASTE_NEW_LEDGER_ADDRESS_AFTER_DEPLOY";
+const KEEL_LEDGER_ADDRESS = "0x21bAe325b8EB16250d53AF5C22af5bceab915c3B";
 const AMOY_CHAIN_ID = 80002;
 const MAX_CAP = 300;
+const MONTHLY_ISSUED = 100; // KEEL issued per member per month (matches token cap)
 const TOKEN_ABI  = ["function balanceOf(address) view returns (uint256)","function decimals() view returns (uint8)"];
 
 // Flat-parameter ABI — no struct, so no ethers tuple-encoding issues.
 const LEDGER_ABI = [
-  "function logAndSettle(address member, uint64 startTs, uint64 endTs, uint32 weekdayDay, uint32 weekdayEvening, uint32 weekendDay, uint32 weekendEvening, uint32 holidayDay, uint32 holidayEvening, bool competitive) external returns (bytes32)"
+  "function logAndSettle(address member, uint64 startTs, uint64 endTs, uint32 weekdayDay, uint32 weekdayEvening, uint32 weekendDay, uint32 weekendEvening, uint32 holidayDay, uint32 holidayEvening, bool competitive) external returns (bytes32)",
+  "event TripSettled(bytes32 indexed tripId, address indexed member, uint256 tokensBurned, uint32 totalTenths)",
+  "function trips(bytes32) view returns (address member, uint64 startTs, uint64 endTs, uint32 totalTenths, bool competitive, uint256 burnHundredths, uint256 tokensBurned)"
 ];
 
 // ── Federal holidays computed from OPM rules for ANY year (US Eastern) ──
@@ -939,67 +927,24 @@ function isHolidayRate(y, m, d) {
 }
 
 let provider, signer, walletAddress;
-let keelBalance = 94;
+let keelBalance = MONTHLY_ISSUED;
 let currentCalc = {};
 let sessionTrips = [];
-let donutChart, trendChart, capChart;
 
 function initCharts() {
-  const months = ["Apr 24","Apr 28","May 2","May 6","May 10","May 14","May 18","May 22"];
-  const issued  = [100,120,140,160,180,210,240,280];
-  const used    = [10,25,40,60,80,110,140,165];
-  const avail   = issued.map((v,i) => v - used[i]);
-
-  const tCtx = document.getElementById("trend-chart").getContext("2d");
-  trendChart = new Chart(tCtx, {
-    type:"line",
-    data:{
-      labels:months,
-      datasets:[
-        {label:"Issued", data:issued, borderColor:"#4ab3ff", backgroundColor:"rgba(74,179,255,0.06)", tension:0.4, pointRadius:0, borderWidth:2},
-        {label:"Used",   data:used,   borderColor:"#d4a840", backgroundColor:"rgba(212,168,64,0.06)",  tension:0.4, pointRadius:0, borderWidth:2},
-        {label:"Available", data:avail, borderColor:"#00c8a0", backgroundColor:"rgba(0,200,160,0.06)", tension:0.4, pointRadius:0, borderWidth:2}
-      ]
-    },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{display:false}},
-      scales:{
-        x:{grid:{color:"rgba(26,48,80,0.4)"},ticks:{color:"#3a607a",font:{size:10}}},
-        y:{grid:{color:"rgba(26,48,80,0.4)"},ticks:{color:"#3a607a",font:{size:10}},beginAtZero:true}
-      }
-    }
-  });
-
-  const cCtx = document.getElementById("cap-chart").getContext("2d");
-  capChart = new Chart(cCtx, {
-    type:"doughnut",
-    data:{datasets:[{data:[keelBalance, MAX_CAP-keelBalance], backgroundColor:["#00c8a0","rgba(26,48,80,0.5)"], borderWidth:0, borderRadius:4}]},
-    options:{responsive:true, maintainAspectRatio:false, cutout:"72%", plugins:{legend:{display:false},tooltip:{enabled:false}}}
-  });
-
-  const dCtx = document.getElementById("donut-chart").getContext("2d");
-  donutChart = new Chart(dCtx, {
-    type:"doughnut",
-    data:{datasets:[{data:[keelBalance, MAX_CAP-keelBalance], backgroundColor:["#00c8a0","rgba(26,48,80,0.6)"], borderWidth:0, borderRadius:3}]},
-    options:{responsive:true, maintainAspectRatio:false, cutout:"68%", plugins:{legend:{display:false},tooltip:{enabled:false}}}
-  });
-
+  // Charts removed — just sync the balance-driven UI.
   updateBalanceUI();
 }
 
 function updateBalanceUI() {
-  const pct = Math.min((keelBalance/MAX_CAP)*100,100);
-  document.getElementById("donut-pct").textContent = pct.toFixed(0)+"%";
-  document.getElementById("cap-label").textContent = keelBalance.toFixed(2)+" / 300 KEEL";
   document.getElementById("stat-remaining").innerHTML = keelBalance.toFixed(2)+' <span style="font-size:13px">KEEL</span>';
-  const used = Math.max(100-keelBalance+6,0);
-  document.getElementById("ms-used").textContent = used.toFixed(0)+" KEEL";
+  // "Used" = issued this month minus current live balance.
+  const used = Math.max(MONTHLY_ISSUED - keelBalance, 0);
+  document.getElementById("ms-issued").textContent = MONTHLY_ISSUED.toFixed(0)+" KEEL";
+  document.getElementById("ms-used").textContent = used.toFixed(2)+" KEEL";
   document.getElementById("ms-avail").textContent = keelBalance.toFixed(2)+" KEEL";
-  document.getElementById("used-bar").style.width = Math.min((used/300)*100,100)+"%";
-  document.getElementById("avail-bar").style.width = Math.min((keelBalance/300)*100,100)+"%";
-  if(donutChart){donutChart.data.datasets[0].data=[keelBalance,MAX_CAP-keelBalance];donutChart.update();}
-  if(capChart){capChart.data.datasets[0].data=[keelBalance,MAX_CAP-keelBalance];capChart.update();}
+  document.getElementById("used-bar").style.width = Math.min((used/MONTHLY_ISSUED)*100,100)+"%";
+  document.getElementById("avail-bar").style.width = Math.min((keelBalance/MONTHLY_ISSUED)*100,100)+"%";
 }
 
 async function connectWallet() {
@@ -1018,6 +963,7 @@ async function connectWallet() {
     const short = walletAddress.slice(0,6)+"..."+walletAddress.slice(-4);
     document.getElementById("wallet-area").innerHTML = '<div class="wallet-pill"><div class="w-dot"></div>'+short+'</div>';
     await refreshBalance();
+    await loadOnChainHistory();
   } catch(e){showStatus("Connection failed: "+e.message,"error");}
 }
 
@@ -1029,6 +975,7 @@ async function refreshBalance() {
     const dec = await token.decimals();
     keelBalance = parseFloat(ethers.utils.formatUnits(bal,dec));
     updateBalanceUI();
+    calculate(); // recompute burn/remaining against the freshly loaded balance
   } catch(e){console.error(e);}
 }
 
@@ -1037,14 +984,14 @@ function calculate() {
   const hours     = parseFloat(document.getElementById("trip-hours").value)||6;
   const startTime = document.getElementById("start-time").value||"09:00";
   const tripType  = document.getElementById("trip-type").value;
-  const isCompete = document.getElementById("is-competitive").checked||tripType==="competitive";
+  const isCompete = (tripType==="competitive");
 
   if(!dateStr){ return; }
   // Daytime = 07:00–17:59, Evening = 18:00–06:59
   const RATE_H = {
-    weekday: { day: 200, evening: 250 },
-    weekend: { day: 400, evening: 500 },
-    holiday: { day: 800, evening: 900 }
+    weekday: { day: 200, evening: 100 },
+    weekend: { day: 400, evening: 200 },
+    holiday: { day: 800, evening: 400 }
   };
   const COMP_PER_HR = 100; // hundredths
   const EVENING_START = 18;          // 6pm
@@ -1054,6 +1001,14 @@ function calculate() {
   // Wall-clock walking is DST-safe for billing because rates are defined on local clock time.
   const [yy,mm,dd] = dateStr.split("-").map(Number);
   const [sh,sm]    = startTime.split(":").map(Number);
+
+  // Estimated disembarkation = departure wall-clock + hours underway.
+  const disembark = new Date(yy, mm-1, dd, sh, sm, 0, 0);
+  disembark.setMinutes(disembark.getMinutes() + Math.round(hours*60));
+  const sameDay = (disembark.getFullYear()===yy && disembark.getMonth()===mm-1 && disembark.getDate()===dd);
+  const timeStr = disembark.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
+  const dayStr  = disembark.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+  document.getElementById("end-time-display").value = sameDay ? timeStr : (timeStr + " · " + dayStr);
 
   let cursor = new Date(yy, mm-1, dd, sh, sm, 0, 0);
 
@@ -1131,8 +1086,8 @@ function calculate() {
     rateInd.className="rate-indicator holiday";
     // Distinguish an actual federal holiday from a long-weekend extension
     rateText.textContent = isFederalHoliday(yy, mm, dd)
-      ? "Federal holiday rate (auto)"
-      : "Holiday weekend rate (auto)";
+      ? "Holiday rate"
+      : "Holiday weekend rate";
   } else if(periods.length > 1){
     rateInd.className="rate-indicator holiday";
     const parts = [];
@@ -1142,18 +1097,15 @@ function calculate() {
     rateText.textContent="Mixed · "+parts.join(" + ");
   } else if(weekendHours > 0.01){
     rateInd.className="rate-indicator weekend";
-    rateText.textContent="Weekend rate (auto)";
+    rateText.textContent="Weekend rate";
   } else {
     rateInd.className="rate-indicator weekday";
-    rateText.textContent="Weekday rate (auto)";
+    rateText.textContent="Weekday rate";
   }
 
   // ── Outputs ──
   document.getElementById("stat-burn").innerHTML=keelBurn.toFixed(2)+' <span style="font-size:13px">KEEL</span>';
   document.getElementById("stat-remaining").innerHTML=remaining.toFixed(2)+' <span style="font-size:13px">KEEL</span>';
-  const pct=Math.min((keelBalance/MAX_CAP)*100,100);
-  document.getElementById("donut-pct").textContent=pct.toFixed(0)+"%";
-  document.getElementById("cap-label").textContent=keelBalance.toFixed(2)+" / 300 KEEL";
 
   const dateDisplay = new Date(yy, mm-1, dd).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"});
   document.getElementById("settle-period").textContent=dateDisplay+" · "+hours+"h ET";
@@ -1237,13 +1189,11 @@ function goToReview() {
   if(!currentCalc.keelBurn){showStatus("Select a date and configure your voyage first.","error");return;}
   if(!walletAddress){showStatus("Connect your wallet first.","error");return;}
   document.getElementById("confirm-amount").textContent=currentCalc.keelBurn.toFixed(2);
-  document.getElementById("section-calculate").style.display="none";
   document.getElementById("section-review").style.display="block";
   setStep(2);
 }
 
 function backToCalc() {
-  document.getElementById("section-calculate").style.display="block";
   document.getElementById("section-review").style.display="none";
   clearStatus(); setStep(1);
 }
@@ -1275,9 +1225,8 @@ async function logTrip() {
     showStatus("Voyage confirmed! "+currentCalc.keelBurn.toFixed(2)+" KEEL burned.","success");
     keelBalance=currentCalc.remaining;
     updateBalanceUI();
-    sessionTrips.unshift({...currentCalc});
-    renderHistory();
     await refreshBalance();
+    await loadOnChainHistory();
     setTimeout(()=>{backToCalc();setStep(1);clearStatus();},4000);
   } catch(e){setStep(2);showStatus("Failed: "+(e.reason||e.message),"error");}
 }
@@ -1300,8 +1249,83 @@ function renderHistory() {
   }).join("");
 }
 
-function setStep(n) {
-  for(let i=1;i<=4;i++){
+// Dedicated read-only provider for log queries (MetaMask's RPC limits getLogs ranges).
+let readProvider = null;
+function getReadProvider(){
+  if(!readProvider){
+    readProvider = new ethers.providers.JsonRpcProvider("https://rpc-amoy.polygon.technology");
+  }
+  return readProvider;
+}
+
+// Load this wallet's voyages for the CURRENT CALENDAR MONTH from the chain.
+async function loadOnChainHistory() {
+  const el = document.getElementById("trip-history");
+  if(!walletAddress){ return; }
+  try {
+    el.innerHTML = '<div class="empty-state">⚓ Loading voyages…</div>';
+    const rp = getReadProvider();
+    const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, rp);
+    const filter = ledger.filters.TripSettled(null, walletAddress);
+
+    // Current calendar month bounds in Eastern time (as Unix seconds).
+    const now = new Date();
+    const monthStart = easternEpoch(now.getFullYear(), now.getMonth()+1, 1, 0, 0);
+    const nextMonth  = new Date(now.getFullYear(), now.getMonth()+1, 1);
+    const monthEnd   = easternEpoch(nextMonth.getFullYear(), nextMonth.getMonth()+1, 1, 0, 0);
+
+    // Scan from the ledger's deployment block forward, in small chunks to stay
+    // under the Amoy RPC getLogs range limit.
+    const DEPLOY_BLOCK = 39444285; // KeelUsageLedger contract-creation block on Amoy
+    const CHUNK = 1000;            // safe range per getLogs call
+    const latest = await rp.getBlockNumber();
+    const start  = DEPLOY_BLOCK;
+
+    let allEvents = [];
+    for(let from = start; from <= latest; from += (CHUNK+1)){
+      const to = Math.min(latest, from + CHUNK);
+      try {
+        const chunk = await ledger.queryFilter(filter, from, to);
+        allEvents = allEvents.concat(chunk);
+      } catch(err) {
+        console.warn("chunk query failed", from, to, err.message);
+      }
+    }
+
+    const rows = [];
+    for(const ev of allEvents){
+      const t = await ledger.trips(ev.args.tripId);
+      const startTs = Number(t.startTs);
+      if(startTs < monthStart || startTs >= monthEnd) continue; // this month only
+      rows.push({
+        startTs,
+        burn: Number(t.tokensBurned) / 1e18,
+        competitive: t.competitive,
+        dateDisplay: new Date(startTs*1000).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",timeZone:"America/New_York"}),
+        hrs: Number(t.totalTenths)/10
+      });
+    }
+
+    rows.sort((a,b)=> b.startTs - a.startTs); // newest first
+
+    if(!rows.length){
+      el.innerHTML = '<div class="empty-state">⚓ No voyages this month</div>';
+      return;
+    }
+    el.innerHTML = rows.map(r =>
+      '<div class="trip-row">'+
+      '<div><div class="trip-type-label">'+(r.competitive?"Racing ":"")+'Voyage</div>'+
+      '<div class="trip-meta">'+r.dateDisplay+' · '+r.hrs+'h ET</div></div>'+
+      '<div class="trip-burn-val">−'+r.burn.toFixed(2)+' KEEL</div>'+
+      '</div>'
+    ).join("");
+  } catch(e){
+    console.error("history load failed", e);
+    el.innerHTML = '<div class="empty-state">⚓ Could not load voyage history</div>';
+  }
+}
+
+function setStep(n) {  for(let i=1;i<=4;i++){
     const el=document.getElementById("step"+i);
     el.className="step"+(i<n?" done":i===n?" active":"");
   }
