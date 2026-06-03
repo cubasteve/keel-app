@@ -64,6 +64,18 @@
     };
     window.__keelAppKitStatus = "ready";
     window.dispatchEvent(new Event("keel-appkit-ready"));
+
+    // On mobile WalletConnect the account arrives asynchronously after returning
+    // from the wallet app. Whenever AppKit reports a connected address, hand off
+    // to the app to populate the UI (address pill, balance, stats, voyages).
+    try {
+      modal.subscribeAccount(acct => {
+        const addr = acct && (acct.address || acct.caipAddress);
+        if(addr && typeof window.keelOnAppKitAccount === "function"){
+          window.keelOnAppKitAccount(addr);
+        }
+      });
+    } catch(subErr){ console.warn("subscribeAccount failed", subErr); }
     }
   } catch (e) {
     window.__keelAppKitStatus = "error: " + (e && e.message ? e.message : String(e));
@@ -709,7 +721,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   <!-- TOPBAR -->
   <div class="topbar">
     <button class="hamburger" id="nav-toggle" onclick="toggleNav()" aria-label="Toggle navigation">☰</button>
-    <div class="page-title">⚓ Captain's Dashboard</div>
+    <div class="page-title">⚓ Captain's Dashboard <span style="font-size:10px;opacity:0.4;font-family:var(--mono)">build wc-8</span></div>
     <div class="topbar-right">
       <div id="wallet-area">
         <button class="btn btn-connect" onclick="connectWallet()">⬡ Connect Wallet</button>
@@ -1204,36 +1216,39 @@ async function connectWallet() {
   finally { window.__keelConnecting = false; }
 }
 
-// Open the AppKit (WalletConnect) modal, wait for a provider, wrap it in ethers v5.
+// Open the AppKit (WalletConnect) modal. The actual UI population happens in
+// keelOnAppKitAccount(), fired by AppKit's account subscription once the wallet
+// connects — this is robust to mobile's async return-from-wallet timing.
 async function connectViaAppKit(){
   await window.keelAppKit.open();
-  // Retrieve the EVM EIP-1193 provider once the wallet connects. We race two
-  // mechanisms for resilience across AppKit versions: a poll on getProvider()
-  // and the subscribeProviders() callback. First non-null provider wins.
-  const eip1193 = await new Promise((resolve, reject) => {
-    let done = false;
-    const finish = (p) => { if(!done && p){ done = true; clearInterval(poll); resolve(p); } };
-
-    // Path A: subscribe (state may be a map keyed by namespace, or the provider itself)
-    try {
-      window.keelAppKit.subscribeProviders(state => {
-        if(!state) return;
-        finish(state["eip155"] || state.eip155 || (typeof state.request === "function" ? state : null));
-      });
-    } catch(_) {}
-
-    // Path B: poll getProvider() — synchronous accessor present in this version
-    const poll = setInterval(() => {
-      try { finish(window.keelAppKit.getProvider()); } catch(_) {}
-    }, 600);
-
-    setTimeout(()=>{ if(!done){ done=true; clearInterval(poll); reject(new Error("Connection timed out or was cancelled.")); } }, 120000);
-  });
-  // Wrap the WalletConnect provider in ethers v5 so all existing code is unchanged.
-  provider = new ethers.providers.Web3Provider(eip1193);
-  window.__keelViaWalletConnect = true; // let the wallet manage gas itself
-  await finishConnect();
+  // If an account is already connected (e.g. returning user), populate now.
+  try {
+    const addr = window.keelAppKit.getAddress();
+    if(addr) await keelOnAppKitAccount(addr);
+  } catch(_) {}
 }
+
+// Called whenever AppKit reports a connected EVM address. Wraps the provider in
+// ethers v5 and runs the shared post-connect population. Guarded so it only does
+// the heavy work once per address.
+window.keelOnAppKitAccount = async function(addr){
+  try {
+    if(!addr) return;
+    if(walletAddress && walletAddress.toLowerCase() === String(addr).toLowerCase()) return; // already done
+    const eip1193 = window.keelAppKit.getProvider();
+    if(!eip1193) return; // provider not ready yet; a later account/provider event will retry
+    // Pin the network so ethers v5 doesn't throw "underlying network changed"
+    // when the WalletConnect provider reports its chain asynchronously.
+    provider = new ethers.providers.Web3Provider(eip1193, {
+      name: "polygon-amoy", chainId: AMOY_CHAIN_ID
+    });
+    window.__keelViaWalletConnect = true; // let the wallet manage gas itself
+    await finishConnect();
+    clearStatus();
+  } catch(e){
+    console.warn("AppKit account populate failed", e);
+  }
+};
 
 // Shared post-connection flow for both injected and WalletConnect paths.
 async function finishConnect(){
@@ -1241,9 +1256,10 @@ async function finishConnect(){
   walletAddress = await signer.getAddress();
   const short = walletAddress.slice(0,6)+"..."+walletAddress.slice(-4);
   document.getElementById("wallet-area").innerHTML = '<div class="wallet-pill"><div class="w-dot"></div>'+short+'</div>';
-  await refreshBalance();
-  await loadMonthlyStats();
-  await loadOnChainHistory();
+  // Run each populate step independently so one failure doesn't blank the others.
+  try { await refreshBalance(); }     catch(e){ console.warn("balance load failed", e); }
+  try { await loadMonthlyStats(); }   catch(e){ console.warn("monthly stats failed", e); }
+  try { await loadOnChainHistory(); } catch(e){ console.warn("history load failed", e); }
 }
 
 async function refreshBalance() {
