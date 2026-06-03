@@ -349,7 +349,13 @@ body.drawer-open .drawer-backdrop { opacity: 1; pointer-events: auto; }
 .hero-title { font-family: var(--display); font-size: 38px; font-weight: 700; line-height: 1.12; margin-bottom: 10px; color: var(--foam); letter-spacing: -0.2px; }
 .hero-title span { color: var(--accent); }
 .hero-sub { font-size: 14px; color: var(--muted2); }
-.hero-coords { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 10px; letter-spacing: 1px; }
+.hero-coords { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 10px; letter-spacing: 1px; cursor: pointer; }
+.hero-coords:hover { color: var(--muted2); }
+.wx-row { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 6px; letter-spacing: 1px; display:flex; flex-direction:column; gap:4px; }
+.wx-item { display:inline-flex; align-items:center; gap:5px; }
+.wx-sym { font-size:12px; opacity:0.85; }
+.wx-sym.gust { color:var(--brass); }
+.wx-val { color:var(--muted); }
 
 /* SAILBOAT SVG */
 .hero-boat {
@@ -411,6 +417,23 @@ select.inp {
 .inp:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-glow); }
 .inp-readonly { background:rgba(20,40,70,0.4); color:var(--muted2); cursor:default; border-style:dashed; }
 .inp-readonly:focus { border-color:var(--border); box-shadow:none; }
+/* Review mode: present the calculator as a locked "callout" — fully visible,
+   emphasized with an accent border/glow, just not editable. */
+.calc-card { transition:border-color 0.25s, box-shadow 0.25s, background 0.25s; position:relative; }
+body.review-mode .calc-card {
+  pointer-events:none;
+  border-color:var(--accent);
+  box-shadow:0 0 0 1px var(--accent), 0 0 26px rgba(74,179,255,0.28);
+  background:linear-gradient(180deg, rgba(74,179,255,0.06), rgba(74,179,255,0.02));
+}
+/* "Locked in" badge that appears on the card title during review */
+body.review-mode .calc-title::after {
+  content:"🔒 Locked for review";
+  font-family:var(--sans); font-size:11px; font-weight:600; letter-spacing:0.3px;
+  color:var(--accent); background:rgba(74,179,255,0.12);
+  border:1px solid rgba(74,179,255,0.4); border-radius:20px;
+  padding:3px 10px; margin-left:10px; vertical-align:middle; white-space:nowrap;
+}
 select.inp option { background:#0b1d30; }
 
 /* SWITCH */
@@ -596,9 +619,6 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   flex-shrink: 0;
 }
 
-/* TIDE INDICATOR */
-.tide-bar { display:flex; align-items:center; gap:10px; font-size:11px; color:var(--muted2); margin-top:6px; }
-.tide-line { flex:1; height:2px; background:linear-gradient(90deg, var(--accent), var(--teal)); border-radius:2px; opacity:0.4; }
 
 @media (max-width:900px) {
   /* Mobile: both panels become fixed slide-outs, hidden by default */
@@ -760,11 +780,10 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
         <div class="hero-text">
           <div class="hero-title">Log your voyage,<br>settle your <span>Keel</span></div>
           <div class="hero-sub">Estimate usage, review the breakdown, then settle from your wallet</div>
-          <div class="hero-coords">⚓ 25°46′N · 80°11′W · Atlantic Coast · All times ET</div>
-          <div class="tide-bar" style="margin-top:10px;max-width:280px">
-            <span>LOW</span>
-            <div class="tide-line"></div>
-            <span>HIGH TIDE</span>
+          <div class="hero-coords" id="hero-coords" onclick="requestGeo()" title="Tap to use your location">⚓ <span id="coords-text">Tap to locate</span> · All times ET</div>
+          <div class="wx-row">
+            <span class="wx-item" title="Wind speed"><span class="wx-sym">⚐</span><span class="wx-val" id="wind-text">— kn</span></span>
+            <span class="wx-item" title="Wind gusts"><span class="wx-sym gust">⚑</span><span class="wx-val" id="gust-text">— kn</span></span>
           </div>
         </div>
         <!-- SAILBOAT SVG -->
@@ -877,7 +896,6 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
           </div>
         </div>
 
-        <div class="status-msg" id="status-msg"></div>
       </div>
 
       <!-- PRICING GRID -->
@@ -973,6 +991,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
         <div id="confirm-burn-wrap" style="display:none;margin-top:10px">
           <button class="btn btn-burn" onclick="logTrip()">🔥 Confirm Burn</button>
         </div>
+        <div class="status-msg" id="settle-status-msg" style="margin-top:10px"></div>
         <div class="settle-note">🔒 You will sign a settlement transaction</div>
       </div>
 
@@ -1514,6 +1533,7 @@ async function goToReview() {
   // Enter review mode: the "Burn from wallet" button morphs into "Back to Chart"
   // (easy revert), and the warning + Confirm Burn appear directly below it.
   inReview = true;
+  document.body.classList.add("review-mode");
   const pb = document.getElementById("primary-action-btn");
   pb.className = "btn btn-back-toggle";
   pb.innerHTML = "← Back to Chart";
@@ -1527,6 +1547,7 @@ function togglePrimary(){ inReview ? backToCalc() : goToReview(); }
 
 function backToCalc() {
   inReview = false;
+  document.body.classList.remove("review-mode");
   const pb = document.getElementById("primary-action-btn");
   pb.className = "btn btn-burn";
   pb.innerHTML = "🔥 Burn from wallet";
@@ -1696,8 +1717,8 @@ function setStep(n) {  for(let i=1;i<=4;i++){
     el.className="step"+(i<n?" done":i===n?" active":"");
   }
 }
-function showStatus(msg,type){const el=document.getElementById("status-msg");el.textContent=msg;el.className="status-msg "+type;}
-function clearStatus(){const el=document.getElementById("status-msg");el.textContent="";el.className="status-msg";}
+function showStatus(msg,type){const el=document.getElementById("settle-status-msg");if(el){el.textContent=msg;el.className="status-msg "+type;}}
+function clearStatus(){const el=document.getElementById("settle-status-msg");if(el){el.textContent="";el.className="status-msg";}}
 
 // ── Drawer (slide-out) controls ──
 function isMobile(){ return window.matchMedia("(max-width:900px)").matches; }
@@ -1742,7 +1763,64 @@ window.addEventListener("load",()=>{
   renderPricingTable();
   calculate();
   loadRatesFromChain(); // pull authoritative rates from chain; refreshes table + recalcs
+  requestGeo(); // try to show the user's real coordinates in the hero
 });
+
+// ── User GPS location for the hero coords line ──
+function formatCoord(value, posLabel, negLabel){
+  const dir = value >= 0 ? posLabel : negLabel;
+  const abs = Math.abs(value);
+  const deg = Math.floor(abs);
+  const min = Math.round((abs - deg) * 60);
+  return deg + "°" + String(min).padStart(2,"0") + "′" + dir;
+}
+function requestGeo(){
+  const txt = document.getElementById("coords-text");
+  if(!("geolocation" in navigator)){
+    if(txt) txt.textContent = "Location unavailable";
+    return;
+  }
+  if(txt) txt.textContent = "Locating…";
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const { latitude, longitude } = pos.coords;
+      if(txt) txt.textContent = formatCoord(latitude,"N","S") + " · " + formatCoord(longitude,"E","W");
+      loadWind(latitude, longitude);
+    },
+    err => {
+      if(txt) txt.textContent = (err && err.code === 1) ? "Location off · tap to retry" : "Tap to locate";
+    },
+    { enableHighAccuracy:false, timeout:10000, maximumAge:600000 }
+  );
+}
+
+// Fetch current wind speed + gusts (in knots) for the given coords from Open-Meteo (no key).
+async function loadWind(lat, lon){
+  const w = document.getElementById("wind-text");
+  const g = document.getElementById("gust-text");
+  if(w) w.textContent = "…";
+  if(g) g.textContent = "…";
+  try {
+    const url = "https://api.open-meteo.com/v1/forecast?latitude="+lat+"&longitude="+lon+
+                "&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=kn";
+    const res = await fetch(url);
+    if(!res.ok) throw new Error("weather fetch failed");
+    const data = await res.json();
+    const c = data.current || {};
+    const spd = c.wind_speed_10m, dir = c.wind_direction_10m, gust = c.wind_gusts_10m;
+    if(w){
+      if(spd != null){
+        const pts = ["N","NE","E","SE","S","SW","W","NW"];
+        const compass = (dir != null) ? " "+pts[Math.round(dir/45)%8] : "";
+        w.textContent = Math.round(spd)+" kn"+compass;
+      } else { w.textContent = "n/a"; }
+    }
+    if(g){ g.textContent = (gust != null) ? Math.round(gust)+" kn" : "n/a"; }
+  } catch(e){
+    if(w) w.textContent = "n/a";
+    if(g) g.textContent = "n/a";
+  }
+}
 
 // ── Load pricing from the contract so the UI always matches the burn ──
 async function loadRatesFromChain(){
