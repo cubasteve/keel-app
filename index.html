@@ -112,7 +112,7 @@
   --display: 'Space Grotesk', sans-serif;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html { width: 100%; overflow-x: hidden; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html { width: 100%; overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
 /* ANIMATED OCEAN BACKGROUND */
 body {
@@ -123,7 +123,7 @@ body {
   width: 100%;
   max-width: 100vw;
   display: flex;
-  overflow-x: hidden;
+  overflow-x: clip;
   position: relative;
 }
 body::before {
@@ -190,15 +190,20 @@ body::before {
 }
 /* Desktop: collapsed nav slides off-screen left */
 body.nav-collapsed .sidebar { transform: translateX(-100%); }
-/* Porthole decoration top of sidebar */
+/* Vertical textured lines along the sidebar's edge, hinting at the panel boundary */
 .sidebar::before {
   content: '';
   position: absolute;
-  top: 90px; right: -35px;
-  width: 70px; height: 70px;
-  border-radius: 50%;
-  border: 3px solid rgba(74,179,255,0.08);
-  box-shadow: 0 0 20px rgba(74,179,255,0.05);
+  top: 0; bottom: 0; right: -7px;
+  width: 6px;
+  background-image: repeating-linear-gradient(
+    to right,
+    rgba(74,179,255,0.18) 0px,
+    rgba(74,179,255,0.18) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  opacity: 0.5;
   pointer-events: none;
 }
 .sidebar-logo {
@@ -264,6 +269,25 @@ body.nav-collapsed .sidebar { transform: translateX(-100%); }
 /* MAIN */
 .main-wrap { margin-left: 230px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; position: relative; z-index: 1; transition: margin-left 0.3s ease; }
 body.nav-collapsed .main-wrap { margin-left: 0; }
+/* Left-edge textured lines hinting a pull-out sidebar exists (when it's not docked) */
+.main-wrap::before {
+  content: '';
+  position: fixed;
+  left: 0; top: 0; bottom: 0;
+  width: 5px;
+  background-image: repeating-linear-gradient(
+    to right,
+    rgba(74,179,255,0.16) 0px,
+    rgba(74,179,255,0.16) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  opacity: 0; pointer-events: none; z-index: 30;
+  transition: opacity 0.3s;
+}
+body.nav-collapsed .main-wrap::before { opacity: 0.55; }
+@media (max-width:900px){ .main-wrap::before { opacity: 0.55; } }
+body.nav-open .main-wrap::before { opacity: 0; }
 
 /* TOPBAR */
 .topbar {
@@ -311,7 +335,7 @@ body.drawer-open .drawer-backdrop { opacity: 1; pointer-events: auto; }
 .w-dot { width:7px; height:7px; border-radius:50%; background:var(--teal); box-shadow:0 0 8px var(--teal); }
 
 /* CONTENT */
-.content { display:flex; gap:0; flex:1; overflow-x:hidden; }
+.content { display:flex; gap:0; flex:1; overflow-x:clip; }
 .center-panel { flex:1; padding:24px 28px; min-width:0; }
 
 /* HERO — nautical chart style */
@@ -685,7 +709,6 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 
 <!-- SIDEBAR -->
 <div class="sidebar">
-  <button class="drawer-close" onclick="closeDrawers()" aria-label="Close">✕</button>
   <div class="sidebar-logo">
     <div class="logo-emblem">
       <svg viewBox="0 0 44 44" width="44" height="44" xmlns="http://www.w3.org/2000/svg">
