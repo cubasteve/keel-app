@@ -1712,21 +1712,21 @@ async function logTrip() {
     } catch(_) {
       overrides.gasLimit = 300000;
     }
-    // Mobile wallets over WalletConnect generally reject explicit fee fields and
-    // prefer to estimate fees themselves — so only force fees on injected MetaMask
-    // (desktop), where Amoy needs the ~30 gwei priority floor.
-    if(!window.__keelViaWalletConnect){
-      try {
-        const fee = await provider.getFeeData();
-        const floor = ethers.utils.parseUnits("30","gwei");
-        const prio  = (fee.maxPriorityFeePerGas && fee.maxPriorityFeePerGas.gt(floor)) ? fee.maxPriorityFeePerGas : floor;
-        const maxFee = (fee.maxFeePerGas && fee.maxFeePerGas.gt(prio)) ? fee.maxFeePerGas : prio.add(ethers.utils.parseUnits("20","gwei"));
-        overrides.maxPriorityFeePerGas = prio;
-        overrides.maxFeePerGas = maxFee;
-      } catch(_) {
-        overrides.maxFeePerGas = ethers.utils.parseUnits("50","gwei");
-        overrides.maxPriorityFeePerGas = ethers.utils.parseUnits("30","gwei");
-      }
+    // Amoy enforces a minimum priority fee (~25 gwei). We set an explicit floor
+    // ABOVE that on BOTH paths — desktop MetaMask AND mobile WalletConnect —
+    // because mobile wallets left to auto-estimate were bidding ~1.5 gwei and
+    // getting rejected ("gas price below minimum gas tip cap"). A valid floor is
+    // safer than letting the wallet underbid.
+    const AMOY_MIN_TIP = ethers.utils.parseUnits("30","gwei"); // > Amoy's ~25 gwei minimum
+    try {
+      const fee = await provider.getFeeData();
+      const prio   = (fee.maxPriorityFeePerGas && fee.maxPriorityFeePerGas.gt(AMOY_MIN_TIP)) ? fee.maxPriorityFeePerGas : AMOY_MIN_TIP;
+      const maxFee = (fee.maxFeePerGas && fee.maxFeePerGas.gt(prio)) ? fee.maxFeePerGas : prio.add(ethers.utils.parseUnits("20","gwei"));
+      overrides.maxPriorityFeePerGas = prio;
+      overrides.maxFeePerGas = maxFee;
+    } catch(_) {
+      overrides.maxPriorityFeePerGas = AMOY_MIN_TIP;
+      overrides.maxFeePerGas = ethers.utils.parseUnits("50","gwei");
     }
 
     const tx = await ledger.logAndSettle(...args, overrides);
