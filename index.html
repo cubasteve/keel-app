@@ -1362,10 +1362,8 @@ async function connectWallet() {
 // connects — this is robust to mobile's async return-from-wallet timing.
 async function connectViaAppKit(){
   await window.keelAppKit.open();
-  // Proactively switch to Amoy so AppKit's "wrong network" overlay never appears.
-  // If the wallet is already on Amoy this is a no-op; if it isn't, AppKit sends
-  // a wallet_switchEthereumChain request silently instead of blocking with a modal.
-  try { await window.keelAppKit.switchToAmoy(); } catch(_) {}
+  // Note: switchToAmoy() is called inside keelOnAppKitAccount() once the wallet
+  // is actually connected — calling it here is too early (no session yet).
   // If an account is already connected (e.g. returning user), populate now.
   try {
     const addr = window.keelAppKit.getAddress();
@@ -1382,6 +1380,12 @@ window.keelOnAppKitAccount = async function(addr){
     if(walletAddress && walletAddress.toLowerCase() === String(addr).toLowerCase()) return; // already done
     const eip1193 = window.keelAppKit.getProvider();
     if(!eip1193) return; // provider not ready yet; a later account/provider event will retry
+
+    // Switch to Amoy NOW — wallet is connected so this actually works here.
+    // Doing it before wrapping the provider means finishConnect() / refreshBalance()
+    // always runs on the right chain, fixing both the overlay and the stale balance.
+    try { await window.keelAppKit.switchToAmoy(); } catch(_) {}
+
     // Pin the network so ethers v5 doesn't throw "underlying network changed"
     // when the WalletConnect provider reports its chain asynchronously.
     provider = new ethers.providers.Web3Provider(eip1193, {
@@ -1389,6 +1393,11 @@ window.keelOnAppKitAccount = async function(addr){
     });
     window.__keelViaWalletConnect = true; // let the wallet manage gas itself
     await finishConnect();
+    // Re-run balance after a short delay — the chain switch needs a moment to
+    // settle before contract reads on Amoy will succeed reliably.
+    setTimeout(async () => {
+      try { await refreshBalance(); } catch(_) {}
+    }, 1500);
     clearStatus();
   } catch(e){
     console.warn("AppKit account populate failed", e);
