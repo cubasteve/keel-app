@@ -1474,8 +1474,13 @@ async function disconnectWallet(e) {
   // Reset all state and restore the Connect button
   provider = null; signer = null; walletAddress = null;
   keelBalance = MONTHLY_ISSUED;
+  sessionTrips = [];
   document.getElementById("wallet-area").innerHTML =
     '<button class="btn btn-connect" onclick="connectWallet()">⬡ Connect Wallet</button>';
+  document.getElementById("trip-history").innerHTML =
+    '<div class="empty-state"><div class="empty-anchor">⚓</div>' +
+    '<div class="empty-title">No voyages yet</div>' +
+    '<div class="empty-sub">Connect your wallet to see your voyage history.</div></div>';
   updateBalanceUI();
 }
 // ────────────────────────────────────────────────────────────────────────────
