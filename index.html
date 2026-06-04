@@ -1075,7 +1075,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
               <div class="ms-bar" style="width:80px"><div class="ms-bar-fill" id="cap-bar" style="width:0%;background:#9664ff"></div></div>
             </div>
           </div>
-          <div class="ms-val purple" id="ms-cap">0 / 300 KEEL</div>
+          <div class="ms-val purple" id="ms-cap">0 / 300<br><span style="font-size:10px;font-weight:400;opacity:0.7">KEEL</span></div>
         </div>
         <div style="margin-top:12px">
           <a href="#" style="font-size:12px;color:var(--accent);text-decoration:none">↗ View full analytics</a>
@@ -1250,7 +1250,7 @@ function isHolidayRate(y, m, d) {
 }
 
 let provider, signer, walletAddress;
-let keelBalance = MONTHLY_ISSUED;
+let keelBalance = 0;
 let currentCalc = {};
 let sessionTrips = [];
 let inReview = false;
@@ -1267,9 +1267,9 @@ let COMP_BPS    = { day: 11000, evening: 11000 }; // competitive day 1.10x, eve 
 let ratesLoaded = false;
 
 // ── "This Month" figures, all read from chain (no more hardcoded assumptions) ──
-let monthlyCap    = MONTHLY_ISSUED;  // KEEL · token.monthlyIssuanceCap()
-let monthlyIssued = MONTHLY_ISSUED;  // KEEL · token.monthlyMinted(member, year, month)
-let monthlyUsed   = null;            // KEEL burned this month · summed from on-chain history
+let monthlyCap    = MAX_CAP;  // KEEL · rolling 3-month ceiling (300)
+let monthlyIssued = 0;        // KEEL · token.monthlyMinted(member, year, month)
+let monthlyUsed   = 0;        // KEEL burned this month · summed from on-chain history
 
 function initCharts() {
   // Charts removed — just sync the balance-driven UI.
@@ -1280,12 +1280,12 @@ function updateBalanceUI() {
   const totalCap = MAX_CAP; // 300 — rolling 3-month ceiling, always the denominator
   const issued   = monthlyIssued;
   const avail    = keelBalance;
-  const used     = (monthlyUsed != null) ? monthlyUsed : Math.max(issued - avail, 0);
+  const used     = monthlyUsed != null ? monthlyUsed : Math.max(issued - avail, 0);
   document.getElementById("ms-issued").textContent = issued.toFixed(0)+" KEEL";
   document.getElementById("ms-used").textContent   = used.toFixed(2)+" KEEL";
   document.getElementById("ms-avail").textContent  = avail.toFixed(2)+" KEEL";
   const capEl = document.getElementById("ms-cap");
-  if(capEl) capEl.textContent = issued.toFixed(0)+" / "+totalCap+" KEEL";
+  if(capEl) capEl.innerHTML = issued.toFixed(0)+" / "+totalCap+'<br><span style="font-size:10px;font-weight:400;opacity:0.7">KEEL</span>';
   const ib = document.getElementById("issued-bar"); if(ib) ib.style.width = Math.min((issued/totalCap)*100,100)+"%";
   document.getElementById("used-bar").style.width  = Math.min((used/totalCap)*100,100)+"%";
   document.getElementById("avail-bar").style.width = Math.min((avail/totalCap)*100,100)+"%";
