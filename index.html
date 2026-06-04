@@ -401,7 +401,7 @@ body.drawer-open .drawer-backdrop { opacity: 1; pointer-events: auto; }
   border-radius: 20px;
   padding: 28px;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 /* Chart lines watermark */
 .calc-card::before {
@@ -410,6 +410,9 @@ body.drawer-open .drawer-backdrop { opacity: 1; pointer-events: auto; }
   background-image: linear-gradient(rgba(74,179,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(74,179,255,0.02) 1px, transparent 1px);
   background-size: 30px 30px;
   pointer-events: none;
+  border-radius: 20px;
+  overflow: hidden;
+  z-index: 0;
 }
 /* Rope top border */
 .calc-card::after {
@@ -463,6 +466,54 @@ select.inp option { background:#0b1d30; }
 /* SWITCH */
 .toggle-row { display:flex; gap:10px; margin:16px 0; flex-wrap:wrap; align-items:center; position:relative; z-index:1; }
 .rate-indicator { display:flex; align-items:center; gap:8px; margin-left:auto; padding:7px 14px; border-radius:20px; font-size:12px; font-weight:600; background:var(--surface2); border:1px solid var(--border); transition:all 0.3s; }
+.avail-hint { font-size:11px; font-family:var(--sans); margin:5px 0 0; line-height:1.3; min-height:14px; transition:color 0.2s; }
+.avail-hint.open  { color:#5fd38a; }
+.avail-hint.taken { color:#ff7a7a; }
+
+/* Custom calendar */
+.cal-trigger { display:flex; align-items:center; justify-content:space-between; cursor:pointer; text-align:left; width:100%; }
+.cal-trigger-icon { opacity:0.6; font-size:12px; }
+.cal-popover { position:absolute; top:100%; left:0; z-index:200; margin-top:8px; width:300px; max-width:90vw;
+  background:#0a1c30; background-image:linear-gradient(180deg,#0d2236,#081627);
+  border:1.5px solid var(--accent); border-radius:14px; padding:16px;
+  box-shadow:0 0 0 1px rgba(74,179,255,0.25), 0 24px 60px rgba(0,0,0,0.75), 0 0 40px rgba(74,179,255,0.18);
+  isolation:isolate; }
+.cal-popover[hidden] { display:none; }
+/* the field wrapping the calendar must sit above the rest of the form */
+.form-group:has(.cal-popover:not([hidden])) { z-index:200; }
+.form-group.cal-open { z-index:200; }
+/* and the whole row must outrank later rows so the popover isn't covered */
+.form-row { position:relative; }
+.form-row:has(.cal-popover:not([hidden])) { z-index:200; }
+.form-row.cal-open-row { z-index:200; }
+.cal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.cal-month { font-family:var(--display); font-weight:700; font-size:15px; color:var(--foam); }
+.cal-nav { background:var(--surface2); border:1px solid var(--border); color:var(--accent); width:30px; height:30px;
+  border-radius:8px; cursor:pointer; font-size:16px; line-height:1; }
+.cal-nav:hover { border-color:var(--accent); }
+.cal-dow { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; margin-bottom:4px; }
+.cal-dow span { text-align:center; font-size:10px; color:var(--muted2); font-weight:600; letter-spacing:0.5px; padding:2px 0; }
+.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+.cal-day { aspect-ratio:1; border:1px solid transparent; border-radius:8px; background:var(--surface2);
+  color:var(--text); font-size:13px; font-family:var(--mono); cursor:pointer; display:flex; align-items:center;
+  justify-content:center; position:relative; transition:background 0.15s, border-color 0.15s; }
+.cal-day:hover:not(.disabled):not(.full) { border-color:var(--accent); }
+.cal-day.empty { background:transparent; cursor:default; }
+.cal-day.disabled { color:var(--muted); opacity:0.35; cursor:not-allowed; }
+.cal-day.past { color:var(--muted); opacity:0.3; cursor:not-allowed; }
+.cal-day.today { box-shadow:inset 0 0 0 1px var(--muted2); }
+.cal-day.selected { background:var(--accent); color:#001; font-weight:700; }
+/* availability dot */
+.cal-day .av { position:absolute; bottom:4px; left:50%; transform:translateX(-50%); width:5px; height:5px; border-radius:50%; }
+.cal-day .av.part { background:#e0a93f; }
+.cal-day.full { background:rgba(255,122,122,0.10); color:#ff9d9d; cursor:not-allowed; }
+.cal-day.full .av { background:#ff7a7a; }
+.cal-legend { display:flex; gap:12px; margin-top:12px; font-size:10px; color:var(--muted2); }
+.cal-legend span { display:inline-flex; align-items:center; gap:5px; }
+.cal-legend .lg { width:8px; height:8px; border-radius:50%; display:inline-block; }
+.cal-legend .lg.open { background:var(--surface2); box-shadow:inset 0 0 0 1px var(--muted2); }
+.cal-legend .lg.part { background:#e0a93f; }
+.cal-legend .lg.full { background:#ff7a7a; }
 .rate-indicator.weekday { color:var(--accent); border-color:rgba(74,179,255,0.4); background:rgba(74,179,255,0.08); }
 .rate-indicator.weekend { color:var(--teal); border-color:rgba(0,200,160,0.4); background:rgba(0,200,160,0.08); }
 .rate-indicator.holiday { color:var(--brass); border-color:rgba(212,168,64,0.4); background:rgba(212,168,64,0.1); }
@@ -541,6 +592,7 @@ select.inp option { background:#0b1d30; }
 .dot.weekday { background:var(--accent); }
 .dot.weekend { background:var(--teal); }
 .dot.holiday { background:var(--brass); }
+.dot.compete { background:#c77dff; }
 .price-note { font-size:11px; color:var(--muted); margin-top:12px; line-height:1.5; position:relative; z-index:1; }
 
 /* CHARTS ROW */
@@ -865,13 +917,32 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
               <option value="repositioning">Repositioning</option>
             </select>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="position:relative">
             <label>📅 Departure Date</label>
-            <input type="date" class="inp" id="trip-date" onchange="calculate()">
+            <input type="hidden" id="trip-date">
+            <button type="button" class="inp cal-trigger" id="cal-trigger" onclick="toggleCalendar()">
+              <span id="cal-trigger-text">Select a date</span>
+              <span class="cal-trigger-icon">▾</span>
+            </button>
+            <div class="cal-popover" id="cal-popover" hidden>
+              <div class="cal-head">
+                <button type="button" class="cal-nav" onclick="calShiftMonth(-1)" aria-label="Previous month">‹</button>
+                <span class="cal-month" id="cal-month-label"></span>
+                <button type="button" class="cal-nav" onclick="calShiftMonth(1)" aria-label="Next month">›</button>
+              </div>
+              <div class="cal-dow"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div>
+              <div class="cal-grid" id="cal-grid"></div>
+              <div class="cal-legend">
+                <span><i class="lg open"></i>Open</span>
+                <span><i class="lg part"></i>Partly booked</span>
+                <span><i class="lg full"></i>Fully booked</span>
+              </div>
+            </div>
           </div>
           <div class="form-group">
             <label>🕐 Departure Time</label>
             <input type="time" class="inp" id="start-time" value="09:00" onchange="calculate()">
+            <div class="avail-hint" id="avail-hint"></div>
           </div>
         </div>
 
@@ -891,18 +962,6 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
           <div class="rate-indicator" id="rate-indicator">
             <span class="rate-dot" id="rate-dot"></span>
             <span id="rate-text">Weekday rate</span>
-          </div>
-        </div>
-
-        <!-- BURN STATS -->
-        <div class="burn-stats burn-stats-2">
-          <div class="stat-item">
-            <div class="stat-label">Estimated Burn</div>
-            <div class="stat-value blue" id="stat-burn">0.00 <span style="font-size:13px">KEEL</span></div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">Remaining Balance</div>
-            <div class="stat-value green" id="stat-remaining">-- <span style="font-size:13px">KEEL</span></div>
           </div>
         </div>
 
@@ -933,10 +992,14 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
             <tbody>
               <tr><td><span class="dot weekday"></span>Weekday</td><td id="rate-weekday-day">2.0</td><td id="rate-weekday-evening">1.0</td></tr>
               <tr><td><span class="dot weekend"></span>Weekend</td><td id="rate-weekend-day">4.0</td><td id="rate-weekend-evening">2.0</td></tr>
-              <tr><td><span class="dot holiday"></span>Holiday</td><td id="rate-holiday-day">8.0</td><td id="rate-holiday-evening">4.0</td></tr>
+              <tr class="mult-row"><td><span class="dot holiday"></span>Holiday</td><td id="rate-holiday-day">1.15×</td><td id="rate-holiday-evening">1.10×</td></tr>
+              <tr class="mult-row"><td><span class="dot compete"></span>Competitive</td><td id="rate-comp-day">1.10×</td><td id="rate-comp-evening">1.10×</td></tr>
             </tbody>
           </table>
-          <div class="price-note"><span id="rate-comp-note">+1.0 KEEL/hr</span> for competitive use · Holiday rate always wins · Black Friday is billed as a holiday · A Fri or Mon holiday extends the holiday rate across the adjacent Sat &amp; Sun · Weekends are Sat 12:00am–Sun 11:59pm ET</div>
+          <div class="price-note">
+            Weekday &amp; weekend cells are KEEL per hour. Holiday &amp; competitive are multipliers applied to that base rate, by slot.<br>
+            Multipliers stack when both apply · Black Friday is billed as a holiday · A Fri or Mon holiday extends the holiday surcharge across the adjacent Sat &amp; Sun · Weekends are Sat 12:00am–Sun 11:59pm ET
+          </div>
         </div>
       </div>
 
@@ -1031,7 +1094,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 
 <script>
 const KEEL_TOKEN_ADDRESS  = "0x9cd72e3d13AdAd360A2e944A2BB84cf901893D15";
-const KEEL_LEDGER_ADDRESS = "0x0cfDb80F2171191930c8Ee697DCFe1069BB5D699";
+const KEEL_LEDGER_ADDRESS = "0x3AE295191F6a5938DA5D893b27e04F3ED75fA867";
 const AMOY_CHAIN_ID = 80002;
 // Dedicated RPC for reading logs/history (public RPC caps getLogs at ~100 blocks).
 const READ_RPC_URL = "https://polygon-amoy.g.alchemy.com/v2/tocmMJjVYA0syE3coEuGB";
@@ -1049,12 +1112,17 @@ const TOKEN_ABI  = [
 
 // Flat-parameter ABI — no struct, so no ethers tuple-encoding issues.
 const LEDGER_ABI = [
-  "function logAndSettle(address member, uint64 startTs, uint64 endTs, uint32 weekdayDay, uint32 weekdayEvening, uint32 weekendDay, uint32 weekendEvening, uint32 holidayDay, uint32 holidayEvening, bool competitive) external returns (bytes32)",
+  "function logAndSettle(address member, uint16 boatId, uint64 startTs, uint64 endTs, uint32[8] h, bool competitive) external returns (bytes32)",
+  "function isAvailable(uint16 boatId, uint64 startTs, uint64 endTs) view returns (bool)",
+  "function cancelTrip(bytes32 tripId) external",
+  "function boatTripCount(uint16 boatId) view returns (uint256)",
+  "function boatTrips(uint16, uint256) view returns (bytes32)",
   "event TripSettled(bytes32 indexed tripId, address indexed member, uint256 tokensBurned, uint32 totalTenths)",
-  "function trips(bytes32) view returns (address member, uint64 startTs, uint64 endTs, uint32 totalTenths, bool competitive, uint256 burnHundredths, uint256 tokensBurned)",
-  "function quoteHundredths(uint32 weekdayDay, uint32 weekdayEvening, uint32 weekendDay, uint32 weekendEvening, uint32 holidayDay, uint32 holidayEvening, bool competitive) view returns (uint256 burnHundredths, uint32 totalTenths)",
+  "function trips(bytes32) view returns (address member, uint64 startTs, uint64 endTs, uint32 totalTenths, bool competitive, bool cancelled, uint16 boatId, uint256 burnHundredths, uint256 tokensBurned)",
+  "function quoteHundredths(uint32[8] h, bool competitive) view returns (uint256 burnHundredths, uint32 totalTenths)",
   "function rateGrid(uint256, uint256) view returns (uint16)",
-  "function competitivePerHour() view returns (uint16)",
+  "function holidayMultiplierBps(uint256) view returns (uint16)",
+  "function competitiveMultiplierBps(uint256) view returns (uint16)",
   "function tripCount() view returns (uint256)",
   "function tripIds(uint256) view returns (bytes32)"
 ];
@@ -1165,14 +1233,14 @@ let sessionTrips = [];
 let inReview = false;
 
 // ── Pricing is READ FROM THE CONTRACT so the UI can never disagree with the burn.
-// Defaults below mirror the deployed rateGrid (hundredths of KEEL per hour) and are
-// overwritten by loadRatesFromChain() on load. quoteHundredths() is the source of truth.
+// Defaults mirror the deployed base rateGrid and multipliers; overwritten by
+// loadRatesFromChain() on load. quoteHundredths() remains the source of truth.
 let RATE_H = {
   weekday: { day: 200, evening: 100 },
-  weekend: { day: 400, evening: 200 },
-  holiday: { day: 800, evening: 400 }
+  weekend: { day: 400, evening: 200 }
 };
-let COMP_PER_HR = 100; // +1.00 KEEL/hr (hundredths), overwritten from chain
+let HOLIDAY_BPS = { day: 11500, evening: 11000 }; // holiday day 1.15x, eve 1.10x
+let COMP_BPS    = { day: 11000, evening: 11000 }; // competitive day 1.10x, eve 1.10x
 let ratesLoaded = false;
 
 // ── "This Month" figures, all read from chain (no more hardcoded assumptions) ──
@@ -1190,7 +1258,6 @@ function updateBalanceUI() {
   const issued = monthlyIssued;
   const avail  = keelBalance;
   const used   = (monthlyUsed != null) ? monthlyUsed : Math.max(issued - avail, 0);
-  document.getElementById("stat-remaining").innerHTML = avail.toFixed(2)+' <span style="font-size:13px">KEEL</span>';
   document.getElementById("ms-issued").textContent = issued.toFixed(0)+" KEEL";
   document.getElementById("ms-used").textContent   = used.toFixed(2)+" KEEL";
   document.getElementById("ms-avail").textContent  = avail.toFixed(2)+" KEEL";
@@ -1353,8 +1420,13 @@ function calculate() {
 
   let cursor = new Date(yy, mm-1, dd, sh, sm, 0, 0);
 
-  // Six hour-buckets accumulated in HOURS (float); converted to tenths at the end.
-  const buckets = { weekdayDay:0, weekdayEvening:0, weekendDay:0, weekendEvening:0, holidayDay:0, holidayEvening:0 };
+  // Eight hour-buckets in HOURS (float); converted to tenths at the end.
+  // Holiday hours are split by their underlying base (weekday vs weekend) so the
+  // contract can apply the holiday multiplier to the correct base rate.
+  const buckets = {
+    weekdayDay:0, weekdayEvening:0, weekendDay:0, weekendEvening:0,
+    holidayWeekdayDay:0, holidayWeekdayEvening:0, holidayWeekendDay:0, holidayWeekendEvening:0
+  };
   let dayHours=0, eveningHours=0, weekdayHours=0, weekendHours=0, holidayHours=0;
 
   let remainingHrs = hours;
@@ -1372,10 +1444,10 @@ function calculate() {
     sliceLen = Math.min(sliceLen, remainingHrs);
 
     const isEvening = (hod >= EVENING_START || hod < EVENING_END);
-    // Holiday rate always wins, then weekend, else weekday.
-    const period = isHol ? "holiday" : (isWknd ? "weekend" : "weekday");
-    const slot   = isEvening ? "Evening" : "Day";
-    buckets[period + slot] += sliceLen;
+    const base = isWknd ? "weekend" : "weekday";          // underlying base period
+    const slot = isEvening ? "Evening" : "Day";
+    const key  = (isHol ? "holiday" + base.charAt(0).toUpperCase()+base.slice(1) : base) + slot;
+    buckets[key] += sliceLen;
 
     if(isEvening) eveningHours += sliceLen; else dayHours += sliceLen;
     if(isHol) holidayHours += sliceLen;
@@ -1388,29 +1460,39 @@ function calculate() {
 
   // ── Convert to TENTHS (integers) exactly as sent to the contract ──
   const tenths = {
-    weekdayDay:     Math.round(buckets.weekdayDay     * 10),
-    weekdayEvening: Math.round(buckets.weekdayEvening * 10),
-    weekendDay:     Math.round(buckets.weekendDay     * 10),
-    weekendEvening: Math.round(buckets.weekendEvening * 10),
-    holidayDay:     Math.round(buckets.holidayDay     * 10),
-    holidayEvening: Math.round(buckets.holidayEvening * 10)
+    weekdayDay:            Math.round(buckets.weekdayDay            * 10),
+    weekdayEvening:        Math.round(buckets.weekdayEvening        * 10),
+    weekendDay:            Math.round(buckets.weekendDay            * 10),
+    weekendEvening:        Math.round(buckets.weekendEvening        * 10),
+    holidayWeekdayDay:     Math.round(buckets.holidayWeekdayDay     * 10),
+    holidayWeekdayEvening: Math.round(buckets.holidayWeekdayEvening * 10),
+    holidayWeekendDay:     Math.round(buckets.holidayWeekendDay     * 10),
+    holidayWeekendEvening: Math.round(buckets.holidayWeekendEvening * 10)
   };
   const totalTenths =
     tenths.weekdayDay + tenths.weekdayEvening +
     tenths.weekendDay + tenths.weekendEvening +
-    tenths.holidayDay + tenths.holidayEvening;
+    tenths.holidayWeekdayDay + tenths.holidayWeekdayEvening +
+    tenths.holidayWeekendDay + tenths.holidayWeekendEvening;
 
-  // ── Mirror the contract's integer math so UI == on-chain burn ──
-  let baseTH =
-    tenths.weekdayDay     * RATE_H.weekday.day +
-    tenths.weekdayEvening * RATE_H.weekday.evening +
-    tenths.weekendDay     * RATE_H.weekend.day +
-    tenths.weekendEvening * RATE_H.weekend.evening +
-    tenths.holidayDay     * RATE_H.holiday.day +
-    tenths.holidayEvening * RATE_H.holiday.evening;
-  let modTH = 0;
-  if(isCompete) modTH += totalTenths * COMP_PER_HR;
-  let burnHundredths = Math.floor((baseTH + modTH + 9) / 10); // round up by 10
+  // ── Mirror the contract's integer per-slot math so UI == on-chain burn ──
+  // slot: 0=day, 1=evening. Holiday & competitive stack per hour.
+  const slotTH = (tenthsVal, baseRate, slotKey, holiday) => {
+    let th = tenthsVal * baseRate;
+    if(holiday)  th = Math.floor(th * HOLIDAY_BPS[slotKey] / 10000);
+    if(isCompete) th = Math.floor(th * COMP_BPS[slotKey] / 10000);
+    return th;
+  };
+  let totalTH = 0;
+  totalTH += slotTH(tenths.weekdayDay,            RATE_H.weekday.day,     "day",     false);
+  totalTH += slotTH(tenths.weekdayEvening,        RATE_H.weekday.evening, "evening", false);
+  totalTH += slotTH(tenths.weekendDay,            RATE_H.weekend.day,     "day",     false);
+  totalTH += slotTH(tenths.weekendEvening,        RATE_H.weekend.evening, "evening", false);
+  totalTH += slotTH(tenths.holidayWeekdayDay,     RATE_H.weekday.day,     "day",     true);
+  totalTH += slotTH(tenths.holidayWeekdayEvening, RATE_H.weekday.evening, "evening", true);
+  totalTH += slotTH(tenths.holidayWeekendDay,     RATE_H.weekend.day,     "day",     true);
+  totalTH += slotTH(tenths.holidayWeekendEvening, RATE_H.weekend.evening, "evening", true);
+  let burnHundredths = Math.floor((totalTH + 9) / 10); // round up by 10
 
   const keelBurn  = burnHundredths / 100;
   const remaining = Math.max(keelBalance - keelBurn, 0);
@@ -1445,9 +1527,6 @@ function calculate() {
   }
 
   // ── Outputs ──
-  document.getElementById("stat-burn").innerHTML=keelBurn.toFixed(2)+' <span style="font-size:13px">KEEL</span>';
-  document.getElementById("stat-remaining").innerHTML=remaining.toFixed(2)+' <span style="font-size:13px">KEEL</span>';
-
   const dateDisplay = new Date(yy, mm-1, dd).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"});
   document.getElementById("settle-period").textContent=dateDisplay+" · "+hours+"h ET";
   document.getElementById("settle-burn").textContent=keelBurn.toFixed(2)+" KEEL";
@@ -1465,41 +1544,59 @@ function calculate() {
     keelBurn, remaining, dateStr, dateDisplay
   };
 
-  renderBreakdown(tenths, isCompete, totalTenths, RATE_H, COMP_PER_HR, keelBurn);
+  renderBreakdown(tenths, isCompete, totalTenths, RATE_H, keelBurn);
+
+  // Live availability hint from locally-cached reserved ranges (instant feedback;
+  // the authoritative check is the contract's isAvailable() at review time).
+  const availEl = document.getElementById("avail-hint");
+  if(availEl){
+    if(RESERVED_LOADED && overlapsReserved(startTs, endTs)){
+      availEl.textContent = "⚠ This time overlaps an existing reservation — pick another slot.";
+      availEl.className = "avail-hint taken";
+    } else if(RESERVED_LOADED){
+      availEl.textContent = "✓ This slot is open.";
+      availEl.className = "avail-hint open";
+    } else {
+      availEl.textContent = "";
+      availEl.className = "avail-hint";
+    }
+  }
 }
 
 // Build the live line-item breakdown of how the burn is computed
-function renderBreakdown(t, isCompete, totalTenths, RATE_H, COMP_PER_HR, keelBurn){
+function renderBreakdown(t, isCompete, totalTenths, RATE_H, keelBurn){
   const rows = [];
-  const line = (cls, label, tenths, rateH) => {
+  // slotKey: "day"|"evening"; holiday: bool. Mirrors the contract's per-hour math.
+  const line = (cls, label, tenths, rateH, slotKey, holiday) => {
     if(tenths <= 0) return;
     const hrs = (tenths/10);
-    const amt = (tenths * rateH / 10) / 100; // KEEL
+    let amt = tenths * rateH;                 // thousandths
+    let calc = hrs.toFixed(1)+'h × '+(rateH/100).toFixed(1);
+    if(holiday){
+      amt = Math.floor(amt * HOLIDAY_BPS[slotKey] / 10000);
+      calc += ' × '+(HOLIDAY_BPS[slotKey]/10000).toFixed(2);
+    }
+    if(isCompete){
+      amt = Math.floor(amt * COMP_BPS[slotKey] / 10000);
+      calc += ' × '+(COMP_BPS[slotKey]/10000).toFixed(2);
+    }
+    const keel = (amt/10)/100; // thousandths → KEEL
     rows.push(
       '<div class="bd-row">'+
         '<span class="bd-desc"><span class="dot '+cls+'"></span>'+label+'</span>'+
-        '<span class="bd-calc">'+hrs.toFixed(1)+'h × '+(rateH/100).toFixed(1)+'</span>'+
-        '<span class="bd-amt">'+amt.toFixed(2)+'</span>'+
+        '<span class="bd-calc">'+calc+'</span>'+
+        '<span class="bd-amt">'+keel.toFixed(2)+'</span>'+
       '</div>'
     );
   };
-  line("weekday", "Weekday daytime",  t.weekdayDay,     RATE_H.weekday.day);
-  line("weekday", "Weekday evening",  t.weekdayEvening, RATE_H.weekday.evening);
-  line("weekend", "Weekend daytime",  t.weekendDay,     RATE_H.weekend.day);
-  line("weekend", "Weekend evening",  t.weekendEvening, RATE_H.weekend.evening);
-  line("holiday", "Holiday daytime",  t.holidayDay,     RATE_H.holiday.day);
-  line("holiday", "Holiday evening",  t.holidayEvening, RATE_H.holiday.evening);
-
-  if(isCompete){
-    const compAmt = (totalTenths * COMP_PER_HR / 10) / 100;
-    rows.push(
-      '<div class="bd-row">'+
-        '<span class="bd-desc">🏆 Competitive use</span>'+
-        '<span class="bd-calc">'+(totalTenths/10).toFixed(1)+'h × 1.0</span>'+
-        '<span class="bd-amt">'+compAmt.toFixed(2)+'</span>'+
-      '</div>'
-    );
-  }
+  line("weekday", "Weekday daytime",         t.weekdayDay,            RATE_H.weekday.day,     "day",     false);
+  line("weekday", "Weekday evening",         t.weekdayEvening,        RATE_H.weekday.evening, "evening", false);
+  line("weekend", "Weekend daytime",         t.weekendDay,            RATE_H.weekend.day,     "day",     false);
+  line("weekend", "Weekend evening",         t.weekendEvening,        RATE_H.weekend.evening, "evening", false);
+  line("holiday", "Holiday daytime (wkdy)",  t.holidayWeekdayDay,     RATE_H.weekday.day,     "day",     true);
+  line("holiday", "Holiday evening (wkdy)",  t.holidayWeekdayEvening, RATE_H.weekday.evening, "evening", true);
+  line("holiday", "Holiday daytime (wknd)",  t.holidayWeekendDay,     RATE_H.weekend.day,     "day",     true);
+  line("holiday", "Holiday evening (wknd)",  t.holidayWeekendEvening, RATE_H.weekend.evening, "evening", true);
 
   const el = document.getElementById("breakdown-rows");
   if(!rows.length){
@@ -1526,9 +1623,30 @@ function easternEpoch(y, m, d, hh, mm){
   return Math.floor((guess - offsetHrs*3600*1000)/1000);
 }
 
+// Build the eight-element hour-bucket array in the exact order the contract expects:
+// [weekdayDay, weekdayEvening, weekendDay, weekendEvening,
+//  holidayWeekdayDay, holidayWeekdayEvening, holidayWeekendDay, holidayWeekendEvening]
+function bucketArray(t){
+  return [
+    t.weekdayDay, t.weekdayEvening, t.weekendDay, t.weekendEvening,
+    t.holidayWeekdayDay, t.holidayWeekdayEvening, t.holidayWeekendDay, t.holidayWeekendEvening
+  ];
+}
+
 async function goToReview() {
   if(!currentCalc.keelBurn){showStatus("Select a date and configure your voyage first.","error");return;}
   if(!walletAddress){showStatus("Connect your wallet first.","error");return;}
+
+  // Availability gate: confirm the slot is free on-chain before pricing/review.
+  try {
+    const rp0 = getReadProvider();
+    const ledger0 = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, rp0);
+    const free = await ledger0.isAvailable(SCHED_BOAT_ID, currentCalc.startTs, currentCalc.endTs);
+    if(!free){
+      showStatus("That time slot is already reserved. Please pick another date or time.","error");
+      return;
+    }
+  } catch(e){ console.warn("availability check failed; proceeding (settle will still enforce)", e); }
 
   // Authoritative re-price straight from the contract so the confirm amount is
   // EXACTLY what logAndSettle will burn — never a stale local estimate.
@@ -1536,17 +1654,10 @@ async function goToReview() {
     const rp = getReadProvider();
     const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, rp);
     const c = currentCalc;
-    const res = await ledger.quoteHundredths(
-      c.tenths.weekdayDay, c.tenths.weekdayEvening,
-      c.tenths.weekendDay, c.tenths.weekendEvening,
-      c.tenths.holidayDay, c.tenths.holidayEvening,
-      c.isCompete
-    );
+    const res = await ledger.quoteHundredths(bucketArray(c.tenths), c.isCompete);
     const chainBurn = Number(res.burnHundredths)/100;
     currentCalc.keelBurn  = chainBurn;
     currentCalc.remaining = Math.max(keelBalance - chainBurn, 0);
-    document.getElementById("stat-burn").innerHTML=chainBurn.toFixed(2)+' <span style="font-size:13px">KEEL</span>';
-    document.getElementById("stat-remaining").innerHTML=currentCalc.remaining.toFixed(2)+' <span style="font-size:13px">KEEL</span>';
     document.getElementById("settle-burn").textContent=chainBurn.toFixed(2)+" KEEL";
     document.getElementById("settle-final").textContent=currentCalc.remaining.toFixed(2)+" KEEL";
   } catch(e){ console.warn("on-chain quote failed, using local estimate", e); }
@@ -1586,11 +1697,10 @@ async function logTrip() {
     const c=currentCalc;
     const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, signer);
 
+    const BOAT_ID = 0; // single boat for now; fleet-ready
     const args = [
-      walletAddress, c.startTs, c.endTs,
-      c.tenths.weekdayDay, c.tenths.weekdayEvening,
-      c.tenths.weekendDay, c.tenths.weekendEvening,
-      c.tenths.holidayDay, c.tenths.holidayEvening,
+      walletAddress, BOAT_ID, c.startTs, c.endTs,
+      bucketArray(c.tenths),
       c.isCompete
     ];
 
@@ -1629,6 +1739,7 @@ async function logTrip() {
     updateBalanceUI();
     await refreshBalance();
     await loadOnChainHistory();
+    await loadReservedRanges(); // refresh scheduler: the new trip now blocks its slot
     setTimeout(()=>{backToCalc();setStep(1);clearStatus();},4000);
   } catch(e){setStep(2);showStatus("Failed: "+(e.reason||e.message),"error");}
 }
@@ -1740,6 +1851,199 @@ function setStep(n) {  for(let i=1;i<=4;i++){
     el.className="step"+(i<n?" done":i===n?" active":"");
   }
 }
+
+// Re-run the calculation so the availability hint reflects freshly-loaded ranges.
+function refreshDateAvailability(){ try { calculate(); } catch(_){} if(!document.getElementById("cal-popover").hidden) renderCalendar(); }
+
+// ── Custom calendar widget ──
+let calViewYear, calViewMonth; // month currently shown (0-based month)
+
+function todayKey(){ return new Date().toLocaleDateString("en-CA",{timeZone:"America/New_York"}); }
+
+function toggleCalendar(){
+  const pop = document.getElementById("cal-popover");
+  if(pop.hidden){
+    // Initialize view to the selected date's month, or current month.
+    const sel = document.getElementById("trip-date").value;
+    const base = sel ? new Date(sel+"T12:00:00") : new Date();
+    calViewYear = base.getFullYear();
+    calViewMonth = base.getMonth();
+    renderCalendar();
+    pop.hidden = false;
+    pop.parentElement.classList.add("cal-open");
+    const row = pop.closest(".form-row");
+    if(row) row.classList.add("cal-open-row");
+    setTimeout(()=>document.addEventListener("click", calOutsideClick), 0);
+  } else {
+    closeCalendar();
+  }
+}
+function closeCalendar(){
+  const pop = document.getElementById("cal-popover");
+  pop.hidden = true;
+  pop.parentElement.classList.remove("cal-open");
+  const row = pop.closest(".form-row");
+  if(row) row.classList.remove("cal-open-row");
+  document.removeEventListener("click", calOutsideClick);
+}
+function calOutsideClick(e){
+  const wrap = document.getElementById("cal-popover");
+  const trig = document.getElementById("cal-trigger");
+  if(!wrap.contains(e.target) && !trig.contains(e.target)) closeCalendar();
+}
+function calShiftMonth(delta){
+  calViewMonth += delta;
+  if(calViewMonth < 0){ calViewMonth = 11; calViewYear--; }
+  else if(calViewMonth > 11){ calViewMonth = 0; calViewYear++; }
+  renderCalendar();
+}
+
+function renderCalendar(){
+  const grid = document.getElementById("cal-grid");
+  const label = document.getElementById("cal-month-label");
+  if(!grid || !label) return;
+  const monthName = new Date(calViewYear, calViewMonth, 1)
+    .toLocaleDateString("en-US",{month:"long",year:"numeric"});
+  label.textContent = monthName;
+
+  const firstDow = new Date(calViewYear, calViewMonth, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(calViewYear, calViewMonth+1, 0).getDate();
+  const selKey = document.getElementById("trip-date").value;
+  const tKey = todayKey();
+
+  let html = "";
+  for(let i=0;i<firstDow;i++) html += '<div class="cal-day empty"></div>';
+  for(let d=1; d<=daysInMonth; d++){
+    const key = calViewYear+"-"+String(calViewMonth+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");
+    const isPast = key < tKey;
+    const isToday = key === tKey;
+    const status = RESERVED_LOADED ? dayStatus(key) : "open"; // open|part|full
+    let cls = "cal-day";
+    if(isPast) cls += " past";
+    if(isToday) cls += " today";
+    if(key === selKey) cls += " selected";
+    let dot = "";
+    if(!isPast){
+      if(status === "full"){ cls += " full"; dot = '<span class="av"></span>'; }
+      else if(status === "part"){ dot = '<span class="av part"></span>'; }
+    }
+    const clickable = !isPast && status !== "full";
+    const onclick = clickable ? ' onclick="selectCalDay(\''+key+'\')"' : '';
+    html += '<div class="'+cls+'"'+onclick+'>'+d+dot+'</div>';
+  }
+  grid.innerHTML = html;
+}
+
+function selectCalDay(key){
+  document.getElementById("trip-date").value = key;
+  const disp = new Date(key+"T12:00:00").toLocaleDateString("en-US",
+    {weekday:"short",month:"short",day:"numeric",year:"numeric"});
+  document.getElementById("cal-trigger-text").textContent = disp;
+  closeCalendar();
+  calculate();
+}
+
+// ── Scheduler: reserved windows across ALL wallets for a given boat ──
+// Reads the per-boat trip list from the contract and returns active (non-
+// cancelled) [startTs, endTs] ranges. Used to grey out the calendar and to
+// give early feedback before the on-chain isAvailable() check at settle time.
+let RESERVED_RANGES = [];        // [{startTs, endTs}]
+let RESERVED_LOADED = false;
+const SCHED_BOAT_ID = 0;         // single boat for now
+
+async function loadReservedRanges(){
+  try {
+    const rp = getReadProvider();
+    const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, rp);
+    const count = Number(await ledger.boatTripCount(SCHED_BOAT_ID));
+    const MAX = 500;
+    const ranges = [];
+    const start = Math.max(0, count - MAX);
+    for(let i = count - 1; i >= start; i--){
+      let id, t;
+      try {
+        id = await ledger.boatTrips(SCHED_BOAT_ID, i);
+        t  = await ledger.trips(id);
+      } catch(err){ continue; }
+      if(t.cancelled) continue;
+      ranges.push({ startTs: Number(t.startTs), endTs: Number(t.endTs) });
+    }
+    RESERVED_RANGES = ranges;
+    RESERVED_LOADED = true;
+  } catch(e){
+    console.warn("Could not load reserved ranges", e);
+    RESERVED_LOADED = false;
+  }
+  // Refresh the date field's disabled-state hint if the calendar is in use.
+  if(typeof refreshDateAvailability === "function") refreshDateAvailability();
+}
+
+// Does a proposed [s,e) overlap any reserved range? (half-open interval)
+function overlapsReserved(s, e){
+  for(const r of RESERVED_RANGES){
+    if(s < r.endTs && r.startTs < e) return true;
+  }
+  return false;
+}
+
+// All fully- or partly-reserved calendar days (YYYY-MM-DD in ET) in a window,
+// for greying out date options. A day is considered blocked if ANY reserved
+// range overlaps that day (whole-day granularity for the calendar hint; the
+// exact-overlap check still happens at settle time against the contract).
+function reservedDaySet(){
+  const days = new Set();
+  for(const r of RESERVED_RANGES){
+    // Walk each ET day the range touches.
+    let cur = r.startTs;
+    while(cur < r.endTs){
+      const d = new Date(cur*1000);
+      const key = d.toLocaleDateString("en-CA",{timeZone:"America/New_York"}); // YYYY-MM-DD
+      days.add(key);
+      cur += 3600; // step an hour; cheap and safe for our trip lengths
+    }
+  }
+  return days;
+}
+
+// Operating window used to decide "fully booked" (hours of the day, ET).
+// Default = whole day; narrow this (e.g. {open:7, close:19}) if the boat has
+// fixed operating hours and you want days to fill up sooner.
+const OPERATING_HOURS = { open: 0, close: 24 };
+
+// Booking status for a given ET calendar day "YYYY-MM-DD":
+//   "open" (no reservations), "part" (some hours booked), "full" (operating
+//   window fully covered). Computed by merging reserved intervals that fall on
+//   that day and measuring coverage of the operating window.
+function dayStatus(dayKey){
+  // Build the day's operating window as ET wall-clock → epoch seconds.
+  const [y,m,d] = dayKey.split("-").map(Number);
+  const winStart = easternEpoch(y, m, d, OPERATING_HOURS.open, 0);
+  const winEnd   = easternEpoch(y, m, d, OPERATING_HOURS.close === 24 ? 23 : OPERATING_HOURS.close, OPERATING_HOURS.close === 24 ? 59 : 0)
+                   + (OPERATING_HOURS.close === 24 ? 60 : 0); // include the final minute when whole-day
+  const winLen = winEnd - winStart;
+  if(winLen <= 0) return "open";
+
+  // Collect portions of reservations that fall within this day's window.
+  const segs = [];
+  for(const r of RESERVED_RANGES){
+    const s = Math.max(r.startTs, winStart);
+    const e = Math.min(r.endTs, winEnd);
+    if(e > s) segs.push([s,e]);
+  }
+  if(!segs.length) return "open";
+
+  // Merge overlapping segments, sum covered seconds.
+  segs.sort((a,b)=> a[0]-b[0]);
+  let covered = 0, curS = segs[0][0], curE = segs[0][1];
+  for(let i=1;i<segs.length;i++){
+    if(segs[i][0] <= curE){ curE = Math.max(curE, segs[i][1]); }
+    else { covered += curE-curS; curS = segs[i][0]; curE = segs[i][1]; }
+  }
+  covered += curE-curS;
+
+  return covered >= winLen ? "full" : "part";
+}
+
 function showStatus(msg,type){const el=document.getElementById("settle-status-msg");if(el){el.textContent=msg;el.className="status-msg "+type;}}
 function clearStatus(){const el=document.getElementById("settle-status-msg");if(el){el.textContent="";el.className="status-msg";}}
 
@@ -1779,13 +2083,16 @@ window.addEventListener("resize", ()=>{
 });
 
 window.addEventListener("load",()=>{
-  const today=new Date().toISOString().split("T")[0];
-  document.getElementById("trip-date").value=today;
+  const today = todayKey(); // ET YYYY-MM-DD
+  document.getElementById("trip-date").value = today;
+  document.getElementById("cal-trigger-text").textContent =
+    new Date(today+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"});
   document.getElementById("current-month").textContent=new Date().toLocaleDateString("en-US",{month:"short",year:"numeric"});
   initCharts();
   renderPricingTable();
   calculate();
   loadRatesFromChain(); // pull authoritative rates from chain; refreshes table + recalcs
+  loadReservedRanges(); // load scheduler availability across all wallets
   requestGeo(); // try to show the user's real coordinates in the hero
 });
 
@@ -1850,18 +2157,18 @@ async function loadRatesFromChain(){
   try {
     const rp = getReadProvider();
     const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, rp);
-    const [wd, we, knd, kne, hd, he, comp] = await Promise.all([
+    const [wd, we, knd, kne, holDay, holEve, compDay, compEve] = await Promise.all([
       ledger.rateGrid(0,0), ledger.rateGrid(0,1),
       ledger.rateGrid(1,0), ledger.rateGrid(1,1),
-      ledger.rateGrid(2,0), ledger.rateGrid(2,1),
-      ledger.competitivePerHour()
+      ledger.holidayMultiplierBps(0), ledger.holidayMultiplierBps(1),
+      ledger.competitiveMultiplierBps(0), ledger.competitiveMultiplierBps(1)
     ]);
     RATE_H = {
       weekday: { day: Number(wd),  evening: Number(we)  },
-      weekend: { day: Number(knd), evening: Number(kne) },
-      holiday: { day: Number(hd),  evening: Number(he)  }
+      weekend: { day: Number(knd), evening: Number(kne) }
     };
-    COMP_PER_HR = Number(comp);
+    HOLIDAY_BPS = { day: Number(holDay),  evening: Number(holEve)  };
+    COMP_BPS    = { day: Number(compDay), evening: Number(compEve) };
     ratesLoaded = true;
   } catch(e){
     console.warn("Could not load rates from chain; using built-in defaults.", e);
@@ -1872,14 +2179,17 @@ async function loadRatesFromChain(){
 
 function renderPricingTable(){
   const f = h => (h/100).toFixed(1);
+  const x = bps => (bps/10000).toFixed(2) + "×";
   const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
   set("rate-weekday-day",     f(RATE_H.weekday.day));
   set("rate-weekday-evening", f(RATE_H.weekday.evening));
   set("rate-weekend-day",     f(RATE_H.weekend.day));
   set("rate-weekend-evening", f(RATE_H.weekend.evening));
-  set("rate-holiday-day",     f(RATE_H.holiday.day));
-  set("rate-holiday-evening", f(RATE_H.holiday.evening));
-  set("rate-comp-note", "+"+f(COMP_PER_HR)+" KEEL/hr");
+  // Holiday & Competitive rows show per-slot multipliers instead of KEEL rates.
+  set("rate-holiday-day",      x(HOLIDAY_BPS.day));
+  set("rate-holiday-evening",  x(HOLIDAY_BPS.evening));
+  set("rate-comp-day",         x(COMP_BPS.day));
+  set("rate-comp-evening",     x(COMP_BPS.evening));
   const src = document.getElementById("rate-source");
   if(src) src.textContent = ratesLoaded ? "live from contract" : "default rates";
 }
