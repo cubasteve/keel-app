@@ -1284,7 +1284,7 @@ function updateBalanceUI() {
   document.getElementById("ms-issued").textContent = issued.toFixed(0)+" KEEL";
   document.getElementById("ms-used").textContent   = used.toFixed(2)+" KEEL";
   document.getElementById("ms-avail").textContent  = avail.toFixed(2)+" KEEL";
-  const capEl = document.getElementById("ms-cap"); if(capEl) capEl.textContent = monthlyCap.toFixed(0)+" KEEL";
+  const capEl = document.getElementById("ms-cap"); if(capEl) capEl.textContent = issued.toFixed(0)+" / "+MAX_CAP+" KEEL";
   const ib = document.getElementById("issued-bar"); if(ib) ib.style.width = Math.min((issued/cap)*100,100)+"%";
   document.getElementById("used-bar").style.width  = Math.min((used/cap)*100,100)+"%";
   document.getElementById("avail-bar").style.width = Math.min((avail/cap)*100,100)+"%";
@@ -1473,8 +1473,8 @@ async function disconnectWallet(e) {
   } catch(_) {}
   // Reset all state and restore the Connect button
   provider = null; signer = null; walletAddress = null;
-  keelBalance = MONTHLY_ISSUED;
-  monthlyUsed = null; monthlyIssued = MONTHLY_ISSUED; monthlyCap = MONTHLY_ISSUED;
+  keelBalance = 0;
+  monthlyUsed = 0; monthlyIssued = 0; monthlyCap = MAX_CAP;
   sessionTrips = [];
   document.getElementById("wallet-area").innerHTML =
     '<button class="btn btn-connect" onclick="connectWallet()">⬡ Connect Wallet</button>';
