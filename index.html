@@ -576,11 +576,15 @@ select.inp option { background:#0b1d30; }
 .bd-row:last-child { border-bottom:none; }
 .bd-desc { color:var(--muted2); display:flex; align-items:center; gap:8px; }
 .bd-desc .dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-.bd-calc { font-family:var(--mono); font-size:12px; color:var(--muted); }
 .bd-amt { font-family:var(--mono); font-weight:700; color:var(--text); min-width:80px; text-align:right; }
 .breakdown-total { display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:12px; border-top:2px solid var(--border); font-family:var(--display); font-weight:700; }
 .breakdown-total > span:last-child { font-family:var(--mono); font-size:18px; color:var(--accent); }
 .bd-empty { color:var(--muted); font-size:12px; text-align:center; padding:12px 0; }
+.bd-calc { font-family:var(--mono); font-size:12px; color:var(--muted); display:flex; flex-wrap:wrap; align-items:center; gap:5px; justify-content:flex-end; }
+.bd-base { color:var(--muted2); opacity:0.8; }
+.bd-tag { font-family:var(--sans); font-size:10px; font-weight:700; letter-spacing:0.3px; padding:2px 7px; border-radius:20px; white-space:nowrap; }
+.bd-tag.hol  { color:var(--brass); background:rgba(212,168,64,0.14); border:1px solid rgba(212,168,64,0.4); }
+.bd-tag.comp { color:#c77dff; background:rgba(199,125,255,0.14); border:1px solid rgba(199,125,255,0.4); }
 
 /* PRICING TABLE */
 .price-table { width:100%; border-collapse:collapse; position:relative; z-index:1; }
@@ -956,13 +960,6 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
             <input type="text" class="inp inp-readonly" id="end-time-display" value="—" readonly tabindex="-1">
           </div>
           <div class="form-group" aria-hidden="true"></div>
-        </div>
-
-        <div class="toggle-row">
-          <div class="rate-indicator" id="rate-indicator">
-            <span class="rate-dot" id="rate-dot"></span>
-            <span id="rate-text">Weekday rate</span>
-          </div>
         </div>
 
         <!-- LIVE BURN BREAKDOWN -->
@@ -1497,35 +1494,6 @@ function calculate() {
   const keelBurn  = burnHundredths / 100;
   const remaining = Math.max(keelBalance - keelBurn, 0);
 
-  // ── Rate indicator: reflect what the trip actually spans ──
-  const rateInd  = document.getElementById("rate-indicator");
-  const rateText = document.getElementById("rate-text");
-  const periods = [];
-  if(holidayHours > 0.01) periods.push("holiday");
-  if(weekendHours > 0.01) periods.push("weekend");
-  if(weekdayHours > 0.01) periods.push("weekday");
-
-  if(holidayHours > 0.01 && periods.length === 1){
-    rateInd.className="rate-indicator holiday";
-    // Distinguish an actual federal holiday from a long-weekend extension
-    rateText.textContent = isFederalHoliday(yy, mm, dd)
-      ? "Holiday rate"
-      : "Holiday weekend rate";
-  } else if(periods.length > 1){
-    rateInd.className="rate-indicator holiday";
-    const parts = [];
-    if(holidayHours>0.01) parts.push(holidayHours.toFixed(1)+"h holiday");
-    if(weekendHours>0.01) parts.push(weekendHours.toFixed(1)+"h weekend");
-    if(weekdayHours>0.01) parts.push(weekdayHours.toFixed(1)+"h weekday");
-    rateText.textContent="Mixed · "+parts.join(" + ");
-  } else if(weekendHours > 0.01){
-    rateInd.className="rate-indicator weekend";
-    rateText.textContent="Weekend rate";
-  } else {
-    rateInd.className="rate-indicator weekday";
-    rateText.textContent="Weekday rate";
-  }
-
   // ── Outputs ──
   const dateDisplay = new Date(yy, mm-1, dd).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"});
   document.getElementById("settle-period").textContent=dateDisplay+" · "+hours+"h ET";
@@ -1566,25 +1534,37 @@ function calculate() {
 // Build the live line-item breakdown of how the burn is computed
 function renderBreakdown(t, isCompete, totalTenths, RATE_H, keelBurn){
   const rows = [];
+  const holPct  = (slotKey)=> Math.round((HOLIDAY_BPS[slotKey]/10000 - 1)*100); // e.g. 15
+  const compPct = (slotKey)=> Math.round((COMP_BPS[slotKey]/10000 - 1)*100);    // e.g. 10
+  let anyHoliday = false, anyCompete = false;
+
   // slotKey: "day"|"evening"; holiday: bool. Mirrors the contract's per-hour math.
   const line = (cls, label, tenths, rateH, slotKey, holiday) => {
     if(tenths <= 0) return;
     const hrs = (tenths/10);
     let amt = tenths * rateH;                 // thousandths
-    let calc = hrs.toFixed(1)+'h × '+(rateH/100).toFixed(1);
+    const baseKeel = (amt/10)/100;
+    let calc = hrs.toFixed(1)+'h × '+(rateH/100).toFixed(1)+' KEEL';
+    const tags = [];
     if(holiday){
       amt = Math.floor(amt * HOLIDAY_BPS[slotKey] / 10000);
-      calc += ' × '+(HOLIDAY_BPS[slotKey]/10000).toFixed(2);
+      tags.push('<span class="bd-tag hol">Holiday +'+holPct(slotKey)+'%</span>');
+      anyHoliday = true;
     }
     if(isCompete){
       amt = Math.floor(amt * COMP_BPS[slotKey] / 10000);
-      calc += ' × '+(COMP_BPS[slotKey]/10000).toFixed(2);
+      tags.push('<span class="bd-tag comp">Competitive +'+compPct(slotKey)+'%</span>');
+      anyCompete = true;
     }
     const keel = (amt/10)/100; // thousandths → KEEL
+    // If surcharges applied, show base → final so the difference is obvious.
+    const calcHtml = tags.length
+      ? calc + ' <span class="bd-base">= '+baseKeel.toFixed(2)+'</span> '+tags.join(' ')
+      : calc;
     rows.push(
       '<div class="bd-row">'+
         '<span class="bd-desc"><span class="dot '+cls+'"></span>'+label+'</span>'+
-        '<span class="bd-calc">'+calc+'</span>'+
+        '<span class="bd-calc">'+calcHtml+'</span>'+
         '<span class="bd-amt">'+keel.toFixed(2)+'</span>'+
       '</div>'
     );
@@ -1602,7 +1582,6 @@ function renderBreakdown(t, isCompete, totalTenths, RATE_H, keelBurn){
   if(!rows.length){
     el.innerHTML = '<div class="bd-empty">Set a trip date and hours to see the breakdown</div>';
   } else {
-    // Note rounding if the summed lines differ from the rounded-up total
     rows.push(
       '<div class="bd-row" style="border-bottom:none;opacity:0.7">'+
         '<span class="bd-desc" style="font-size:11px">Rounded up to nearest 0.01 KEEL</span>'+
