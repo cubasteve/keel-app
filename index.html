@@ -1252,7 +1252,6 @@ function isHolidayRate(y, m, d) {
 let provider, signer, walletAddress;
 let keelBalance = 0;
 let currentCalc = {};
-let sessionTrips = [];
 let inReview = false;
 
 // ── Pricing is READ FROM THE CONTRACT so the UI can never disagree with the burn.
@@ -1270,11 +1269,6 @@ let ratesLoaded = false;
 let monthlyCap    = MAX_CAP;  // KEEL · rolling 3-month ceiling (300)
 let monthlyIssued = 0;        // KEEL · token.monthlyMinted(member, year, month)
 let monthlyUsed   = 0;        // KEEL burned this month · summed from on-chain history
-
-function initCharts() {
-  // Charts removed — just sync the balance-driven UI.
-  updateBalanceUI();
-}
 
 function updateBalanceUI() {
   const totalCap = MAX_CAP; // 300 — rolling 3-month ceiling, always the denominator
@@ -1477,7 +1471,12 @@ async function disconnectWallet(e) {
   provider = null; signer = null; walletAddress = null;
   keelBalance = 0;
   monthlyUsed = 0; monthlyIssued = 0; monthlyCap = MAX_CAP;
-  sessionTrips = [];
+  // Reset settle panel to blank state
+  currentCalc = {};
+  document.getElementById("settle-period").textContent = "--";
+  document.getElementById("settle-burn").textContent   = "0 KEEL";
+  document.getElementById("settle-final").textContent  = "-- KEEL";
+  if(inReview) backToCalc();
   document.getElementById("wallet-area").innerHTML =
     '<button class="btn btn-connect" onclick="connectWallet()">⬡ Connect Wallet</button>';
   document.getElementById("trip-history").innerHTML =
@@ -1783,7 +1782,7 @@ function backToCalc() {
 async function logTrip() {
   if(!signer){showStatus("Connect your wallet first.","error");return;}
   try {
-    showStatus("Waiting for MetaMask confirmation...","pending"); setStep(3);
+    showStatus("Waiting for wallet confirmation…","pending"); setStep(3);
     const c=currentCalc;
     const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, signer);
 
@@ -1841,24 +1840,6 @@ function voyageEmpty(title, sub){
          (sub ? '<div class="empty-sub">'+sub+'</div>' : '')+'</div>';
 }
 
-function renderHistory() {
-  const el=document.getElementById("trip-history");
-  if(!sessionTrips.length){el.innerHTML=voyageEmpty("No voyages yet","Settle a burn and your logged trips will appear here.");return;}
-  el.innerHTML=sessionTrips.map(t=>{
-    let label;
-    if(t.holidayHours>0.01) label="Holiday ";
-    else if(t.weekendHours>0.01 && t.weekdayHours>0.01) label="Mixed ";
-    else if(t.weekendHours>0.01) label="Weekend ";
-    else label="Weekday ";
-    if(t.isCompete) label+="Racing ";
-    return '<div class="trip-row">'+
-      '<div><div class="trip-type-label">'+label+'Voyage</div>'+
-      '<div class="trip-meta">'+(t.dateDisplay||t.dateStr)+' · '+t.hours+'h ET</div></div>'+
-      '<div class="trip-burn-val">−'+t.keelBurn.toFixed(2)+' KEEL</div>'+
-      '</div>';
-  }).join("");
-}
-
 // Dedicated read-only provider for log queries (MetaMask's RPC limits getLogs ranges).
 let readProvider = null;
 function getReadProvider(){
@@ -1883,27 +1864,37 @@ async function loadOnChainHistory() {
     const nextMonth  = new Date(now.getFullYear(), now.getMonth()+1, 1);
     const monthEnd   = easternEpoch(nextMonth.getFullYear(), nextMonth.getMonth()+1, 1, 0, 0);
 
-    // Read trips directly from contract storage via eth_call — these have NO
-    // block-range limit (unlike getLogs, which free RPCs throttle hard).
-    // Walk tripIds backward from newest; stop once we've scanned enough.
+    // Read trips directly from contract storage via eth_call — no block-range
+    // limit unlike getLogs. Fetch all IDs in parallel, then all trip records in
+    // parallel — 2 round trips instead of 2×N serial calls.
     const total = Number(await ledger.tripCount());
-    const MAX_SCAN = 300; // cap how many recent trips we inspect
-    const rows = [];
+    const MAX_SCAN = 300;
     const startIdx = total - 1;
     const stopIdx  = Math.max(0, total - MAX_SCAN);
+    const indices  = Array.from({length: startIdx - stopIdx + 1}, (_, k) => startIdx - k);
 
-    for(let i = startIdx; i >= stopIdx; i--){
-      let id, t;
-      try {
-        id = await ledger.tripIds(i);
-        t  = await ledger.trips(id);
-      } catch(err){ console.warn("trip read failed at", i, err.message); continue; }
+    // Batch to avoid overwhelming the RPC endpoint (20 concurrent at a time).
+    const BATCH = 20;
+    const ids = [];
+    for(let b = 0; b < indices.length; b += BATCH){
+      const chunk = indices.slice(b, b + BATCH);
+      const got = await Promise.all(chunk.map(i => ledger.tripIds(i).catch(()=>null)));
+      ids.push(...got);
+    }
+    const validIds = ids.filter(Boolean);
+    const tripRecords = [];
+    for(let b = 0; b < validIds.length; b += BATCH){
+      const chunk = validIds.slice(b, b + BATCH);
+      const got = await Promise.all(chunk.map(id => ledger.trips(id).catch(()=>null)));
+      tripRecords.push(...got);
+    }
 
-      // Only this member's trips.
+    const rows = [];
+    for(const t of tripRecords){
+      if(!t) continue;
       if(t.member.toLowerCase() !== walletAddress.toLowerCase()) continue;
-
       const startTs = Number(t.startTs);
-      if(startTs < monthStart || startTs >= monthEnd) continue; // current month only
+      if(startTs < monthStart || startTs >= monthEnd) continue;
       rows.push({
         startTs,
         burn: Number(t.tokensBurned) / 1e18,
@@ -2047,17 +2038,25 @@ async function loadReservedRanges(){
     const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, rp);
     const count = Number(await ledger.boatTripCount(SCHED_BOAT_ID));
     const MAX = 500;
-    const ranges = [];
-    const start = Math.max(0, count - MAX);
-    for(let i = count - 1; i >= start; i--){
-      let id, t;
-      try {
-        id = await ledger.boatTrips(SCHED_BOAT_ID, i);
-        t  = await ledger.trips(id);
-      } catch(err){ continue; }
-      if(t.cancelled) continue;
-      ranges.push({ startTs: Number(t.startTs), endTs: Number(t.endTs) });
+    const BATCH = 20;
+    const indices = Array.from({length: Math.min(count, MAX)}, (_, k) => count - 1 - k);
+
+    const ids = [];
+    for(let b = 0; b < indices.length; b += BATCH){
+      const got = await Promise.all(
+        indices.slice(b, b + BATCH).map(i => ledger.boatTrips(SCHED_BOAT_ID, i).catch(()=>null))
+      );
+      ids.push(...got);
     }
+    const validIds = ids.filter(Boolean);
+    const tripRecords = [];
+    for(let b = 0; b < validIds.length; b += BATCH){
+      const got = await Promise.all(validIds.slice(b, b + BATCH).map(id => ledger.trips(id).catch(()=>null)));
+      tripRecords.push(...got);
+    }
+    const ranges = tripRecords
+      .filter(t => t && !t.cancelled)
+      .map(t => ({ startTs: Number(t.startTs), endTs: Number(t.endTs) }));
     RESERVED_RANGES = ranges;
     RESERVED_LOADED = true;
   } catch(e){
@@ -2077,24 +2076,6 @@ function overlapsReserved(s, e){
 }
 
 // All fully- or partly-reserved calendar days (YYYY-MM-DD in ET) in a window,
-// for greying out date options. A day is considered blocked if ANY reserved
-// range overlaps that day (whole-day granularity for the calendar hint; the
-// exact-overlap check still happens at settle time against the contract).
-function reservedDaySet(){
-  const days = new Set();
-  for(const r of RESERVED_RANGES){
-    // Walk each ET day the range touches.
-    let cur = r.startTs;
-    while(cur < r.endTs){
-      const d = new Date(cur*1000);
-      const key = d.toLocaleDateString("en-CA",{timeZone:"America/New_York"}); // YYYY-MM-DD
-      days.add(key);
-      cur += 3600; // step an hour; cheap and safe for our trip lengths
-    }
-  }
-  return days;
-}
-
 // Operating window used to decide "fully booked" (hours of the day, ET).
 // Default = whole day; narrow this (e.g. {open:7, close:19}) if the boat has
 // fixed operating hours and you want days to fill up sooner.
@@ -2178,7 +2159,7 @@ window.addEventListener("load",()=>{
   document.getElementById("cal-trigger-text").textContent =
     new Date(today+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"});
   document.getElementById("current-month").textContent=new Date().toLocaleDateString("en-US",{month:"short",year:"numeric"});
-  initCharts();
+  updateBalanceUI();
   renderPricingTable();
   calculate();
   loadRatesFromChain(); // pull authoritative rates from chain; refreshes table + recalcs
