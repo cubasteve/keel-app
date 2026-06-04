@@ -1042,40 +1042,40 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
             <div class="ms-icon blue">↓</div>
             <div>
               <div class="ms-label">Issued</div>
-              <div class="ms-bar" style="width:80px"><div class="ms-bar-fill" id="issued-bar" style="width:33%;background:var(--accent)"></div></div>
+              <div class="ms-bar" style="width:80px"><div class="ms-bar-fill" id="issued-bar" style="width:0%;background:var(--accent)"></div></div>
             </div>
           </div>
-          <div class="ms-val blue" id="ms-issued">100 KEEL</div>
+          <div class="ms-val blue" id="ms-issued">0 KEEL</div>
         </div>
         <div class="month-stat">
           <div class="ms-left">
             <div class="ms-icon gold">↑</div>
             <div>
               <div class="ms-label">Used</div>
-              <div class="ms-bar" style="width:80px"><div class="ms-bar-fill" id="used-bar" style="width:6%;background:var(--brass)"></div></div>
+              <div class="ms-bar" style="width:80px"><div class="ms-bar-fill" id="used-bar" style="width:0%;background:var(--brass)"></div></div>
             </div>
           </div>
-          <div class="ms-val gold" id="ms-used">— KEEL</div>
+          <div class="ms-val gold" id="ms-used">0 KEEL</div>
         </div>
         <div class="month-stat">
           <div class="ms-left">
             <div class="ms-icon green">◈</div>
             <div>
               <div class="ms-label">Available</div>
-              <div class="ms-bar" style="width:80px"><div class="ms-bar-fill" id="avail-bar" style="width:31%;background:var(--teal)"></div></div>
+              <div class="ms-bar" style="width:80px"><div class="ms-bar-fill" id="avail-bar" style="width:0%;background:var(--teal)"></div></div>
             </div>
           </div>
-          <div class="ms-val green" id="ms-avail">— KEEL</div>
+          <div class="ms-val green" id="ms-avail">0 KEEL</div>
         </div>
         <div class="month-stat">
           <div class="ms-left">
             <div class="ms-icon purple">⊙</div>
             <div>
               <div class="ms-label">Cap</div>
-              <div class="ms-bar" style="width:80px"><div class="ms-bar-fill" style="width:100%;background:#9664ff"></div></div>
+              <div class="ms-bar" style="width:80px"><div class="ms-bar-fill" id="cap-bar" style="width:0%;background:#9664ff"></div></div>
             </div>
           </div>
-          <div class="ms-val purple" id="ms-cap">300 KEEL</div>
+          <div class="ms-val purple" id="ms-cap">0 / 300 KEEL</div>
         </div>
         <div style="margin-top:12px">
           <a href="#" style="font-size:12px;color:var(--accent);text-decoration:none">↗ View full analytics</a>
@@ -1277,17 +1277,19 @@ function initCharts() {
 }
 
 function updateBalanceUI() {
-  const cap    = monthlyCap > 0 ? monthlyCap : 1;
-  const issued = monthlyIssued;
-  const avail  = keelBalance;
-  const used   = (monthlyUsed != null) ? monthlyUsed : Math.max(issued - avail, 0);
+  const totalCap = MAX_CAP; // 300 — rolling 3-month ceiling, always the denominator
+  const issued   = monthlyIssued;
+  const avail    = keelBalance;
+  const used     = (monthlyUsed != null) ? monthlyUsed : Math.max(issued - avail, 0);
   document.getElementById("ms-issued").textContent = issued.toFixed(0)+" KEEL";
   document.getElementById("ms-used").textContent   = used.toFixed(2)+" KEEL";
   document.getElementById("ms-avail").textContent  = avail.toFixed(2)+" KEEL";
-  const capEl = document.getElementById("ms-cap"); if(capEl) capEl.textContent = issued.toFixed(0)+" / "+MAX_CAP+" KEEL";
-  const ib = document.getElementById("issued-bar"); if(ib) ib.style.width = Math.min((issued/cap)*100,100)+"%";
-  document.getElementById("used-bar").style.width  = Math.min((used/cap)*100,100)+"%";
-  document.getElementById("avail-bar").style.width = Math.min((avail/cap)*100,100)+"%";
+  const capEl = document.getElementById("ms-cap");
+  if(capEl) capEl.textContent = issued.toFixed(0)+" / "+totalCap+" KEEL";
+  const ib = document.getElementById("issued-bar"); if(ib) ib.style.width = Math.min((issued/totalCap)*100,100)+"%";
+  document.getElementById("used-bar").style.width  = Math.min((used/totalCap)*100,100)+"%";
+  document.getElementById("avail-bar").style.width = Math.min((avail/totalCap)*100,100)+"%";
+  const cb = document.getElementById("cap-bar");   if(cb)  cb.style.width  = Math.min((issued/totalCap)*100,100)+"%";
 }
 
 // Read this member's real monthly cap + issuance from the token contract.
