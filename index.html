@@ -1474,6 +1474,7 @@ async function disconnectWallet(e) {
   // Reset all state and restore the Connect button
   provider = null; signer = null; walletAddress = null;
   keelBalance = MONTHLY_ISSUED;
+  monthlyUsed = null; monthlyIssued = MONTHLY_ISSUED; monthlyCap = MONTHLY_ISSUED;
   sessionTrips = [];
   document.getElementById("wallet-area").innerHTML =
     '<button class="btn btn-connect" onclick="connectWallet()">⬡ Connect Wallet</button>';
