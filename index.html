@@ -1075,7 +1075,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
               <div class="ms-bar" style="width:80px"><div class="ms-bar-fill" id="cap-bar" style="width:0%;background:#9664ff"></div></div>
             </div>
           </div>
-          <div class="ms-val purple" id="ms-cap">0 / 300<br><span style="font-size:10px;font-weight:400;opacity:0.7">KEEL</span></div>
+          <div class="ms-val purple" id="ms-cap" style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;line-height:1.1"><span>0 / 300</span><span style="font-size:10px;font-weight:400;opacity:0.7">KEEL</span></div>
         </div>
         <div style="margin-top:12px">
           <a href="#" style="font-size:12px;color:var(--accent);text-decoration:none">↗ View full analytics</a>
@@ -1279,7 +1279,7 @@ function updateBalanceUI() {
   document.getElementById("ms-used").textContent   = used.toFixed(2)+" KEEL";
   document.getElementById("ms-avail").textContent  = avail.toFixed(2)+" KEEL";
   const capEl = document.getElementById("ms-cap");
-  if(capEl) capEl.innerHTML = issued.toFixed(0)+" / "+totalCap+'<br><span style="font-size:10px;font-weight:400;opacity:0.7">KEEL</span>';
+  if(capEl) capEl.innerHTML = '<span>'+issued.toFixed(0)+" / "+totalCap+'</span><span style="font-size:10px;font-weight:400;opacity:0.7">KEEL</span>';
   const ib = document.getElementById("issued-bar"); if(ib) ib.style.width = Math.min((issued/totalCap)*100,100)+"%";
   document.getElementById("used-bar").style.width  = Math.min((used/totalCap)*100,100)+"%";
   document.getElementById("avail-bar").style.width = Math.min((avail/totalCap)*100,100)+"%";
