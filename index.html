@@ -2392,6 +2392,9 @@ function showPage(page) {
   const titles = { dashboard: "⚓ Dashboard", trips: "⛵ My Trips" };
   document.getElementById("page-title").textContent = titles[page] || "";
   document.getElementById("settle-toggle").style.display = page === "dashboard" ? "" : "none";
+  // Hide the burn bar on non-dashboard pages, restore it on dashboard
+  document.body.classList.toggle("settle-collapsed", page !== "dashboard");
+  if(isMobile()) document.body.classList.toggle("settle-open", false);
 
   // On mobile, close the nav drawer after navigation
   if(isMobile()) { document.body.classList.remove("nav-open"); syncBackdrop(); }
