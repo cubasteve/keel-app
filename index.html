@@ -2371,7 +2371,7 @@ function showPage(page) {
   if(navMap[page] !== undefined) navItems[navMap[page]].classList.add("active");
 
   // Update topbar title + settle toggle visibility
-  const titles = { dashboard: "⚓ Dashboard", trips: "⛵ My Trips" };
+  const titles = { dashboard: "⚓ Dashboard", trips: "⛵ Trips" };
   document.getElementById("page-title").textContent = titles[page] || "";
   document.getElementById("settle-toggle").style.display = page === "dashboard" ? "" : "none";
   // Hide the burn bar on non-dashboard pages, restore it on dashboard
