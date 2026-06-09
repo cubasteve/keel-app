@@ -1245,28 +1245,28 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
       <!-- Admin content -->
       <div id="admin-content" style="display:none">
 
-        <!-- Row 1: Mint + Member Lookup -->
+        <!-- Row 1: Batch Mint + Member Balances -->
         <div class="admin-grid">
 
-          <!-- Mint Tokens -->
+          <!-- Batch Mint -->
           <div class="admin-card">
-            <div class="admin-card-title">🪙 Mint Monthly Allocation</div>
+            <div class="admin-card-title">⚡ Batch Mint</div>
             <div class="admin-field">
-              <label>Member Wallet Address</label>
-              <input class="inp" id="admin-mint-addr" placeholder="0x…" autocomplete="off">
+              <label>Amount per Member (KEEL)</label>
+              <input class="inp" type="number" id="admin-batch-amount" value="100" min="1" max="300">
             </div>
-            <div class="admin-row">
-              <div class="admin-field">
-                <label>Amount (KEEL)</label>
-                <input class="inp" type="number" id="admin-mint-amount" value="100" min="1" max="300">
-              </div>
-              <div class="admin-field">
-                <label>Month / Year</label>
-                <input class="inp" type="month" id="admin-mint-month">
-              </div>
+            <div class="admin-field">
+              <label>Month / Year</label>
+              <input class="inp" type="month" id="admin-batch-month">
             </div>
-            <button class="btn-admin btn-admin-gold" id="admin-mint-btn" onclick="adminMint()">🪙 Mint Tokens</button>
-            <div class="admin-result" id="admin-mint-result"></div>
+            <button class="btn-admin btn-admin-gold" id="admin-batch-btn" onclick="adminBatchMint()">⚡ Issue to All Members</button>
+            <div class="admin-result" id="admin-batch-result"></div>
+            <div id="admin-batch-progress" style="display:none;margin-top:12px">
+              <div style="height:6px;background:var(--surface3);border-radius:6px;overflow:hidden;margin-bottom:8px">
+                <div id="admin-batch-bar" style="height:100%;background:linear-gradient(90deg,var(--brass2),var(--brass));border-radius:6px;width:0%;transition:width 0.3s"></div>
+              </div>
+              <div id="admin-batch-status" style="font-size:12px;color:var(--muted2)"></div>
+            </div>
           </div>
 
           <!-- Member Balances -->
@@ -1280,29 +1280,6 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
             </div>
           </div>
 
-        </div>
-
-        <!-- Batch Mint (full width) -->
-        <div class="admin-card" style="margin-bottom:20px">
-          <div class="admin-card-title">⚡ Issue Tokens to All Members</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:flex-end">
-            <div class="admin-field" style="margin-bottom:0">
-              <label>Amount per Member (KEEL)</label>
-              <input class="inp" type="number" id="admin-batch-amount" value="100" min="1" max="300">
-            </div>
-            <div class="admin-field" style="margin-bottom:0">
-              <label>Month / Year</label>
-              <input class="inp" type="month" id="admin-batch-month">
-            </div>
-            <button class="btn-admin btn-admin-gold" id="admin-batch-btn" onclick="adminBatchMint()" style="margin-top:0;white-space:nowrap">⚡ Issue to All</button>
-          </div>
-          <div class="admin-result" id="admin-batch-result"></div>
-          <div id="admin-batch-progress" style="display:none;margin-top:12px">
-            <div style="height:6px;background:var(--surface3);border-radius:6px;overflow:hidden;margin-bottom:8px">
-              <div id="admin-batch-bar" style="height:100%;background:linear-gradient(90deg,var(--brass2),var(--brass));border-radius:6px;width:0%;transition:width 0.3s"></div>
-            </div>
-            <div id="admin-batch-status" style="font-size:12px;color:var(--muted2)"></div>
-          </div>
         </div>
 
         <!-- Row 2: Contract Settings + Stats -->
@@ -3044,7 +3021,6 @@ async function loadAdminPage() {
   // Default mint month to current month
   const now = new Date();
   const monthVal = now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
-  document.getElementById("admin-mint-month").value  = monthVal;
   document.getElementById("admin-batch-month").value = monthVal;
 
   await Promise.all([ adminLoadStats(), adminLoadAllTrips(), adminLoadMemberBalances() ]);
@@ -3160,38 +3136,6 @@ function renderAdminTrips() {
       </tr>`;
     }).join("")}</tbody>
   </table>`;
-}
-
-async function adminMint() {
-  const btn    = document.getElementById("admin-mint-btn");
-  const result = document.getElementById("admin-mint-result");
-  const addr   = document.getElementById("admin-mint-addr").value.trim();
-  const amount = parseFloat(document.getElementById("admin-mint-amount").value);
-  const month  = document.getElementById("admin-mint-month").value; // "YYYY-MM"
-
-  result.className = "admin-result";
-  if(!ethers.utils.isAddress(addr)) { showAdminResult("admin-mint-result","error","Invalid wallet address."); return; }
-  if(!amount || amount <= 0)        { showAdminResult("admin-mint-result","error","Enter a valid amount."); return; }
-  if(!month)                        { showAdminResult("admin-mint-result","error","Select a month."); return; }
-
-  const [yr, mo] = month.split("-").map(Number);
-  btn.disabled = true; btn.textContent = "Minting…";
-  try {
-    const token  = new ethers.Contract(KEEL_TOKEN_ADDRESS, TOKEN_ABI, signer);
-    const wei    = ethers.utils.parseUnits(amount.toString(), 18);
-    const AMOY_MIN_TIP = ethers.utils.parseUnits("30","gwei");
-    const fee    = await provider.getFeeData().catch(()=>({}));
-    const prio   = (fee.maxPriorityFeePerGas && fee.maxPriorityFeePerGas.gt(AMOY_MIN_TIP)) ? fee.maxPriorityFeePerGas : AMOY_MIN_TIP;
-    const maxFee = (fee.maxFeePerGas && fee.maxFeePerGas.gt(prio)) ? fee.maxFeePerGas : prio.add(ethers.utils.parseUnits("20","gwei"));
-    const tx = await token.mintMonthlyAllocation(addr, wei, yr, mo, { maxPriorityFeePerGas:prio, maxFeePerGas:maxFee });
-    showAdminResult("admin-mint-result","info","Transaction submitted — waiting…");
-    await tx.wait();
-    showAdminResult("admin-mint-result","success",`✓ Minted ${amount} KEEL to ${addr.slice(0,8)}…`);
-    adminLoadStats();
-  } catch(e) {
-    showAdminResult("admin-mint-result","error","Failed: "+(e.reason||e.message));
-  }
-  btn.disabled = false; btn.textContent = "🪙 Mint Tokens";
 }
 
 async function adminBatchMint() {
