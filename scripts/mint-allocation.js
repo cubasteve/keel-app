@@ -2,7 +2,7 @@ const hre = require("hardhat");
 
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
-  const KEEL_TOKEN = "0xBd2166367113572E37044A385931488AD0971DDd";
+  const KEEL_TOKEN = "0xd4Ca4D559ccE5025e198B0EBb351BD7cE9C4164A";
   const RECIPIENT  = deployer.address;
   const AMOUNT     = hre.ethers.parseUnits("100", 18);
 

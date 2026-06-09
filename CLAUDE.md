@@ -31,8 +31,8 @@ A working end-to-end usage + reservation system:
 
 | Thing | Address |
 |---|---|
-| **KeelUsageLedger (ACTIVE, v7)** | `0xbd92a37539b4DEE500f743c95e306C3bBAef697E` |
-| **KeelToken (ACTIVE, v3)** | `0xBd2166367113572E37044A385931488AD0971DDd` |
+| **KeelUsageLedger (ACTIVE, UUPS proxy — permanent)** | `0x5c27f0399C3737a68e0933183609b8a273A98eC0` |
+| **KeelToken (ACTIVE, UUPS proxy — permanent)** | `0xd4Ca4D559ccE5025e198B0EBb351BD7cE9C4164A` |
 | Deployer / admin wallet | `0xa953cF5c65EA74c66d874186D3832E398d388660` |
 
 - Read RPC (embedded client-side): Alchemy Amoy key — fine for testnet, **restrict before mainnet**.
