@@ -1179,25 +1179,33 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
             <div class="settings-name-display" id="settings-name-display">—</div>
             <div class="settings-addr-display" id="settings-addr-display">Connect wallet to save profile</div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-            <div class="settings-field">
-              <label>First Name</label>
-              <input class="inp" id="settings-first-name" placeholder="e.g. Steve" maxlength="32">
-            </div>
-            <div class="settings-field">
-              <label>Last Name</label>
-              <input class="inp" id="settings-last-name" placeholder="e.g. Cuba" maxlength="32">
-            </div>
-          </div>
           <div class="settings-field">
-            <label>Display Name <span style="opacity:0.5;font-weight:400;text-transform:none">(optional — shown in the app)</span></label>
+            <label>Display Name <span style="opacity:0.5;font-weight:400;text-transform:none">(public · shown to all members)</span></label>
             <input class="inp" id="settings-display-name" placeholder="e.g. CubaSteve" maxlength="32">
           </div>
-          <button class="btn-settings-save" onclick="saveProfile()">💾 Save Profile</button>
+          <div class="settings-field">
+            <label>Experience Level <span style="opacity:0.5;font-weight:400;text-transform:none">(public)</span></label>
+            <select class="inp" id="settings-experience">
+              <option value="">— Select —</option>
+              <option value="Novice">Novice</option>
+              <option value="Intermediate">Intermediate</option>
+              <option value="Advanced">Advanced</option>
+              <option value="Captain">Captain</option>
+            </select>
+          </div>
+          <div class="settings-field">
+            <label>First Name <span style="opacity:0.5;font-weight:400;text-transform:none">(private · stored on this device only)</span></label>
+            <input class="inp" id="settings-first-name" placeholder="e.g. Steve" maxlength="32">
+          </div>
+          <div class="settings-field">
+            <label>Last Name <span style="opacity:0.5;font-weight:400;text-transform:none">(private · stored on this device only)</span></label>
+            <input class="inp" id="settings-last-name" placeholder="e.g. Cuba" maxlength="32">
+          </div>
+          <button class="btn-settings-save" id="settings-save-btn" onclick="saveProfile()">💾 Save Profile</button>
           <div class="settings-result" id="settings-profile-result"></div>
           <p style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.5">
-            Profile is stored locally on this device and linked to your wallet address.
-            It is also visible to the admin panel.
+            Display name and experience level are saved on-chain (publicly readable).<br>
+            First and last name are private — stored only on this device, never shared.
           </p>
         </div>
 
@@ -1450,8 +1458,8 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 </div><!-- /main-wrap -->
 
 <script>
-const KEEL_TOKEN_ADDRESS  = "0x757743aF271b4B7c4CBF1363F518A4D5b50307F1";
-const KEEL_LEDGER_ADDRESS = "0x3a4eedaf227C2f16Ea57EcC31465A2a302126056";
+const KEEL_TOKEN_ADDRESS  = "0xBd2166367113572E37044A385931488AD0971DDd";
+const KEEL_LEDGER_ADDRESS = "0xbd92a37539b4DEE500f743c95e306C3bBAef697E";
 const AMOY_CHAIN_ID = 80002;
 // Dedicated RPC for reading logs/history (public RPC caps getLogs at ~100 blocks).
 const READ_RPC_URL = "https://polygon-amoy.g.alchemy.com/v2/tocmMJjVYA0syE3coEuGB";
@@ -1488,6 +1496,10 @@ const LEDGER_ABI = [
   "function holidayMultiplierBps(uint256) view returns (uint16)",
   "function competitiveMultiplierBps(uint256) view returns (uint16)",
   "function tripCount() view returns (uint256)",
+  "function setMemberProfile(address member, string displayName, string experienceLevel) external",
+  "function memberProfiles(address) view returns (string displayName, string experienceLevel, uint64 memberSince)",
+  "function getMemberCount() view returns (uint256)",
+  "function memberList(uint256) view returns (address)",
   "function tripIds(uint256) view returns (bytes32)"
 ];
 
@@ -2732,6 +2744,22 @@ async function loadTripsPage() {
   }
 }
 
+// Pre-fetch on-chain profiles for a list of unique addresses into adminProfileCache
+async function prefetchProfiles(addresses) {
+  const rp     = getReadProvider();
+  const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, rp);
+  const unique = [...new Set(addresses.map(a => a.toLowerCase()))];
+  const BATCH  = 10;
+  for(let b = 0; b < unique.length; b += BATCH){
+    const chunk   = unique.slice(b, b+BATCH);
+    const results = await Promise.all(chunk.map(a => ledger.memberProfiles(a).catch(()=>null)));
+    chunk.forEach((a, i) => {
+      const p = results[i];
+      if(p) adminProfileCache[a] = { displayName: p.displayName, experienceLevel: p.experienceLevel };
+    });
+  }
+}
+
 function renderTripsPage() {
   if(!tripsLoaded) return;
   const nowTs    = Math.floor(Date.now() / 1000);
@@ -2850,101 +2878,143 @@ async function cancelTrip(tripId, burnAmt) {
   }
 }
 // ── SETTINGS PAGE ────────────────────────────────────────────────────────────
-const PROFILES_KEY = "keel_member_profiles"; // localStorage key
+const PROFILES_KEY = "keel_member_profiles"; // localStorage — private fields only
 
-function getProfiles() {
+function getLocalProfiles() {
   try { return JSON.parse(localStorage.getItem(PROFILES_KEY) || "{}"); } catch(_) { return {}; }
 }
-function saveProfiles(profiles) {
-  localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
-}
-function getProfile(addr) {
+function saveLocalProfiles(p) { localStorage.setItem(PROFILES_KEY, JSON.stringify(p)); }
+function getLocalProfile(addr) {
   if(!addr) return null;
-  return getProfiles()[addr.toLowerCase()] || null;
+  return getLocalProfiles()[addr.toLowerCase()] || null;
 }
 
-function loadSettingsPage() {
-  // Populate wallet info
-  const addrEl = document.getElementById("settings-wallet-addr");
-  if(walletAddress) {
-    addrEl.textContent = walletAddress.slice(0,10)+"…"+walletAddress.slice(-6);
-  } else {
-    addrEl.textContent = "Not connected";
-  }
+// Fetch on-chain profile for any address
+async function fetchOnChainProfile(addr) {
+  try {
+    const rp = getReadProvider();
+    const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, rp);
+    const p = await ledger.memberProfiles(addr);
+    return { displayName: p.displayName, experienceLevel: p.experienceLevel, memberSince: Number(p.memberSince) };
+  } catch(_) { return null; }
+}
+
+// Combined profile: on-chain public fields + localStorage private fields
+async function getProfile(addr) {
+  if(!addr) return null;
+  const local   = getLocalProfile(addr) || {};
+  const onChain = await fetchOnChainProfile(addr);
+  return { ...local, ...(onChain || {}), wallet: addr };
+}
+
+// Sync version using only localStorage (for places that can't await)
+function getProfileSync(addr) {
+  if(!addr) return null;
+  return getLocalProfiles()[addr.toLowerCase()] || null;
+}
+
+async function loadSettingsPage() {
   document.getElementById("settings-token-addr").textContent  = KEEL_TOKEN_ADDRESS.slice(0,10)+"…"+KEEL_TOKEN_ADDRESS.slice(-6);
   document.getElementById("settings-ledger-addr").textContent = KEEL_LEDGER_ADDRESS.slice(0,10)+"…"+KEEL_LEDGER_ADDRESS.slice(-6);
   document.getElementById("settings-balance").textContent = keelBalance > 0 ? keelBalance.toFixed(2)+" KEEL" : "—";
 
-  // Load saved profile for this wallet
-  if(walletAddress) {
-    const p = getProfile(walletAddress);
-    document.getElementById("settings-first-name").value    = p?.firstName    || "";
-    document.getElementById("settings-last-name").value     = p?.lastName     || "";
-    document.getElementById("settings-display-name").value  = p?.displayName  || "";
-    document.getElementById("settings-addr-display").textContent = walletAddress.slice(0,6)+"…"+walletAddress.slice(-4);
-    updateSettingsAvatar(p);
-  } else {
-    document.getElementById("settings-first-name").value   = "";
-    document.getElementById("settings-last-name").value    = "";
-    document.getElementById("settings-display-name").value = "";
+  if(!walletAddress) {
+    document.getElementById("settings-wallet-addr").textContent = "Not connected";
     document.getElementById("settings-addr-display").textContent = "Connect wallet to save profile";
+    document.getElementById("settings-save-btn").disabled = true;
     updateSettingsAvatar(null);
+    return;
   }
+
+  document.getElementById("settings-wallet-addr").textContent = walletAddress.slice(0,10)+"…"+walletAddress.slice(-6);
+  document.getElementById("settings-addr-display").textContent = walletAddress.slice(0,6)+"…"+walletAddress.slice(-4);
+  document.getElementById("settings-save-btn").disabled = false;
+
+  // Load private fields from localStorage
+  const local = getLocalProfile(walletAddress);
+  document.getElementById("settings-first-name").value = local?.firstName || "";
+  document.getElementById("settings-last-name").value  = local?.lastName  || "";
+
+  // Load public fields from chain
+  const onChain = await fetchOnChainProfile(walletAddress);
+  document.getElementById("settings-display-name").value = onChain?.displayName     || "";
+  document.getElementById("settings-experience").value   = onChain?.experienceLevel || "";
+
+  updateSettingsAvatar({ ...local, ...onChain });
 }
 
 function updateSettingsAvatar(p) {
   const avatarEl = document.getElementById("settings-avatar");
   const nameEl   = document.getElementById("settings-name-display");
-  if(p && (p.firstName || p.lastName)) {
-    const initials = ((p.firstName||"").charAt(0)+(p.lastName||"").charAt(0)).toUpperCase();
-    avatarEl.textContent = initials || "⚓";
-    nameEl.textContent = [p.firstName, p.lastName].filter(Boolean).join(" ");
+  if(p?.firstName || p?.lastName) {
+    avatarEl.textContent = ((p.firstName||"").charAt(0)+(p.lastName||"").charAt(0)).toUpperCase() || "⚓";
+    nameEl.textContent   = [p.firstName, p.lastName].filter(Boolean).join(" ");
   } else {
     avatarEl.textContent = "⚓";
-    nameEl.textContent = p?.displayName || "—";
+    nameEl.textContent   = p?.displayName || "—";
   }
 }
 
-function saveProfile() {
-  if(!walletAddress) {
-    document.getElementById("settings-profile-result").className = "settings-result error";
-    document.getElementById("settings-profile-result").textContent = "Connect your wallet first.";
+async function saveProfile() {
+  if(!walletAddress || !signer) {
+    showSettingsResult("error", "Connect your wallet first.");
     return;
   }
-  const firstName   = document.getElementById("settings-first-name").value.trim();
-  const lastName    = document.getElementById("settings-last-name").value.trim();
-  const displayName = document.getElementById("settings-display-name").value.trim();
+  const displayName     = document.getElementById("settings-display-name").value.trim();
+  const experienceLevel = document.getElementById("settings-experience").value;
+  const firstName       = document.getElementById("settings-first-name").value.trim();
+  const lastName        = document.getElementById("settings-last-name").value.trim();
 
-  const profiles = getProfiles();
-  profiles[walletAddress.toLowerCase()] = { firstName, lastName, displayName, wallet: walletAddress, savedAt: Date.now() };
-  saveProfiles(profiles);
+  const btn = document.getElementById("settings-save-btn");
+  btn.disabled = true; btn.textContent = "Saving…";
 
-  updateSettingsAvatar({ firstName, lastName, displayName });
-  updateWalletPillName();
+  // 1. Save private fields to localStorage (never on-chain)
+  const profiles = getLocalProfiles();
+  profiles[walletAddress.toLowerCase()] = { firstName, lastName, savedAt: Date.now() };
+  saveLocalProfiles(profiles);
 
-  document.getElementById("settings-profile-result").className = "settings-result success";
-  document.getElementById("settings-profile-result").textContent = "✓ Profile saved.";
-  setTimeout(() => { document.getElementById("settings-profile-result").className = "settings-result"; }, 3000);
+  // 2. Save public fields on-chain
+  try {
+    const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, signer);
+    const AMOY_MIN_TIP = ethers.utils.parseUnits("30","gwei");
+    const fee    = await provider.getFeeData().catch(()=>({}));
+    const prio   = (fee.maxPriorityFeePerGas?.gt(AMOY_MIN_TIP)) ? fee.maxPriorityFeePerGas : AMOY_MIN_TIP;
+    const maxFee = (fee.maxFeePerGas?.gt(prio)) ? fee.maxFeePerGas : prio.add(ethers.utils.parseUnits("20","gwei"));
+    const tx = await ledger.setMemberProfile(walletAddress, displayName, experienceLevel,
+      { maxPriorityFeePerGas: prio, maxFeePerGas: maxFee });
+    showSettingsResult("info", "Transaction submitted — waiting for confirmation…");
+    await tx.wait();
+    showSettingsResult("success", "✓ Profile saved on-chain.");
+    updateSettingsAvatar({ firstName, lastName, displayName, experienceLevel });
+    updateWalletPillName();
+  } catch(e) {
+    showSettingsResult("error", "On-chain save failed: "+(e.reason||e.message));
+  }
+
+  btn.disabled = false; btn.textContent = "💾 Save Profile";
 }
 
-// Update the wallet pill in the topbar to show name if available
+function showSettingsResult(type, msg) {
+  const el = document.getElementById("settings-profile-result");
+  el.className = "settings-result "+type;
+  el.textContent = msg;
+  if(type === "success") setTimeout(() => { el.className = "settings-result"; }, 4000);
+}
+
 function updateWalletPillName() {
   const pill = document.getElementById("wallet-pill");
   if(!pill || !walletAddress) return;
-  const p = getProfile(walletAddress);
-  const label = p?.displayName || (p?.firstName ? [p.firstName, p.lastName].filter(Boolean).join(" ") : null);
+  const local = getLocalProfile(walletAddress);
+  const displayName = document.getElementById("settings-display-name")?.value.trim();
+  const name = displayName || (local?.firstName ? [local.firstName, local.lastName].filter(Boolean).join(" ") : null);
   const short = walletAddress.slice(0,6)+"..."+walletAddress.slice(-4);
-  // Update just the text node (between w-dot and pill-caret)
-  const dots = pill.querySelectorAll(".w-dot, .pill-caret, .wallet-menu");
-  // Replace pill text content while keeping child elements
-  const text = label || short;
-  // Rebuild the pill inner text node
-  pill.childNodes.forEach(n => { if(n.nodeType === Node.TEXT_NODE) n.textContent = text; });
+  pill.childNodes.forEach(n => { if(n.nodeType === Node.TEXT_NODE) n.textContent = name || short; });
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── ADMIN PAGE ───────────────────────────────────────────────────────────────
 let adminTripsData = [];
+let adminProfileCache = {}; // address.toLowerCase() → on-chain profile
 let isAdmin = false;
 
 async function loadAdminPage() {
@@ -3041,6 +3111,9 @@ async function adminLoadAllTrips() {
             : "upcoming"
     })).sort((a,b) => b.startTs - a.startTs);
 
+    // Pre-fetch on-chain profiles for all unique members
+    await prefetchProfiles(adminTripsData.map(t => t.member));
+
     // Update network stats
     const active    = adminTripsData.filter(t => t.status === "upcoming" || t.status === "active-now").length;
     const cancelled = adminTripsData.filter(t => t.cancelled).length;
@@ -3073,8 +3146,8 @@ function renderAdminTrips() {
     <tbody>${data.map(t => {
       const date = new Date(t.startTs*1000).toLocaleDateString("en-US",
         {month:"short",day:"numeric",year:"numeric",timeZone:"America/New_York"});
-      const p = getProfile(t.member);
-      const memberName = p ? [p.firstName, p.lastName].filter(Boolean).join(" ") || p.displayName : null;
+      const p = adminProfileCache[t.member.toLowerCase()];
+      const memberName = p?.displayName || null;
       const short = t.member.slice(0,6)+"…"+t.member.slice(-4);
       const memberDisplay = memberName
         ? `<span style="color:var(--foam);font-weight:600">${memberName}</span><br><span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${short}</span>`
@@ -3144,10 +3217,14 @@ async function adminLookup() {
     const balF    = parseFloat(ethers.utils.formatUnits(bal,18)).toFixed(2);
     const mintedF = parseFloat(ethers.utils.formatUnits(minted,18)).toFixed(2);
     const capF    = parseFloat(ethers.utils.formatUnits(cap,18)).toFixed(0);
-    const p = getProfile(addr);
-    const name = p ? [p.firstName, p.lastName].filter(Boolean).join(" ") || p.displayName : null;
+    const rp2    = getReadProvider();
+    const ledger2 = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, rp2);
+    const profile = await ledger2.memberProfiles(addr).catch(()=>null);
+    const displayName = profile?.displayName || null;
+    const expLevel    = profile?.experienceLevel || null;
     showAdminResult("admin-lookup-result","success",
-      (name ? `Member: ${name}\n` : "") +
+      (displayName ? `Display name: ${displayName}\n` : "") +
+      (expLevel    ? `Experience: ${expLevel}\n`       : "") +
       `Balance: ${balF} KEEL\nThis month issued: ${mintedF} / ${capF} KEEL`
     );
   } catch(e) {
@@ -3185,7 +3262,7 @@ function showAdminResult(id, type, msg) {
 
 // Reset admin page on disconnect
 function resetAdminPage() {
-  isAdmin = false; adminTripsData = [];
+  isAdmin = false; adminTripsData = []; adminProfileCache = {};
   document.getElementById("admin-access-denied").style.display = "";
   document.getElementById("admin-content").style.display = "none";
   document.getElementById("admin-denied-msg").textContent = "Connect your wallet to access the admin panel";

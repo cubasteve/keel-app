@@ -176,6 +176,45 @@ contract KeelUsageLedger is AccessControl {
     function tripCount() external view returns (uint256) { return tripIds.length; }
     function boatTripCount(uint16 boatId) external view returns (uint256) { return boatTrips[boatId].length; }
 
+    // ── Member Registry ──────────────────────────────────────────────────────
+    // Stores only public-safe profile data. Display name and experience level
+    // are voluntarily set by each member. Member since is auto-set on first save.
+    // NOTE: all data stored here is publicly readable on-chain.
+
+    struct MemberProfile {
+        string  displayName;     // chosen handle shown in the app
+        string  experienceLevel; // "Novice" | "Intermediate" | "Advanced" | "Captain"
+        uint64  memberSince;     // Unix timestamp of first registration
+    }
+
+    mapping(address => MemberProfile) public memberProfiles;
+    address[] public memberList;
+
+    event MemberProfileUpdated(address indexed member, string displayName);
+
+    /**
+     * @notice Save or update your own public profile. Any member may call this.
+     *         Operators may also update any member's profile.
+     */
+    function setMemberProfile(
+        address member,
+        string calldata displayName,
+        string calldata experienceLevel
+    ) external {
+        require(member == msg.sender || hasRole(OPERATOR_ROLE, msg.sender), "not allowed");
+        MemberProfile storage p = memberProfiles[member];
+        if (p.memberSince == 0) {
+            // First registration — record timestamp and add to member list.
+            p.memberSince = uint64(block.timestamp);
+            memberList.push(member);
+        }
+        p.displayName     = displayName;
+        p.experienceLevel = experienceLevel;
+        emit MemberProfileUpdated(member, displayName);
+    }
+
+    function getMemberCount() external view returns (uint256) { return memberList.length; }
+
     function setRate(uint8 period, uint16 dayRate, uint16 eveningRate) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(period < 2, "bad period");
         rateGrid[period][0] = dayRate;
