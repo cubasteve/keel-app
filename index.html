@@ -1555,6 +1555,10 @@ async function disconnectWallet(e) {
   provider = null; signer = null; walletAddress = null;
   keelBalance = 0;
   monthlyUsed = 0; monthlyIssued = 0; monthlyCap = MAX_CAP;
+  // Reset trips page state
+  tripsData = []; tripsLoaded = false;
+  document.getElementById("trips-connect-prompt").style.display = "";
+  document.getElementById("trips-content").style.display = "none";
   // Reset settle panel to blank state
   currentCalc = {};
   document.getElementById("settle-period").textContent = "--";
