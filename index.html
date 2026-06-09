@@ -1269,15 +1269,15 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
             <div class="admin-result" id="admin-mint-result"></div>
           </div>
 
-          <!-- Member Lookup -->
+          <!-- Member Balances -->
           <div class="admin-card">
-            <div class="admin-card-title">🔍 Member Lookup</div>
-            <div class="admin-field">
-              <label>Wallet Address</label>
-              <input class="inp" id="admin-lookup-addr" placeholder="0x…" autocomplete="off">
+            <div class="admin-card-title" style="justify-content:space-between">
+              <span>👥 Member Balances</span>
+              <button class="btn-admin btn-admin-primary" style="width:auto;padding:6px 14px;font-size:12px;margin-top:0" onclick="adminLoadMemberBalances()">↻ Refresh</button>
             </div>
-            <button class="btn-admin btn-admin-primary" onclick="adminLookup()">🔍 Look Up</button>
-            <div class="admin-result" id="admin-lookup-result"></div>
+            <div id="admin-member-balances">
+              <div class="empty-state" style="padding:20px 0"><div class="empty-anchor">👥</div><div class="empty-title">Loading…</div></div>
+            </div>
           </div>
 
         </div>
@@ -3023,7 +3023,7 @@ async function loadAdminPage() {
   document.getElementById("admin-mint-month").value =
     now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
 
-  await Promise.all([ adminLoadStats(), adminLoadAllTrips() ]);
+  await Promise.all([ adminLoadStats(), adminLoadAllTrips(), adminLoadMemberBalances() ]);
 }
 
 async function adminLoadStats() {
@@ -3170,37 +3170,76 @@ async function adminMint() {
   btn.disabled = false; btn.textContent = "🪙 Mint Tokens";
 }
 
-async function adminLookup() {
-  const result = document.getElementById("admin-lookup-result");
-  const addr   = document.getElementById("admin-lookup-addr").value.trim();
-  if(!ethers.utils.isAddress(addr)) { showAdminResult("admin-lookup-result","error","Invalid address."); return; }
-
-  showAdminResult("admin-lookup-result","info","Looking up…");
+async function adminLoadMemberBalances() {
+  const el = document.getElementById("admin-member-balances");
+  el.innerHTML = '<div class="empty-state" style="padding:20px 0"><div class="empty-anchor">👥</div><div class="empty-title">Loading…</div></div>';
   try {
-    const rp    = getReadProvider();
-    const token = new ethers.Contract(KEEL_TOKEN_ADDRESS, TOKEN_ABI, rp);
-    const now   = new Date();
-    const key   = ethers.utils.solidityKeccak256(
-      ["address","uint256","uint256"], [addr, now.getFullYear(), now.getMonth()+1]
-    );
-    const [bal, minted, cap] = await Promise.all([
-      token.balanceOf(addr), token.monthlyMinted(key), token.monthlyIssuanceCap()
+    const rp     = getReadProvider();
+    const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, rp);
+    const token  = new ethers.Contract(KEEL_TOKEN_ADDRESS, TOKEN_ABI, rp);
+    const now    = new Date();
+
+    const count = Number(await ledger.getMemberCount());
+    if(count === 0) {
+      el.innerHTML = '<div class="empty-state" style="padding:20px 0"><div class="empty-anchor">👥</div><div class="empty-title">No registered members yet</div></div>';
+      return;
+    }
+
+    // Fetch all member addresses in parallel
+    const BATCH = 10;
+    const addrs = [];
+    for(let b = 0; b < count; b += BATCH){
+      const got = await Promise.all(
+        Array.from({length: Math.min(BATCH, count-b)}, (_,k) => ledger.memberList(b+k))
+      );
+      addrs.push(...got);
+    }
+
+    // Fetch profiles + balances + monthly minted in parallel
+    const [profiles, balances, mintedArr] = await Promise.all([
+      Promise.all(addrs.map(a => ledger.memberProfiles(a).catch(()=>null))),
+      Promise.all(addrs.map(a => token.balanceOf(a).catch(()=>ethers.BigNumber.from(0)))),
+      Promise.all(addrs.map(a => {
+        const key = ethers.utils.solidityKeccak256(
+          ["address","uint256","uint256"], [a, now.getFullYear(), now.getMonth()+1]
+        );
+        return token.monthlyMinted(key).catch(()=>ethers.BigNumber.from(0));
+      }))
     ]);
-    const balF    = parseFloat(ethers.utils.formatUnits(bal,18)).toFixed(2);
-    const mintedF = parseFloat(ethers.utils.formatUnits(minted,18)).toFixed(2);
-    const capF    = parseFloat(ethers.utils.formatUnits(cap,18)).toFixed(0);
-    const rp2    = getReadProvider();
-    const ledger2 = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, rp2);
-    const profile = await ledger2.memberProfiles(addr).catch(()=>null);
-    const displayName = profile?.displayName || null;
-    const expLevel    = profile?.experienceLevel || null;
-    showAdminResult("admin-lookup-result","success",
-      (displayName ? `Display name: ${displayName}\n` : "") +
-      (expLevel    ? `Experience: ${expLevel}\n`       : "") +
-      `Balance: ${balF} KEEL\nThis month issued: ${mintedF} / ${capF} KEEL`
-    );
+
+    const rows = addrs.map((addr, i) => ({
+      addr,
+      displayName:     profiles[i]?.displayName     || "",
+      experienceLevel: profiles[i]?.experienceLevel || "",
+      memberSince:     Number(profiles[i]?.memberSince || 0),
+      balance:         parseFloat(ethers.utils.formatUnits(balances[i], 18)),
+      monthlyMinted:   parseFloat(ethers.utils.formatUnits(mintedArr[i], 18)),
+    })).sort((a, b) => b.balance - a.balance);
+
+    el.innerHTML = `<table class="admin-trips-table">
+      <thead><tr>
+        <th>Member</th><th>Experience</th><th>Balance</th><th>Issued This Month</th><th>Member Since</th>
+      </tr></thead>
+      <tbody>${rows.map(r => {
+        const short = r.addr.slice(0,6)+"…"+r.addr.slice(-4);
+        const nameDisplay = r.displayName
+          ? `<span style="color:var(--foam);font-weight:600">${r.displayName}</span><br><span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${short}</span>`
+          : `<span style="font-family:var(--mono);font-size:12px">${short}</span>`;
+        const since = r.memberSince
+          ? new Date(r.memberSince*1000).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})
+          : "—";
+        return `<tr>
+          <td>${nameDisplay}</td>
+          <td>${r.experienceLevel || '<span style="color:var(--muted)">—</span>'}</td>
+          <td style="font-family:var(--mono);color:var(--teal);font-weight:700">${r.balance.toFixed(2)}</td>
+          <td style="font-family:var(--mono);color:var(--accent)">${r.monthlyMinted.toFixed(0)} KEEL</td>
+          <td style="font-size:12px;color:var(--muted2)">${since}</td>
+        </tr>`;
+      }).join("")}</tbody>
+    </table>`;
   } catch(e) {
-    showAdminResult("admin-lookup-result","error","Lookup failed: "+(e.reason||e.message));
+    console.error("member balances failed", e);
+    el.innerHTML = '<div class="empty-state" style="padding:20px 0"><div class="empty-anchor">⚓</div><div class="empty-title">Failed to load</div></div>';
   }
 }
 
