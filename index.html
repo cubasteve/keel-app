@@ -1282,6 +1282,29 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 
         </div>
 
+        <!-- Batch Mint (full width) -->
+        <div class="admin-card" style="margin-bottom:20px">
+          <div class="admin-card-title">⚡ Issue Tokens to All Members</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:flex-end">
+            <div class="admin-field" style="margin-bottom:0">
+              <label>Amount per Member (KEEL)</label>
+              <input class="inp" type="number" id="admin-batch-amount" value="100" min="1" max="300">
+            </div>
+            <div class="admin-field" style="margin-bottom:0">
+              <label>Month / Year</label>
+              <input class="inp" type="month" id="admin-batch-month">
+            </div>
+            <button class="btn-admin btn-admin-gold" id="admin-batch-btn" onclick="adminBatchMint()" style="margin-top:0;white-space:nowrap">⚡ Issue to All</button>
+          </div>
+          <div class="admin-result" id="admin-batch-result"></div>
+          <div id="admin-batch-progress" style="display:none;margin-top:12px">
+            <div style="height:6px;background:var(--surface3);border-radius:6px;overflow:hidden;margin-bottom:8px">
+              <div id="admin-batch-bar" style="height:100%;background:linear-gradient(90deg,var(--brass2),var(--brass));border-radius:6px;width:0%;transition:width 0.3s"></div>
+            </div>
+            <div id="admin-batch-status" style="font-size:12px;color:var(--muted2)"></div>
+          </div>
+        </div>
+
         <!-- Row 2: Contract Settings + Stats -->
         <div class="admin-grid">
 
@@ -3020,8 +3043,9 @@ async function loadAdminPage() {
 
   // Default mint month to current month
   const now = new Date();
-  document.getElementById("admin-mint-month").value =
-    now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+  const monthVal = now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+  document.getElementById("admin-mint-month").value  = monthVal;
+  document.getElementById("admin-batch-month").value = monthVal;
 
   await Promise.all([ adminLoadStats(), adminLoadAllTrips(), adminLoadMemberBalances() ]);
 }
@@ -3168,6 +3192,88 @@ async function adminMint() {
     showAdminResult("admin-mint-result","error","Failed: "+(e.reason||e.message));
   }
   btn.disabled = false; btn.textContent = "🪙 Mint Tokens";
+}
+
+async function adminBatchMint() {
+  const btn    = document.getElementById("admin-batch-btn");
+  const amount = parseFloat(document.getElementById("admin-batch-amount").value);
+  const month  = document.getElementById("admin-batch-month").value;
+
+  if(!amount || amount <= 0) { showAdminResult("admin-batch-result","error","Enter a valid amount."); return; }
+  if(!month)                 { showAdminResult("admin-batch-result","error","Select a month."); return; }
+  if(!signer)                { showAdminResult("admin-batch-result","error","Connect your wallet first."); return; }
+
+  const [yr, mo] = month.split("-").map(Number);
+
+  // Load member list
+  let addrs = [];
+  try {
+    const rp     = getReadProvider();
+    const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, rp);
+    const count  = Number(await ledger.getMemberCount());
+    if(count === 0) { showAdminResult("admin-batch-result","error","No registered members found."); return; }
+    const BATCH = 10;
+    for(let b = 0; b < count; b += BATCH){
+      const got = await Promise.all(
+        Array.from({length: Math.min(BATCH, count-b)}, (_,k) => ledger.memberList(b+k))
+      );
+      addrs.push(...got);
+    }
+  } catch(e) {
+    showAdminResult("admin-batch-result","error","Failed to load member list: "+(e.message));
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Issuing…";
+  const progressEl = document.getElementById("admin-batch-progress");
+  const barEl      = document.getElementById("admin-batch-bar");
+  const statusEl   = document.getElementById("admin-batch-status");
+  progressEl.style.display = "";
+  showAdminResult("admin-batch-result","info",`Issuing ${amount} KEEL to ${addrs.length} member${addrs.length>1?"s":""}…`);
+
+  const wei = ethers.utils.parseUnits(amount.toString(), 18);
+  const AMOY_MIN_TIP = ethers.utils.parseUnits("30","gwei");
+  const fee    = await provider.getFeeData().catch(()=>({}));
+  const prio   = (fee.maxPriorityFeePerGas?.gt(AMOY_MIN_TIP)) ? fee.maxPriorityFeePerGas : AMOY_MIN_TIP;
+  const maxFee = (fee.maxFeePerGas?.gt(prio)) ? fee.maxFeePerGas : prio.add(ethers.utils.parseUnits("20","gwei"));
+
+  const token = new ethers.Contract(KEEL_TOKEN_ADDRESS, TOKEN_ABI, signer);
+  let succeeded = 0, failed = 0, skipped = 0;
+
+  for(let i = 0; i < addrs.length; i++){
+    const addr  = addrs[i];
+    const short = addr.slice(0,6)+"…"+addr.slice(-4);
+    const pct   = Math.round(((i) / addrs.length) * 100);
+    barEl.style.width    = pct+"%";
+    statusEl.textContent = `(${i+1}/${addrs.length}) Minting to ${short}…`;
+
+    try {
+      const tx = await token.mintMonthlyAllocation(addr, wei, yr, mo,
+        { maxPriorityFeePerGas: prio, maxFeePerGas: maxFee });
+      await tx.wait();
+      succeeded++;
+    } catch(e) {
+      const reason = e.reason || e.message || "";
+      if(reason.includes("exceeds monthly cap")) {
+        skipped++;
+        statusEl.textContent = `(${i+1}/${addrs.length}) ${short} already at cap — skipped.`;
+      } else {
+        failed++;
+        statusEl.textContent = `(${i+1}/${addrs.length}) ${short} failed: ${reason}`;
+      }
+    }
+  }
+
+  barEl.style.width = "100%";
+  const summary = `✓ Done — ${succeeded} issued, ${skipped} skipped (at cap), ${failed} failed.`;
+  statusEl.textContent = summary;
+  showAdminResult("admin-batch-result", failed > 0 ? "error" : "success", summary);
+  btn.disabled = false;
+  btn.textContent = "⚡ Issue to All";
+
+  // Refresh member balances table
+  await Promise.all([adminLoadStats(), adminLoadMemberBalances()]);
 }
 
 async function adminLoadMemberBalances() {
