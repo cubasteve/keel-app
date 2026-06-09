@@ -1506,6 +1506,8 @@ async function finishConnect(){
   try { await refreshBalance(); }     catch(e){ console.warn("balance load failed", e); }
   try { await loadMonthlyStats(); }   catch(e){ console.warn("monthly stats failed", e); }
   try { await loadOnChainHistory(); } catch(e){ console.warn("history load failed", e); }
+  // If the user connected while already on the Trips page, load it now.
+  if(currentPage === "trips") try { await loadTripsPage(); } catch(e){ console.warn("trips load failed", e); }
 }
 
 // ── Wallet menu actions ──────────────────────────────────────────────────────
