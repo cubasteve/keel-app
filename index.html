@@ -770,6 +770,27 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   .drawer-close { display: none; }
   .drawer-backdrop { display: none; }
 }
+/* ── SETTINGS PAGE ──────────────────────────────────────────────────────── */
+.settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; max-width:860px; }
+.settings-card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:24px 26px; position:relative; overflow:hidden; }
+.settings-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg, var(--accent), var(--teal)); opacity:0.6; border-radius:16px 16px 0 0; }
+.settings-card-title { font-family:var(--display); font-size:15px; font-weight:700; color:var(--foam); margin-bottom:20px; display:flex; align-items:center; gap:8px; }
+.settings-field { display:flex; flex-direction:column; gap:7px; margin-bottom:16px; }
+.settings-field label { font-size:11px; font-weight:600; color:var(--muted2); text-transform:uppercase; letter-spacing:0.8px; }
+.settings-field .inp-readonly { font-family:var(--mono); font-size:12px; }
+.btn-settings-save { font-family:var(--sans); font-weight:600; font-size:13px; padding:11px 24px; border-radius:10px; border:none; cursor:pointer; background:linear-gradient(135deg, #0a4090, var(--accent)); color:#fff; box-shadow:0 4px 16px rgba(74,179,255,0.25); transition:all 0.2s; width:100%; margin-top:4px; }
+.btn-settings-save:hover { opacity:0.9; transform:translateY(-1px); }
+.settings-result { margin-top:12px; padding:10px 14px; border-radius:10px; font-size:13px; display:none; }
+.settings-result.success { background:rgba(0,200,160,0.1); border:1px solid rgba(0,200,160,0.3); color:var(--teal); display:block; }
+.settings-result.error   { background:rgba(255,83,112,0.1); border:1px solid rgba(255,83,112,0.3); color:var(--danger); display:block; }
+.settings-info-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid rgba(26,48,80,0.5); font-size:13px; }
+.settings-info-row:last-child { border-bottom:none; }
+.settings-info-label { color:var(--muted2); }
+.settings-info-val { font-family:var(--mono); font-size:12px; color:var(--text); }
+.settings-avatar { width:64px; height:64px; border-radius:50%; background:linear-gradient(135deg, var(--navy), var(--surface3)); border:2px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:26px; margin:0 auto 16px; }
+.settings-name-display { text-align:center; font-family:var(--display); font-size:20px; font-weight:700; color:var(--foam); margin-bottom:4px; }
+.settings-addr-display { text-align:center; font-family:var(--mono); font-size:11px; color:var(--muted2); }
+@media(max-width:900px){ .settings-grid { grid-template-columns:1fr; } }
 /* ── ADMIN PAGE ─────────────────────────────────────────────────────────── */
 .admin-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
 .admin-card {
@@ -907,7 +928,8 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   <div class="nav-item active" onclick="showPage('dashboard')"><span class="nav-icon">⊞</span> Dashboard</div>
   <div class="nav-item" onclick="showPage('trips')"><span class="nav-icon">⛵</span> Trips</div>
 
-  <div class="nav-section-label" style="margin-top:8px">Admin</div>
+  <div class="nav-section-label" style="margin-top:8px">Account</div>
+  <div class="nav-item" onclick="showPage('settings')"><span class="nav-icon">⚙</span> Settings</div>
   <div class="nav-item" id="nav-admin" onclick="showPage('admin')"><span class="nav-icon">🔑</span> Admin Panel</div>
 
   <div class="sidebar-footer">
@@ -1144,6 +1166,72 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
       </div><!-- /trips-content -->
 
     </div><!-- /page-trips -->
+
+    <!-- SETTINGS PAGE -->
+    <div class="page center-panel" id="page-settings">
+      <div class="settings-grid">
+
+        <!-- Profile card -->
+        <div class="settings-card">
+          <div class="settings-card-title">👤 Your Profile</div>
+          <div id="settings-avatar-block" style="margin-bottom:20px">
+            <div class="settings-avatar" id="settings-avatar">⚓</div>
+            <div class="settings-name-display" id="settings-name-display">—</div>
+            <div class="settings-addr-display" id="settings-addr-display">Connect wallet to save profile</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="settings-field">
+              <label>First Name</label>
+              <input class="inp" id="settings-first-name" placeholder="e.g. Steve" maxlength="32">
+            </div>
+            <div class="settings-field">
+              <label>Last Name</label>
+              <input class="inp" id="settings-last-name" placeholder="e.g. Cuba" maxlength="32">
+            </div>
+          </div>
+          <div class="settings-field">
+            <label>Display Name <span style="opacity:0.5;font-weight:400;text-transform:none">(optional — shown in the app)</span></label>
+            <input class="inp" id="settings-display-name" placeholder="e.g. CubaSteve" maxlength="32">
+          </div>
+          <button class="btn-settings-save" onclick="saveProfile()">💾 Save Profile</button>
+          <div class="settings-result" id="settings-profile-result"></div>
+          <p style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.5">
+            Profile is stored locally on this device and linked to your wallet address.
+            It is also visible to the admin panel.
+          </p>
+        </div>
+
+        <!-- Wallet info card -->
+        <div class="settings-card">
+          <div class="settings-card-title">⬡ Wallet & Network</div>
+          <div class="settings-info-row">
+            <span class="settings-info-label">Connected Wallet</span>
+            <span class="settings-info-val" id="settings-wallet-addr">—</span>
+          </div>
+          <div class="settings-info-row">
+            <span class="settings-info-label">Network</span>
+            <span class="settings-info-val" style="color:var(--teal)">Polygon Amoy</span>
+          </div>
+          <div class="settings-info-row">
+            <span class="settings-info-label">KEEL Balance</span>
+            <span class="settings-info-val" id="settings-balance">—</span>
+          </div>
+          <div class="settings-info-row">
+            <span class="settings-info-label">Token Contract</span>
+            <span class="settings-info-val" style="font-size:10px" id="settings-token-addr">—</span>
+          </div>
+          <div class="settings-info-row">
+            <span class="settings-info-label">Ledger Contract</span>
+            <span class="settings-info-val" style="font-size:10px" id="settings-ledger-addr">—</span>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:16px">
+            <button class="btn-continue" style="flex:1;padding:10px;font-size:12px" onclick="openExplorer()">↗ View on Explorer</button>
+            <button class="btn-continue" style="flex:1;padding:10px;font-size:12px" onclick="copyWalletAddress()">⧉ Copy Address</button>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-settings -->
 
     <!-- ADMIN PAGE -->
     <div class="page center-panel" id="page-admin">
@@ -1673,9 +1761,12 @@ async function finishConnect(){
   try { await refreshBalance(); }     catch(e){ console.warn("balance load failed", e); }
   try { await loadMonthlyStats(); }   catch(e){ console.warn("monthly stats failed", e); }
   try { await loadOnChainHistory(); } catch(e){ console.warn("history load failed", e); }
+  // Update wallet pill to show saved name if available
+  updateWalletPillName();
   // If the user connected while already on another page, reload it now.
-  if(currentPage === "trips") try { await loadTripsPage(); } catch(e){ console.warn("trips load failed", e); }
-  if(currentPage === "admin") try { await loadAdminPage(); } catch(e){ console.warn("admin load failed", e); }
+  if(currentPage === "trips")    try { await loadTripsPage(); }    catch(e){ console.warn("trips load failed", e); }
+  if(currentPage === "settings") try { loadSettingsPage(); }        catch(e){ console.warn("settings load failed", e); }
+  if(currentPage === "admin")    try { await loadAdminPage(); }    catch(e){ console.warn("admin load failed", e); }
 }
 
 // ── Wallet menu actions ──────────────────────────────────────────────────────
@@ -2536,16 +2627,17 @@ function showPage(page) {
   // Toggle page panels
   document.getElementById("page-dashboard").classList.toggle("active", page === "dashboard");
   document.getElementById("page-trips").classList.toggle("active", page === "trips");
+  document.getElementById("page-settings").classList.toggle("active", page === "settings");
   document.getElementById("page-admin").classList.toggle("active", page === "admin");
 
   // Update nav active state
   document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
-  const navMap = { dashboard: 0, trips: 1, admin: 2 };
+  const navMap = { dashboard: 0, trips: 1, settings: 2, admin: 3 };
   const navItems = document.querySelectorAll(".nav-item");
   if(navMap[page] !== undefined) navItems[navMap[page]].classList.add("active");
 
   // Update topbar title + settle toggle visibility
-  const titles = { dashboard: "⚓ Dashboard", trips: "⛵ Trips", admin: "🔑 Admin Panel" };
+  const titles = { dashboard: "⚓ Dashboard", trips: "⛵ Trips", settings: "⚙ Settings", admin: "🔑 Admin Panel" };
   document.getElementById("page-title").textContent = titles[page] || "";
   document.getElementById("settle-toggle").style.display = page === "dashboard" ? "" : "none";
   // Hide the burn bar on non-dashboard pages, restore it on dashboard
@@ -2555,8 +2647,9 @@ function showPage(page) {
   // On mobile, close the nav drawer after navigation
   if(isMobile()) { document.body.classList.remove("nav-open"); syncBackdrop(); }
 
-  if(page === "trips") loadTripsPage();
-  if(page === "admin") loadAdminPage();
+  if(page === "trips")    loadTripsPage();
+  if(page === "settings") loadSettingsPage();
+  if(page === "admin")    loadAdminPage();
 }
 
 // ── TRIPS PAGE ────────────────────────────────────────────────────────────────
@@ -2756,6 +2849,100 @@ async function cancelTrip(tripId, burnAmt) {
     alert("Cancellation failed: " + (e.reason || e.message));
   }
 }
+// ── SETTINGS PAGE ────────────────────────────────────────────────────────────
+const PROFILES_KEY = "keel_member_profiles"; // localStorage key
+
+function getProfiles() {
+  try { return JSON.parse(localStorage.getItem(PROFILES_KEY) || "{}"); } catch(_) { return {}; }
+}
+function saveProfiles(profiles) {
+  localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
+}
+function getProfile(addr) {
+  if(!addr) return null;
+  return getProfiles()[addr.toLowerCase()] || null;
+}
+
+function loadSettingsPage() {
+  // Populate wallet info
+  const addrEl = document.getElementById("settings-wallet-addr");
+  if(walletAddress) {
+    addrEl.textContent = walletAddress.slice(0,10)+"…"+walletAddress.slice(-6);
+  } else {
+    addrEl.textContent = "Not connected";
+  }
+  document.getElementById("settings-token-addr").textContent  = KEEL_TOKEN_ADDRESS.slice(0,10)+"…"+KEEL_TOKEN_ADDRESS.slice(-6);
+  document.getElementById("settings-ledger-addr").textContent = KEEL_LEDGER_ADDRESS.slice(0,10)+"…"+KEEL_LEDGER_ADDRESS.slice(-6);
+  document.getElementById("settings-balance").textContent = keelBalance > 0 ? keelBalance.toFixed(2)+" KEEL" : "—";
+
+  // Load saved profile for this wallet
+  if(walletAddress) {
+    const p = getProfile(walletAddress);
+    document.getElementById("settings-first-name").value    = p?.firstName    || "";
+    document.getElementById("settings-last-name").value     = p?.lastName     || "";
+    document.getElementById("settings-display-name").value  = p?.displayName  || "";
+    document.getElementById("settings-addr-display").textContent = walletAddress.slice(0,6)+"…"+walletAddress.slice(-4);
+    updateSettingsAvatar(p);
+  } else {
+    document.getElementById("settings-first-name").value   = "";
+    document.getElementById("settings-last-name").value    = "";
+    document.getElementById("settings-display-name").value = "";
+    document.getElementById("settings-addr-display").textContent = "Connect wallet to save profile";
+    updateSettingsAvatar(null);
+  }
+}
+
+function updateSettingsAvatar(p) {
+  const avatarEl = document.getElementById("settings-avatar");
+  const nameEl   = document.getElementById("settings-name-display");
+  if(p && (p.firstName || p.lastName)) {
+    const initials = ((p.firstName||"").charAt(0)+(p.lastName||"").charAt(0)).toUpperCase();
+    avatarEl.textContent = initials || "⚓";
+    nameEl.textContent = [p.firstName, p.lastName].filter(Boolean).join(" ");
+  } else {
+    avatarEl.textContent = "⚓";
+    nameEl.textContent = p?.displayName || "—";
+  }
+}
+
+function saveProfile() {
+  if(!walletAddress) {
+    document.getElementById("settings-profile-result").className = "settings-result error";
+    document.getElementById("settings-profile-result").textContent = "Connect your wallet first.";
+    return;
+  }
+  const firstName   = document.getElementById("settings-first-name").value.trim();
+  const lastName    = document.getElementById("settings-last-name").value.trim();
+  const displayName = document.getElementById("settings-display-name").value.trim();
+
+  const profiles = getProfiles();
+  profiles[walletAddress.toLowerCase()] = { firstName, lastName, displayName, wallet: walletAddress, savedAt: Date.now() };
+  saveProfiles(profiles);
+
+  updateSettingsAvatar({ firstName, lastName, displayName });
+  updateWalletPillName();
+
+  document.getElementById("settings-profile-result").className = "settings-result success";
+  document.getElementById("settings-profile-result").textContent = "✓ Profile saved.";
+  setTimeout(() => { document.getElementById("settings-profile-result").className = "settings-result"; }, 3000);
+}
+
+// Update the wallet pill in the topbar to show name if available
+function updateWalletPillName() {
+  const pill = document.getElementById("wallet-pill");
+  if(!pill || !walletAddress) return;
+  const p = getProfile(walletAddress);
+  const label = p?.displayName || (p?.firstName ? [p.firstName, p.lastName].filter(Boolean).join(" ") : null);
+  const short = walletAddress.slice(0,6)+"..."+walletAddress.slice(-4);
+  // Update just the text node (between w-dot and pill-caret)
+  const dots = pill.querySelectorAll(".w-dot, .pill-caret, .wallet-menu");
+  // Replace pill text content while keeping child elements
+  const text = label || short;
+  // Rebuild the pill inner text node
+  pill.childNodes.forEach(n => { if(n.nodeType === Node.TEXT_NODE) n.textContent = text; });
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ── ADMIN PAGE ───────────────────────────────────────────────────────────────
 let adminTripsData = [];
 let isAdmin = false;
@@ -2886,11 +3073,16 @@ function renderAdminTrips() {
     <tbody>${data.map(t => {
       const date = new Date(t.startTs*1000).toLocaleDateString("en-US",
         {month:"short",day:"numeric",year:"numeric",timeZone:"America/New_York"});
+      const p = getProfile(t.member);
+      const memberName = p ? [p.firstName, p.lastName].filter(Boolean).join(" ") || p.displayName : null;
       const short = t.member.slice(0,6)+"…"+t.member.slice(-4);
+      const memberDisplay = memberName
+        ? `<span style="color:var(--foam);font-weight:600">${memberName}</span><br><span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${short}</span>`
+        : `<span style="font-family:var(--mono);font-size:12px">${short}</span>`;
       const label = (t.competitive?"Racing ":"")+"Voyage";
       const statusLabel = {upcoming:"Upcoming","active-now":"Underway",past:"Completed",cancelled:"Cancelled"}[t.status];
       return `<tr>
-        <td><span style="font-family:var(--mono);font-size:12px">${short}</span></td>
+        <td>${memberDisplay}</td>
         <td>${date}</td>
         <td>${t.hrs}h</td>
         <td>${label}</td>
@@ -2952,7 +3144,10 @@ async function adminLookup() {
     const balF    = parseFloat(ethers.utils.formatUnits(bal,18)).toFixed(2);
     const mintedF = parseFloat(ethers.utils.formatUnits(minted,18)).toFixed(2);
     const capF    = parseFloat(ethers.utils.formatUnits(cap,18)).toFixed(0);
+    const p = getProfile(addr);
+    const name = p ? [p.firstName, p.lastName].filter(Boolean).join(" ") || p.displayName : null;
     showAdminResult("admin-lookup-result","success",
+      (name ? `Member: ${name}\n` : "") +
       `Balance: ${balF} KEEL\nThis month issued: ${mintedF} / ${capF} KEEL`
     );
   } catch(e) {
