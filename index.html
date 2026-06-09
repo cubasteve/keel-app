@@ -1193,19 +1193,10 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
               <option value="Captain">Captain</option>
             </select>
           </div>
-          <div class="settings-field">
-            <label>First Name <span style="opacity:0.5;font-weight:400;text-transform:none">(private · stored on this device only)</span></label>
-            <input class="inp" id="settings-first-name" placeholder="e.g. Steve" maxlength="32">
-          </div>
-          <div class="settings-field">
-            <label>Last Name <span style="opacity:0.5;font-weight:400;text-transform:none">(private · stored on this device only)</span></label>
-            <input class="inp" id="settings-last-name" placeholder="e.g. Cuba" maxlength="32">
-          </div>
           <button class="btn-settings-save" id="settings-save-btn" onclick="saveProfile()">💾 Save Profile</button>
           <div class="settings-result" id="settings-profile-result"></div>
           <p style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.5">
-            Display name and experience level are saved on-chain (publicly readable).<br>
-            First and last name are private — stored only on this device, never shared.
+            Display name and experience level are saved on-chain and are publicly readable.
           </p>
         </div>
 
@@ -2930,29 +2921,19 @@ async function loadSettingsPage() {
   document.getElementById("settings-addr-display").textContent = walletAddress.slice(0,6)+"…"+walletAddress.slice(-4);
   document.getElementById("settings-save-btn").disabled = false;
 
-  // Load private fields from localStorage
-  const local = getLocalProfile(walletAddress);
-  document.getElementById("settings-first-name").value = local?.firstName || "";
-  document.getElementById("settings-last-name").value  = local?.lastName  || "";
-
   // Load public fields from chain
   const onChain = await fetchOnChainProfile(walletAddress);
   document.getElementById("settings-display-name").value = onChain?.displayName     || "";
   document.getElementById("settings-experience").value   = onChain?.experienceLevel || "";
 
-  updateSettingsAvatar({ ...local, ...onChain });
+  updateSettingsAvatar(onChain);
 }
 
 function updateSettingsAvatar(p) {
   const avatarEl = document.getElementById("settings-avatar");
   const nameEl   = document.getElementById("settings-name-display");
-  if(p?.firstName || p?.lastName) {
-    avatarEl.textContent = ((p.firstName||"").charAt(0)+(p.lastName||"").charAt(0)).toUpperCase() || "⚓";
-    nameEl.textContent   = [p.firstName, p.lastName].filter(Boolean).join(" ");
-  } else {
-    avatarEl.textContent = "⚓";
-    nameEl.textContent   = p?.displayName || "—";
-  }
+  avatarEl.textContent = p?.displayName ? p.displayName.charAt(0).toUpperCase() : "⚓";
+  nameEl.textContent   = p?.displayName || "—";
 }
 
 async function saveProfile() {
@@ -2962,18 +2943,11 @@ async function saveProfile() {
   }
   const displayName     = document.getElementById("settings-display-name").value.trim();
   const experienceLevel = document.getElementById("settings-experience").value;
-  const firstName       = document.getElementById("settings-first-name").value.trim();
-  const lastName        = document.getElementById("settings-last-name").value.trim();
 
   const btn = document.getElementById("settings-save-btn");
   btn.disabled = true; btn.textContent = "Saving…";
 
-  // 1. Save private fields to localStorage (never on-chain)
-  const profiles = getLocalProfiles();
-  profiles[walletAddress.toLowerCase()] = { firstName, lastName, savedAt: Date.now() };
-  saveLocalProfiles(profiles);
-
-  // 2. Save public fields on-chain
+  // Save public fields on-chain
   try {
     const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, signer);
     const AMOY_MIN_TIP = ethers.utils.parseUnits("30","gwei");
@@ -2985,7 +2959,7 @@ async function saveProfile() {
     showSettingsResult("info", "Transaction submitted — waiting for confirmation…");
     await tx.wait();
     showSettingsResult("success", "✓ Profile saved on-chain.");
-    updateSettingsAvatar({ firstName, lastName, displayName, experienceLevel });
+    updateSettingsAvatar({ displayName, experienceLevel });
     updateWalletPillName();
   } catch(e) {
     showSettingsResult("error", "On-chain save failed: "+(e.reason||e.message));
@@ -3004,11 +2978,9 @@ function showSettingsResult(type, msg) {
 function updateWalletPillName() {
   const pill = document.getElementById("wallet-pill");
   if(!pill || !walletAddress) return;
-  const local = getLocalProfile(walletAddress);
   const displayName = document.getElementById("settings-display-name")?.value.trim();
-  const name = displayName || (local?.firstName ? [local.firstName, local.lastName].filter(Boolean).join(" ") : null);
   const short = walletAddress.slice(0,6)+"..."+walletAddress.slice(-4);
-  pill.childNodes.forEach(n => { if(n.nodeType === Node.TEXT_NODE) n.textContent = name || short; });
+  pill.childNodes.forEach(n => { if(n.nodeType === Node.TEXT_NODE) n.textContent = displayName || short; });
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
