@@ -778,6 +778,63 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   .drawer-close { display: none; }
   .drawer-backdrop { display: none; }
 }
+/* ── TRIPS PAGE ─────────────────────────────────────────────────────────── */
+.page { display:none; }
+.page.active { display:block; }
+
+.trips-tabs { display:flex; gap:0; border-radius:10px; overflow:hidden; border:1px solid var(--border); margin-bottom:24px; }
+.trips-tab { flex:1; padding:11px 8px; text-align:center; font-size:13px; font-weight:600; letter-spacing:0.4px; background:var(--surface2); color:var(--muted2); cursor:pointer; border-right:1px solid var(--border); transition:all 0.2s; }
+.trips-tab:last-child { border-right:none; }
+.trips-tab.active { background:rgba(74,179,255,0.15); color:var(--accent); }
+.trips-tab:hover:not(.active) { color:var(--text); background:rgba(74,179,255,0.05); }
+
+.trip-card-full {
+  background:var(--surface); border:1px solid var(--border); border-radius:16px;
+  padding:20px 22px; margin-bottom:14px; display:flex; align-items:center;
+  gap:18px; position:relative; transition:border-color 0.2s;
+}
+.trip-card-full:hover { border-color: var(--accent); }
+.trip-card-full.cancelled { opacity:0.5; }
+.trip-card-full.upcoming { border-left:3px solid var(--teal); }
+.trip-card-full.active-now { border-left:3px solid var(--brass); }
+
+.trip-card-icon { width:46px; height:46px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
+.trip-card-icon.upcoming { background:rgba(0,200,160,0.12); }
+.trip-card-icon.past     { background:rgba(74,179,255,0.10); }
+.trip-card-icon.cancelled{ background:rgba(255,83,112,0.08); }
+.trip-card-icon.active-now { background:rgba(212,168,64,0.15); }
+
+.trip-card-body { flex:1; min-width:0; }
+.trip-card-title { font-family:var(--display); font-size:15px; font-weight:700; color:var(--foam); margin-bottom:4px; }
+.trip-card-meta  { font-size:12px; color:var(--muted2); display:flex; flex-wrap:wrap; gap:10px; }
+.trip-card-meta span { display:flex; align-items:center; gap:4px; }
+
+.trip-card-right { display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0; }
+.trip-burn-badge { font-family:var(--mono); font-size:14px; font-weight:700; color:var(--danger); }
+.trip-status-badge { font-size:11px; font-weight:600; padding:3px 10px; border-radius:20px; letter-spacing:0.3px; }
+.trip-status-badge.upcoming  { background:rgba(0,200,160,0.12); color:var(--teal); border:1px solid rgba(0,200,160,0.3); }
+.trip-status-badge.active-now{ background:rgba(212,168,64,0.12); color:var(--brass); border:1px solid rgba(212,168,64,0.3); }
+.trip-status-badge.past      { background:rgba(74,179,255,0.08); color:var(--muted2); border:1px solid var(--border); }
+.trip-status-badge.cancelled { background:rgba(255,83,112,0.08); color:var(--danger); border:1px solid rgba(255,83,112,0.2); }
+
+.btn-cancel-trip { font-size:12px; font-weight:600; padding:5px 14px; border-radius:8px; border:1px solid rgba(255,83,112,0.3); background:rgba(255,83,112,0.06); color:var(--danger); cursor:pointer; transition:all 0.2s; font-family:var(--sans); }
+.btn-cancel-trip:hover { background:rgba(255,83,112,0.15); border-color:var(--danger); }
+.btn-cancel-trip:disabled { opacity:0.4; cursor:default; }
+
+.trips-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:24px; }
+.trips-stat { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 18px; }
+.trips-stat-label { font-size:11px; color:var(--muted2); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:6px; }
+.trips-stat-val { font-family:var(--mono); font-size:22px; font-weight:700; }
+
+.trips-connect-prompt { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; gap:14px; text-align:center; }
+.trips-connect-prompt .empty-anchor { font-size:48px; opacity:0.3; }
+.trips-connect-prompt h3 { font-family:var(--display); font-size:18px; color:var(--foam); }
+.trips-connect-prompt p { font-size:13px; color:var(--muted2); max-width:280px; line-height:1.6; }
+
+@media(max-width:900px){
+  .trips-summary { grid-template-columns:1fr 1fr; }
+  .trip-card-full { flex-wrap:wrap; }
+}
 </style>
 </head>
 <body>
@@ -815,8 +872,8 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   </div>
 
   <div class="nav-section-label">Navigation</div>
-  <div class="nav-item active"><span class="nav-icon">⊞</span> Dashboard</div>
-  <div class="nav-item"><span class="nav-icon">⛵</span> Trips</div>
+  <div class="nav-item active" onclick="showPage('dashboard')"><span class="nav-icon">⊞</span> Dashboard</div>
+  <div class="nav-item" onclick="showPage('trips')"><span class="nav-icon">⛵</span> Trips</div>
   <div class="nav-item"><span class="nav-icon">◈</span> Keel Tokens</div>
   <div class="nav-item"><span class="nav-icon">⚓</span> Marinas</div>
   <div class="nav-item"><span class="nav-icon">🗺</span> Fleet</div>
@@ -855,7 +912,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   <!-- TOPBAR -->
   <div class="topbar">
     <button class="hamburger" id="nav-toggle" onclick="toggleNav()" aria-label="Toggle navigation">☰</button>
-    <div class="page-title">⚓ Dashboard</div>
+    <div class="page-title" id="page-title">⚓ Dashboard</div>
     <div class="topbar-right">
       <div id="wallet-area">
         <button class="btn btn-connect" onclick="connectWallet()">⬡ Connect Wallet</button>
@@ -869,8 +926,8 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 
   <div class="content">
 
-    <!-- CENTER PANEL -->
-    <div class="center-panel">
+    <!-- CENTER PANEL (Dashboard) -->
+    <div class="page active center-panel" id="page-dashboard">
 
       <!-- STEP BAR -->
       <div class="step-bar">
@@ -1027,6 +1084,56 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
       </div>
 
     </div><!-- /center-panel -->
+
+    <!-- TRIPS PAGE -->
+    <div class="page center-panel" id="page-trips">
+
+      <!-- Connect prompt (shown when no wallet) -->
+      <div id="trips-connect-prompt" class="trips-connect-prompt" style="display:none">
+        <div class="empty-anchor">⛵</div>
+        <h3>Connect your wallet to view trips</h3>
+        <p>Your upcoming and past voyages will appear here once your wallet is connected.</p>
+        <button class="btn btn-connect" onclick="connectWallet()">⬡ Connect Wallet</button>
+      </div>
+
+      <!-- Trips content (shown when wallet connected) -->
+      <div id="trips-content" style="display:none">
+
+        <!-- Summary stats -->
+        <div class="trips-summary">
+          <div class="trips-stat">
+            <div class="trips-stat-label">Upcoming</div>
+            <div class="trips-stat-val" id="ts-upcoming" style="color:var(--teal)">—</div>
+          </div>
+          <div class="trips-stat">
+            <div class="trips-stat-label">This Month</div>
+            <div class="trips-stat-val" id="ts-month" style="color:var(--accent)">—</div>
+          </div>
+          <div class="trips-stat">
+            <div class="trips-stat-label">Total KEEL Burned</div>
+            <div class="trips-stat-val" id="ts-burned" style="color:var(--danger)">—</div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="trips-tabs">
+          <div class="trips-tab active" id="tab-upcoming" onclick="switchTripsTab('upcoming')">⏳ Upcoming</div>
+          <div class="trips-tab" id="tab-past" onclick="switchTripsTab('past')">📋 Past Voyages</div>
+        </div>
+
+        <!-- Upcoming trips list -->
+        <div id="trips-list-upcoming">
+          <div class="empty-state"><div class="empty-anchor">⚓</div><div class="empty-title">Loading…</div></div>
+        </div>
+
+        <!-- Past trips list -->
+        <div id="trips-list-past" style="display:none">
+          <div class="empty-state"><div class="empty-anchor">⚓</div><div class="empty-title">Loading…</div></div>
+        </div>
+
+      </div><!-- /trips-content -->
+
+    </div><!-- /page-trips -->
 
     <!-- RIGHT PANEL -->
     <div class="right-panel">
@@ -2264,6 +2371,226 @@ function renderPricingTable(){
   const src = document.getElementById("rate-source");
   if(src) src.textContent = ratesLoaded ? "live from contract" : "default rates";
 }
+
+// ── PAGE NAVIGATION ──────────────────────────────────────────────────────────
+let currentPage = "dashboard";
+
+function showPage(page) {
+  currentPage = page;
+
+  // Toggle page panels
+  document.getElementById("page-dashboard").classList.toggle("active", page === "dashboard");
+  document.getElementById("page-trips").classList.toggle("active", page === "trips");
+
+  // Update nav active state
+  document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
+  const navMap = { dashboard: 0, trips: 1 };
+  const navItems = document.querySelectorAll(".nav-item");
+  if(navMap[page] !== undefined) navItems[navMap[page]].classList.add("active");
+
+  // Update topbar title + settle toggle visibility
+  const titles = { dashboard: "⚓ Dashboard", trips: "⛵ My Trips" };
+  document.getElementById("page-title").textContent = titles[page] || "";
+  document.getElementById("settle-toggle").style.display = page === "dashboard" ? "" : "none";
+
+  // On mobile, close the nav drawer after navigation
+  if(isMobile()) { document.body.classList.remove("nav-open"); syncBackdrop(); }
+
+  if(page === "trips") loadTripsPage();
+}
+
+// ── TRIPS PAGE ────────────────────────────────────────────────────────────────
+let tripsData = [];        // all loaded trip records
+let tripsLoaded = false;
+let currentTripsTab = "upcoming";
+
+function switchTripsTab(tab) {
+  currentTripsTab = tab;
+  document.getElementById("tab-upcoming").classList.toggle("active", tab === "upcoming");
+  document.getElementById("tab-past").classList.toggle("active", tab === "past");
+  document.getElementById("trips-list-upcoming").style.display = tab === "upcoming" ? "" : "none";
+  document.getElementById("trips-list-past").style.display     = tab === "past"     ? "" : "none";
+}
+
+async function loadTripsPage() {
+  if(!walletAddress) {
+    document.getElementById("trips-connect-prompt").style.display = "";
+    document.getElementById("trips-content").style.display = "none";
+    return;
+  }
+  document.getElementById("trips-connect-prompt").style.display = "none";
+  document.getElementById("trips-content").style.display = "";
+
+  // Show loading state
+  document.getElementById("trips-list-upcoming").innerHTML = tripLoadingHTML();
+  document.getElementById("trips-list-past").innerHTML     = tripLoadingHTML();
+
+  try {
+    const rp = getReadProvider();
+    const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, rp);
+    const total  = Number(await ledger.tripCount());
+    const MAX_SCAN = 500;
+    const BATCH    = 20;
+    const startIdx = total - 1;
+    const stopIdx  = Math.max(0, total - MAX_SCAN);
+    const indices  = Array.from({length: startIdx - stopIdx + 1}, (_, k) => startIdx - k);
+
+    // Fetch all IDs then all records in parallel batches
+    const ids = [];
+    for(let b = 0; b < indices.length; b += BATCH){
+      const got = await Promise.all(indices.slice(b, b + BATCH).map(i => ledger.tripIds(i).catch(()=>null)));
+      ids.push(...got);
+    }
+    const validIds = ids.filter(Boolean);
+    const records = [];
+    for(let b = 0; b < validIds.length; b += BATCH){
+      const got = await Promise.all(validIds.slice(b, b + BATCH).map((id, k) =>
+        ledger.trips(id).then(t => ({...t, _id: validIds[b+k]})).catch(()=>null)
+      ));
+      records.push(...got);
+    }
+
+    // Filter to this wallet only
+    const nowTs = Math.floor(Date.now() / 1000);
+    tripsData = records
+      .filter(t => t && t.member.toLowerCase() === walletAddress.toLowerCase())
+      .map(t => ({
+        id:          t._id,
+        startTs:     Number(t.startTs),
+        endTs:       Number(t.endTs),
+        hrs:         Number(t.totalTenths) / 10,
+        competitive: t.competitive,
+        cancelled:   t.cancelled,
+        burn:        Number(t.tokensBurned) / 1e18,
+        status:      t.cancelled ? "cancelled"
+                   : Number(t.endTs) < nowTs   ? "past"
+                   : Number(t.startTs) <= nowTs ? "active-now"
+                   : "upcoming"
+      }))
+      .sort((a, b) => b.startTs - a.startTs);
+
+    tripsLoaded = true;
+    renderTripsPage();
+  } catch(e) {
+    console.error("trips load failed", e);
+    const err = tripEmptyHTML("Couldn't load trips", "Check your connection and try again.");
+    document.getElementById("trips-list-upcoming").innerHTML = err;
+    document.getElementById("trips-list-past").innerHTML     = err;
+  }
+}
+
+function renderTripsPage() {
+  if(!tripsLoaded) return;
+  const nowTs    = Math.floor(Date.now() / 1000);
+  const upcoming = tripsData.filter(t => !t.cancelled && t.startTs > nowTs);
+  const active   = tripsData.filter(t => !t.cancelled && t.startTs <= nowTs && t.endTs > nowTs);
+  const past     = tripsData.filter(t => t.cancelled || t.endTs <= nowTs);
+
+  // Summary stats
+  const thisMonthStart = easternEpoch(new Date().getFullYear(), new Date().getMonth()+1, 1, 0, 0);
+  const thisMonthTrips = tripsData.filter(t => !t.cancelled && t.startTs >= thisMonthStart);
+  const totalBurned    = tripsData.filter(t => !t.cancelled).reduce((s,t) => s + t.burn, 0);
+  document.getElementById("ts-upcoming").textContent = (upcoming.length + active.length).toString();
+  document.getElementById("ts-month").textContent    = thisMonthTrips.length.toString();
+  document.getElementById("ts-burned").textContent   = totalBurned.toFixed(2);
+
+  // Upcoming tab: active now + future, sorted soonest first
+  const upcomingList = [...active, ...upcoming].sort((a,b) => a.startTs - b.startTs);
+  const upEl = document.getElementById("trips-list-upcoming");
+  upEl.innerHTML = upcomingList.length
+    ? upcomingList.map(t => tripCardHTML(t)).join("")
+    : tripEmptyHTML("No upcoming voyages", "Book a voyage from the Dashboard to reserve your next trip.");
+
+  // Past tab: completed + cancelled, newest first
+  const pastEl = document.getElementById("trips-list-past");
+  pastEl.innerHTML = past.length
+    ? past.map(t => tripCardHTML(t)).join("")
+    : tripEmptyHTML("No past voyages yet", "Completed and cancelled trips will appear here.");
+}
+
+function tripCardHTML(t) {
+  const nowTs    = Math.floor(Date.now() / 1000);
+  const start    = new Date(t.startTs * 1000);
+  const dateStr  = start.toLocaleDateString("en-US", {weekday:"short", month:"short", day:"numeric", year:"numeric", timeZone:"America/New_York"});
+  const timeStr  = start.toLocaleTimeString("en-US", {hour:"numeric", minute:"2-digit", timeZone:"America/New_York"});
+  const typeLabel = (t.competitive ? "Racing " : "") + "Voyage";
+  const statusLabel = { upcoming:"Upcoming", "active-now":"Underway Now", past:"Completed", cancelled:"Cancelled" }[t.status];
+  const iconMap     = { upcoming:"🗓", "active-now":"⛵", past:"✓", cancelled:"✕" };
+
+  const canCancel = (t.status === "upcoming") && !!walletAddress;
+
+  return `<div class="trip-card-full ${t.status}" id="tcard-${t.id}">
+    <div class="trip-card-icon ${t.status}">${iconMap[t.status]}</div>
+    <div class="trip-card-body">
+      <div class="trip-card-title">${typeLabel}</div>
+      <div class="trip-card-meta">
+        <span>📅 ${dateStr}</span>
+        <span>🕐 ${timeStr} ET</span>
+        <span>⏱ ${t.hrs}h</span>
+      </div>
+    </div>
+    <div class="trip-card-right">
+      <div class="trip-burn-badge">−${t.burn.toFixed(2)} KEEL</div>
+      <div class="trip-status-badge ${t.status}">${statusLabel}</div>
+      ${canCancel ? `<button class="btn-cancel-trip" id="cbtn-${t.id}" onclick="cancelTrip('${t.id}')">Cancel</button>` : ""}
+    </div>
+  </div>`;
+}
+
+function tripEmptyHTML(title, sub) {
+  return `<div class="empty-state"><div class="empty-anchor">⚓</div>
+    <div class="empty-title">${title}</div>
+    <div class="empty-sub">${sub}</div></div>`;
+}
+
+function tripLoadingHTML() {
+  return `<div class="empty-state"><div class="empty-anchor" style="animation:pulse 1.5s infinite">⚓</div>
+    <div class="empty-title">Loading voyages…</div></div>`;
+}
+
+async function cancelTrip(tripId) {
+  if(!signer) { alert("Connect your wallet to cancel a trip."); return; }
+  const btn = document.getElementById("cbtn-" + tripId);
+  if(!btn) return;
+  if(!confirm("Cancel this reservation? The burn is non-refundable — cancelling only frees the time slot.")) return;
+
+  btn.disabled = true;
+  btn.textContent = "Cancelling…";
+  try {
+    const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, signer);
+    const overrides = {};
+    try {
+      const est = await ledger.estimateGas.cancelTrip(tripId);
+      overrides.gasLimit = est.mul(130).div(100);
+    } catch(_) { overrides.gasLimit = 100000; }
+    const AMOY_MIN_TIP = ethers.utils.parseUnits("30","gwei");
+    try {
+      const fee = await provider.getFeeData();
+      const prio   = (fee.maxPriorityFeePerGas && fee.maxPriorityFeePerGas.gt(AMOY_MIN_TIP)) ? fee.maxPriorityFeePerGas : AMOY_MIN_TIP;
+      const maxFee = (fee.maxFeePerGas && fee.maxFeePerGas.gt(prio)) ? fee.maxFeePerGas : prio.add(ethers.utils.parseUnits("20","gwei"));
+      overrides.maxPriorityFeePerGas = prio;
+      overrides.maxFeePerGas = maxFee;
+    } catch(_) {
+      overrides.maxPriorityFeePerGas = AMOY_MIN_TIP;
+      overrides.maxFeePerGas = ethers.utils.parseUnits("50","gwei");
+    }
+
+    const tx = await ledger.cancelTrip(tripId, overrides);
+    btn.textContent = "Confirming…";
+    await tx.wait();
+
+    // Update local state and re-render without a full reload
+    const trip = tripsData.find(t => t.id === tripId);
+    if(trip) { trip.cancelled = true; trip.status = "cancelled"; }
+    renderTripsPage();
+    await loadReservedRanges(); // free the slot on the calendar too
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = "Cancel";
+    alert("Cancellation failed: " + (e.reason || e.message));
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
 </script>
 </body>
 </html>
