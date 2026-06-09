@@ -2001,6 +2001,7 @@ async function loadOnChainHistory() {
     for(const t of tripRecords){
       if(!t) continue;
       if(t.member.toLowerCase() !== walletAddress.toLowerCase()) continue;
+      if(t.cancelled) continue; // exclude cancelled — refunded, not "used"
       const startTs = Number(t.startTs);
       if(startTs < monthStart || startTs >= monthEnd) continue;
       rows.push({
@@ -2588,8 +2589,9 @@ async function cancelTrip(tripId, burnAmt) {
     if(trip) { trip.cancelled = true; trip.status = "cancelled"; }
     renderTripsPage();
     await Promise.all([
-      refreshBalance(),      // show refunded tokens in balance immediately
-      loadReservedRanges(),  // free the slot on the calendar
+      refreshBalance(),       // show refunded tokens in balance immediately
+      loadReservedRanges(),   // free the slot on the calendar
+      loadOnChainHistory(),   // update dashboard Recent Voyages + Used stat
     ]);
   } catch(e) {
     btn.disabled = false;
