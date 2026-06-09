@@ -1223,8 +1223,8 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 </div><!-- /main-wrap -->
 
 <script>
-const KEEL_TOKEN_ADDRESS  = "0x9cd72e3d13AdAd360A2e944A2BB84cf901893D15";
-const KEEL_LEDGER_ADDRESS = "0x3AE295191F6a5938DA5D893b27e04F3ED75fA867";
+const KEEL_TOKEN_ADDRESS  = "0x757743aF271b4B7c4CBF1363F518A4D5b50307F1";
+const KEEL_LEDGER_ADDRESS = "0x3a4eedaf227C2f16Ea57EcC31465A2a302126056";
 const AMOY_CHAIN_ID = 80002;
 // Dedicated RPC for reading logs/history (public RPC caps getLogs at ~100 blocks).
 const READ_RPC_URL = "https://polygon-amoy.g.alchemy.com/v2/tocmMJjVYA0syE3coEuGB";
@@ -1248,6 +1248,7 @@ const LEDGER_ABI = [
   "function boatTripCount(uint16 boatId) view returns (uint256)",
   "function boatTrips(uint16, uint256) view returns (bytes32)",
   "event TripSettled(bytes32 indexed tripId, address indexed member, uint256 tokensBurned, uint32 totalTenths)",
+  "event TripCancelled(bytes32 indexed tripId, address indexed member, uint16 indexed boatId, uint256 refundAmount, bool refunded)",
   "function trips(bytes32) view returns (address member, uint64 startTs, uint64 endTs, uint32 totalTenths, bool competitive, bool cancelled, uint16 boatId, uint256 burnHundredths, uint256 tokensBurned)",
   "function quoteHundredths(uint32[8] h, bool competitive) view returns (uint256 burnHundredths, uint32 totalTenths)",
   "function rateGrid(uint256, uint256) view returns (uint16)",
@@ -2535,7 +2536,7 @@ function tripCardHTML(t) {
     <div class="trip-card-right">
       <div class="trip-burn-badge">−${t.burn.toFixed(2)} KEEL</div>
       <div class="trip-status-badge ${t.status}">${statusLabel}</div>
-      ${canCancel ? `<button class="btn-cancel-trip" id="cbtn-${t.id}" onclick="cancelTrip('${t.id}')">Cancel</button>` : ""}
+      ${canCancel ? `<button class="btn-cancel-trip" id="cbtn-${t.id}" onclick="cancelTrip('${t.id}', ${t.burn.toFixed(2)})">Cancel & Refund</button>` : ""}
     </div>
   </div>`;
 }
@@ -2551,11 +2552,11 @@ function tripLoadingHTML() {
     <div class="empty-title">Loading voyages…</div></div>`;
 }
 
-async function cancelTrip(tripId) {
+async function cancelTrip(tripId, burnAmt) {
   if(!signer) { alert("Connect your wallet to cancel a trip."); return; }
   const btn = document.getElementById("cbtn-" + tripId);
   if(!btn) return;
-  if(!confirm("Cancel this reservation? The burn is non-refundable — cancelling only frees the time slot.")) return;
+  if(!confirm(`Cancel this reservation?\n\n${burnAmt} KEEL will be refunded to your wallet and the time slot will be freed.`)) return;
 
   btn.disabled = true;
   btn.textContent = "Cancelling…";
@@ -2586,7 +2587,10 @@ async function cancelTrip(tripId) {
     const trip = tripsData.find(t => t.id === tripId);
     if(trip) { trip.cancelled = true; trip.status = "cancelled"; }
     renderTripsPage();
-    await loadReservedRanges(); // free the slot on the calendar too
+    await Promise.all([
+      refreshBalance(),      // show refunded tokens in balance immediately
+      loadReservedRanges(),  // free the slot on the calendar
+    ]);
   } catch(e) {
     btn.disabled = false;
     btn.textContent = "Cancel";
