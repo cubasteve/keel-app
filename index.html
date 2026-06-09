@@ -259,14 +259,6 @@ body.nav-collapsed .sidebar { transform: translateX(-100%); }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
 .token-addr { font-family: var(--mono); font-size: 10px; color: var(--muted); }
 
-/* COMPASS ROSE decoration in sidebar footer */
-.compass {
-  width: 60px; height: 60px;
-  margin: 8px auto 0;
-  position: relative;
-  opacity: 0.25;
-}
-.compass svg { width: 100%; height: 100%; }
 
 /* MAIN */
 .main-wrap { margin-left: 230px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; position: relative; z-index: 1; transition: margin-left 0.3s ease; }
@@ -889,22 +881,6 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
     <div class="network-pill"><div class="net-dot"></div> Polygon Amoy</div>
     <div class="token-addr" style="margin-top:4px">⬡ KEEL · 0x9cd7...D15</div>
 
-    <!-- Mini compass rose -->
-    <div class="compass">
-      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="50" cy="50" r="48" stroke="#4ab3ff" stroke-width="1" opacity="0.4"/>
-        <circle cx="50" cy="50" r="38" stroke="#4ab3ff" stroke-width="0.5" opacity="0.2"/>
-        <circle cx="50" cy="50" r="4" fill="#4ab3ff" opacity="0.6"/>
-        <polygon points="50,4 54,46 50,50 46,46" fill="#4ab3ff" opacity="0.8"/>
-        <polygon points="50,96 54,54 50,50 46,54" fill="#4a4a6a" opacity="0.6"/>
-        <polygon points="4,50 46,46 50,50 46,54" fill="#4a4a6a" opacity="0.6"/>
-        <polygon points="96,50 54,46 50,50 54,54" fill="#4a4a6a" opacity="0.6"/>
-        <text x="50" y="18" text-anchor="middle" fill="#4ab3ff" font-size="10" font-family="monospace" opacity="0.8">N</text>
-        <text x="50" y="90" text-anchor="middle" fill="#666" font-size="9" font-family="monospace" opacity="0.6">S</text>
-        <text x="88" y="54" text-anchor="middle" fill="#666" font-size="9" font-family="monospace" opacity="0.6">E</text>
-        <text x="12" y="54" text-anchor="middle" fill="#666" font-size="9" font-family="monospace" opacity="0.6">W</text>
-      </svg>
-    </div>
   </div>
 </div>
 
