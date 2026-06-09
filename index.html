@@ -1282,37 +1282,11 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 
         </div>
 
-        <!-- Row 2: Contract Settings + Stats -->
+        <!-- Row 2: Network Stats (full width) -->
         <div class="admin-grid">
 
-          <!-- Contract Settings -->
-          <div class="admin-card">
-            <div class="admin-card-title">⚙ Contract Settings</div>
-            <div class="admin-stat-row">
-              <span class="admin-stat-label">Token Address</span>
-              <span class="admin-stat-val" style="font-size:11px" id="admin-token-addr">—</span>
-            </div>
-            <div class="admin-stat-row">
-              <span class="admin-stat-label">Ledger Address</span>
-              <span class="admin-stat-val" style="font-size:11px" id="admin-ledger-addr">—</span>
-            </div>
-            <div class="admin-stat-row">
-              <span class="admin-stat-label">Total Supply</span>
-              <span class="admin-stat-val" id="admin-total-supply">—</span>
-            </div>
-            <div class="admin-stat-row">
-              <span class="admin-stat-label">Monthly Issuance Cap</span>
-              <span class="admin-stat-val" id="admin-cap-display">—</span>
-            </div>
-            <div class="admin-row" style="margin-top:14px">
-              <input class="inp" type="number" id="admin-new-cap" placeholder="New cap (KEEL)">
-              <button class="btn-admin btn-admin-primary" onclick="adminSetCap()" style="margin-top:0">Update Cap</button>
-            </div>
-            <div class="admin-result" id="admin-cap-result"></div>
-          </div>
-
           <!-- Network Stats -->
-          <div class="admin-card">
+          <div class="admin-card" style="grid-column:1/-1">
             <div class="admin-card-title">📊 Network Stats</div>
             <div class="admin-stat-row">
               <span class="admin-stat-label">Total Trips</span>
@@ -3014,10 +2988,6 @@ async function loadAdminPage() {
 
   denied.style.display = "none"; content.style.display = "";
 
-  // Populate static fields
-  document.getElementById("admin-token-addr").textContent  = KEEL_TOKEN_ADDRESS.slice(0,10)+"…"+KEEL_TOKEN_ADDRESS.slice(-6);
-  document.getElementById("admin-ledger-addr").textContent = KEEL_LEDGER_ADDRESS.slice(0,10)+"…"+KEEL_LEDGER_ADDRESS.slice(-6);
-
   // Default mint month to current month
   const now = new Date();
   const monthVal = now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
@@ -3031,13 +3001,11 @@ async function adminLoadStats() {
     const rp     = getReadProvider();
     const token  = new ethers.Contract(KEEL_TOKEN_ADDRESS, TOKEN_ABI, rp);
     const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, rp);
-    const [supply, cap, tripCount] = await Promise.all([
-      token.totalSupply(), token.monthlyIssuanceCap(), ledger.tripCount()
+    const [supply, tripCount] = await Promise.all([
+      token.totalSupply(), ledger.tripCount()
     ]);
     document.getElementById("admin-total-supply").textContent =
       parseFloat(ethers.utils.formatUnits(supply,18)).toFixed(2)+" KEEL";
-    document.getElementById("admin-cap-display").textContent =
-      parseFloat(ethers.utils.formatUnits(cap,18)).toFixed(0)+" KEEL / month";
     document.getElementById("admin-total-trips").textContent = tripCount.toString();
   } catch(e) { console.warn("admin stats failed", e); }
 }
@@ -3290,27 +3258,6 @@ async function adminLoadMemberBalances() {
   } catch(e) {
     console.error("member balances failed", e);
     el.innerHTML = '<div class="empty-state" style="padding:20px 0"><div class="empty-anchor">⚓</div><div class="empty-title">Failed to load</div></div>';
-  }
-}
-
-async function adminSetCap() {
-  const newCap = parseFloat(document.getElementById("admin-new-cap").value);
-  if(!newCap || newCap <= 0) { showAdminResult("admin-cap-result","error","Enter a valid cap amount."); return; }
-  showAdminResult("admin-cap-result","info","Submitting…");
-  try {
-    const token  = new ethers.Contract(KEEL_TOKEN_ADDRESS, TOKEN_ABI, signer);
-    const wei    = ethers.utils.parseUnits(newCap.toString(), 18);
-    const AMOY_MIN_TIP = ethers.utils.parseUnits("30","gwei");
-    const fee    = await provider.getFeeData().catch(()=>({}));
-    const prio   = (fee.maxPriorityFeePerGas && fee.maxPriorityFeePerGas.gt(AMOY_MIN_TIP)) ? fee.maxPriorityFeePerGas : AMOY_MIN_TIP;
-    const maxFee = (fee.maxFeePerGas && fee.maxFeePerGas.gt(prio)) ? fee.maxFeePerGas : prio.add(ethers.utils.parseUnits("20","gwei"));
-    const tx = await token.setMonthlyIssuanceCap(wei, { maxPriorityFeePerGas:prio, maxFeePerGas:maxFee });
-    await tx.wait();
-    showAdminResult("admin-cap-result","success",`✓ Monthly cap updated to ${newCap} KEEL`);
-    document.getElementById("admin-cap-display").textContent = newCap+" KEEL / month";
-    document.getElementById("admin-new-cap").value = "";
-  } catch(e) {
-    showAdminResult("admin-cap-result","error","Failed: "+(e.reason||e.message));
   }
 }
 
