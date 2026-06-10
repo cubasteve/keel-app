@@ -3641,19 +3641,16 @@ function addToCalendar(startTs, endTs, typeLabel, burnAmt) {
     + "&details="  + encodeURIComponent(`KEEL Token Voyage\nType: ${typeLabel}\nDuration: ${hrs}h\nKEEL burned: ${burnAmt}`)
     + "&location=" + encodeURIComponent("Boat · All times US Eastern");
 
-  // ── iOS: blob downloads get dumped to iCloud Drive, so use the native share
-  //    sheet with the .ics file — it offers Calendar directly. ──
-  if (isIOS && navigator.share) {
-    const file = new File([ics], fileName, { type: "text/calendar" });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      navigator.share({ files: [file], title: "KEEL Voyage" }).catch(err => {
-        // User dismissed the sheet → do nothing. Real failure → Google Calendar.
-        if (err && err.name !== "AbortError") window.open(gcalUrl, "_blank");
-      });
-      return;
-    }
-    // Old iOS without file sharing — Google Calendar works in any browser.
-    window.open(gcalUrl, "_blank");
+  // ── iOS: open the .ics blob in a new tab WITHOUT a download attribute —
+  //    Safari renders the event inline with an "Add All" button straight into
+  //    Apple Calendar. (The share sheet doesn't offer Calendar for .ics, and a
+  //    download attribute shoves the file into iCloud Drive instead.) ──
+  if (isIOS) {
+    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+    const url  = URL.createObjectURL(blob);
+    const win  = window.open(url, "_blank");
+    if (!win) window.open(gcalUrl, "_blank"); // popup blocked → Google Calendar fallback
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
     return;
   }
 
