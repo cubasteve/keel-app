@@ -127,10 +127,10 @@ A holiday hour multiplies *whatever its underlying base would be* (weekday base 
 
 ## ICS calendar worker (`ics-worker/`)
 
-- Cloudflare Worker at **https://keel-ics.sartau.workers.dev/** serves voyage `.ics` files with a real `text/calendar` Content-Type — the only way iOS Safari shows its native "Add All" calendar preview (blob downloads go to iCloud Drive; the share sheet doesn't offer Calendar).
+- Cloudflare Worker at **https://keel-ics.keel-app.workers.dev/** serves voyage `.ics` files with a real `text/calendar` Content-Type — the only way iOS Safari shows its native "Add All" calendar preview (blob downloads go to iCloud Drive; the share sheet doesn't offer Calendar).
 - Params: `?s=<startUnix>&e=<endUnix>&t=<typeLabel>&b=<keelBurned>`. App constant: `KEEL_ICS_ENDPOINT` in `index.html`.
 - "Add to Calendar" per platform: iOS → worker URL (same-tab nav), Android → Google Calendar template URL, desktop → blob `.ics` download.
-- Deploy changes: `npx wrangler deploy` from `ics-worker/` (Cloudflare account: sartau).
+- Deploy changes: `npx wrangler deploy` from `ics-worker/` (Cloudflare subdomain: keel-app).
 
 ## Helper scripts (`scripts/` in the Hardhat project)
 
