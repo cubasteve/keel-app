@@ -169,6 +169,21 @@ contract KeelToken is
         return h < ts.length ? ts[h].expiresAt : 0;
     }
 
+    /// @notice All live tranches for a member, oldest first.
+    function tranchesOf(address member)
+        external view returns (uint256[] memory amounts, uint64[] memory expiresAts)
+    {
+        Tranche[] storage ts = _tranches[member];
+        uint256 h = _trancheHead[member];
+        uint256 n = ts.length - h;
+        amounts    = new uint256[](n);
+        expiresAts = new uint64[](n);
+        for (uint256 i = 0; i < n; i++) {
+            amounts[i]    = ts[h + i].amount;
+            expiresAts[i] = ts[h + i].expiresAt;
+        }
+    }
+
     // ── Core monthly issuance ────────────────────────────────────────────────
 
     /**

@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "C:\\dev\\keel-token\\contracts\\KeelToken.sol": {
-      "lastModificationDate": 1781096407562,
-      "contentHash": "b60905a5651ab95fbdd0185224711f48",
+      "lastModificationDate": 1781096788118,
+      "contentHash": "ab5de4e703b624fb6e3839bb6383a594",
       "sourceName": "contracts/KeelToken.sol",
       "solcConfig": {
         "version": "0.8.24",

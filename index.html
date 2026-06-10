@@ -927,6 +927,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   <div class="nav-section-label">Navigation</div>
   <div class="nav-item active" onclick="showPage('dashboard')"><span class="nav-icon">⊞</span> Dashboard</div>
   <div class="nav-item" onclick="showPage('trips')"><span class="nav-icon">⛵</span> Trips</div>
+  <div class="nav-item" onclick="showPage('keeltoken')"><span class="nav-icon">◈</span> Keel Token</div>
 
   <div class="nav-section-label" style="margin-top:8px">Account</div>
   <div class="nav-item" onclick="showPage('settings')"><span class="nav-icon">⚙</span> Settings</div>
@@ -1166,6 +1167,113 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
       </div><!-- /trips-content -->
 
     </div><!-- /page-trips -->
+
+    <!-- KEEL TOKEN PAGE -->
+    <div class="page center-panel" id="page-keeltoken">
+
+      <!-- Connect prompt -->
+      <div id="kt-connect-prompt" class="trips-connect-prompt">
+        <div class="empty-anchor">◈</div>
+        <h3>Connect your wallet to view your KEEL</h3>
+        <p>Your token balance, expiration schedule, and usage history will appear here.</p>
+      </div>
+
+      <!-- Content -->
+      <div id="kt-content" style="display:none">
+
+        <!-- Summary stats -->
+        <div class="trips-summary">
+          <div class="trips-stat">
+            <div class="trips-stat-label">Balance</div>
+            <div class="trips-stat-val" id="kt-balance" style="color:var(--teal)">—</div>
+          </div>
+          <div class="trips-stat">
+            <div class="trips-stat-label">Expiring ≤ 30 Days</div>
+            <div class="trips-stat-val" id="kt-expiring" style="color:var(--danger)">—</div>
+          </div>
+          <div class="trips-stat">
+            <div class="trips-stat-label">Issued This Month</div>
+            <div class="trips-stat-val" id="kt-issued" style="color:var(--accent)">—</div>
+          </div>
+        </div>
+
+        <!-- Tranche expiration schedule -->
+        <div class="admin-card" style="margin-bottom:20px">
+          <div class="admin-card-title">⌛ Expiration Schedule</div>
+          <p style="font-size:12px;color:var(--muted2);margin-bottom:14px;line-height:1.6">
+            Each monthly issuance lives for <strong style="color:var(--brass)">90 days</strong>.
+            Voyage burns always spend your <strong style="color:var(--accent)">oldest tokens first</strong>,
+            so booking trips keeps your balance fresh.
+          </p>
+          <div id="kt-tranches">
+            <div class="empty-state" style="padding:20px 0"><div class="empty-anchor">⌛</div><div class="empty-title">Loading…</div></div>
+          </div>
+        </div>
+
+        <!-- Usage + Token facts -->
+        <div class="admin-grid">
+
+          <div class="admin-card">
+            <div class="admin-card-title">🔥 Your Usage</div>
+            <div class="admin-stat-row">
+              <span class="admin-stat-label">Total Voyages</span>
+              <span class="admin-stat-val" id="kt-voyages">—</span>
+            </div>
+            <div class="admin-stat-row">
+              <span class="admin-stat-label">Hours on the Water</span>
+              <span class="admin-stat-val" id="kt-hours">—</span>
+            </div>
+            <div class="admin-stat-row">
+              <span class="admin-stat-label">Total KEEL Burned</span>
+              <span class="admin-stat-val" id="kt-burned" style="color:var(--danger)">—</span>
+            </div>
+            <div class="admin-stat-row">
+              <span class="admin-stat-label">Cancelled (Refunded)</span>
+              <span class="admin-stat-val" id="kt-cancelled">—</span>
+            </div>
+            <div class="admin-stat-row">
+              <span class="admin-stat-label">Avg Burn per Voyage</span>
+              <span class="admin-stat-val" id="kt-avg" style="color:var(--brass)">—</span>
+            </div>
+          </div>
+
+          <div class="admin-card">
+            <div class="admin-card-title">◈ Token Facts</div>
+            <div class="admin-stat-row">
+              <span class="admin-stat-label">Wallet Cap</span>
+              <span class="admin-stat-val" id="kt-cap">300 KEEL</span>
+            </div>
+            <div class="admin-stat-row">
+              <span class="admin-stat-label">Monthly Issuance</span>
+              <span class="admin-stat-val" id="kt-monthly">100 KEEL</span>
+            </div>
+            <div class="admin-stat-row">
+              <span class="admin-stat-label">Token Lifetime</span>
+              <span class="admin-stat-val">90 days</span>
+            </div>
+            <div class="admin-stat-row">
+              <span class="admin-stat-label">Transfers</span>
+              <span class="admin-stat-val" style="color:var(--danger)">Disabled</span>
+            </div>
+            <div class="admin-stat-row">
+              <span class="admin-stat-label">Network</span>
+              <span class="admin-stat-val" style="color:var(--teal)">Polygon Amoy</span>
+            </div>
+            <div class="admin-stat-row">
+              <span class="admin-stat-label">Contract</span>
+              <span class="admin-stat-val"><a id="kt-contract-link" href="#" target="_blank" style="color:var(--accent);text-decoration:none;font-size:11px">—</a></span>
+            </div>
+            <p style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.5">
+              KEEL is a usage token, not currency — it can only be minted by the club
+              and burned for voyages. Burns are spent oldest-first; unused tokens expire 90 days
+              after issuance to keep the fleet calendar active.
+            </p>
+          </div>
+
+        </div>
+
+      </div><!-- /kt-content -->
+    </div><!-- /page-keeltoken -->
 
     <!-- SETTINGS PAGE -->
     <div class="page center-panel" id="page-settings">
@@ -1457,6 +1565,7 @@ const TOKEN_ABI  = [
   "function expiringWithin(address member, uint256 window) view returns (uint256)",
   "function pendingExpiry(address member) view returns (uint256)",
   "function nextExpiryAt(address member) view returns (uint64)",
+  "function tranchesOf(address member) view returns (uint256[] amounts, uint64[] expiresAts)",
   "function sweepExpired(address member) external returns (uint256)",
   "function setWalletCap(uint256 newCap) external",
   "function setMonthlyAllocation(uint256 newAmount) external",
@@ -1792,9 +1901,10 @@ async function finishConnect(){
   } catch(_) { walletDisplayName = ""; }
   updateWalletPillName();
   // If the user connected while already on another page, reload it now.
-  if(currentPage === "trips")    try { await loadTripsPage(); }    catch(e){ console.warn("trips load failed", e); }
-  if(currentPage === "settings") try { loadSettingsPage(); }        catch(e){ console.warn("settings load failed", e); }
-  if(currentPage === "admin")    try { await loadAdminPage(); }    catch(e){ console.warn("admin load failed", e); }
+  if(currentPage === "trips")     try { await loadTripsPage(); }     catch(e){ console.warn("trips load failed", e); }
+  if(currentPage === "keeltoken") try { await loadKeelTokenPage(); } catch(e){ console.warn("keel token load failed", e); }
+  if(currentPage === "settings")  try { loadSettingsPage(); }         catch(e){ console.warn("settings load failed", e); }
+  if(currentPage === "admin")     try { await loadAdminPage(); }     catch(e){ console.warn("admin load failed", e); }
 }
 
 // ── Wallet menu actions ──────────────────────────────────────────────────────
@@ -1846,6 +1956,9 @@ async function disconnectWallet(e) {
   provider = null; signer = null; walletAddress = null;
   keelBalance = 0; walletDisplayName = "";
   const expRow = document.getElementById("ms-expiring-row"); if(expRow) expRow.style.display = "none";
+  // Reset Keel Token page
+  document.getElementById("kt-connect-prompt").style.display = "";
+  document.getElementById("kt-content").style.display = "none";
   monthlyUsed = 0; monthlyIssued = 0; monthlyCap = MAX_CAP;
   // Reset trips + admin page state
   tripsData = []; tripsLoaded = false;
@@ -2656,17 +2769,18 @@ function showPage(page) {
   // Toggle page panels
   document.getElementById("page-dashboard").classList.toggle("active", page === "dashboard");
   document.getElementById("page-trips").classList.toggle("active", page === "trips");
+  document.getElementById("page-keeltoken").classList.toggle("active", page === "keeltoken");
   document.getElementById("page-settings").classList.toggle("active", page === "settings");
   document.getElementById("page-admin").classList.toggle("active", page === "admin");
 
   // Update nav active state
   document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
-  const navMap = { dashboard: 0, trips: 1, settings: 2, admin: 3 };
+  const navMap = { dashboard: 0, trips: 1, keeltoken: 2, settings: 3, admin: 4 };
   const navItems = document.querySelectorAll(".nav-item");
   if(navMap[page] !== undefined) navItems[navMap[page]].classList.add("active");
 
   // Update topbar title + settle toggle visibility
-  const titles = { dashboard: "⚓ Dashboard", trips: "⛵ Trips", settings: "⚙ Settings", admin: "🔑 Admin Panel" };
+  const titles = { dashboard: "⚓ Dashboard", trips: "⛵ Trips", keeltoken: "◈ Keel Token", settings: "⚙ Settings", admin: "🔑 Admin Panel" };
   document.getElementById("page-title").textContent = titles[page] || "";
   document.getElementById("settle-toggle").style.display = page === "dashboard" ? "" : "none";
   // Hide the burn bar on non-dashboard pages, restore it on dashboard
@@ -2676,9 +2790,10 @@ function showPage(page) {
   // On mobile, close the nav drawer after navigation
   if(isMobile()) { document.body.classList.remove("nav-open"); syncBackdrop(); }
 
-  if(page === "trips")    loadTripsPage();
-  if(page === "settings") loadSettingsPage();
-  if(page === "admin")    loadAdminPage();
+  if(page === "trips")     loadTripsPage();
+  if(page === "keeltoken") loadKeelTokenPage();
+  if(page === "settings")  loadSettingsPage();
+  if(page === "admin")     loadAdminPage();
 }
 
 // ── TRIPS PAGE ────────────────────────────────────────────────────────────────
@@ -2894,6 +3009,132 @@ async function cancelTrip(tripId, burnAmt) {
     alert("Cancellation failed: " + (e.reason || e.message));
   }
 }
+// ── KEEL TOKEN PAGE ──────────────────────────────────────────────────────────
+async function loadKeelTokenPage() {
+  const prompt  = document.getElementById("kt-connect-prompt");
+  const content = document.getElementById("kt-content");
+  if(!walletAddress) {
+    prompt.style.display = ""; content.style.display = "none"; return;
+  }
+  prompt.style.display = "none"; content.style.display = "";
+
+  const rp     = getReadProvider();
+  const token  = new ethers.Contract(KEEL_TOKEN_ADDRESS, TOKEN_ABI, rp);
+  const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, rp);
+  const now    = new Date();
+  const nowSec = Math.floor(Date.now()/1000);
+
+  // Contract link
+  const link = document.getElementById("kt-contract-link");
+  link.textContent = KEEL_TOKEN_ADDRESS.slice(0,8)+"…"+KEEL_TOKEN_ADDRESS.slice(-6);
+  link.href = "https://amoy.polygonscan.com/address/"+KEEL_TOKEN_ADDRESS;
+
+  // ── Balance, expiry, config — all in parallel ──
+  try {
+    const mintKey = ethers.utils.solidityKeccak256(
+      ["address","uint256","uint256"], [walletAddress, now.getFullYear(), now.getMonth()+1]);
+    const [bal, expWei, minted, capWei, allocWei, tranches] = await Promise.all([
+      token.balanceOf(walletAddress),
+      token.expiringWithin(walletAddress, 30*24*3600),
+      token.monthlyMinted(mintKey),
+      token.walletCap(),
+      token.monthlyAllocation(),
+      token.tranchesOf(walletAddress)
+    ]);
+    const balF = parseFloat(ethers.utils.formatUnits(bal,18));
+    document.getElementById("kt-balance").textContent  = balF.toFixed(2);
+    document.getElementById("kt-expiring").textContent = parseFloat(ethers.utils.formatUnits(expWei,18)).toFixed(2);
+    document.getElementById("kt-issued").textContent   = parseFloat(ethers.utils.formatUnits(minted,18)).toFixed(0);
+    document.getElementById("kt-cap").textContent      = parseFloat(ethers.utils.formatUnits(capWei,18)).toFixed(0)+" KEEL";
+    document.getElementById("kt-monthly").textContent  = parseFloat(ethers.utils.formatUnits(allocWei,18)).toFixed(0)+" KEEL";
+    renderKtTranches(tranches, balF, nowSec);
+  } catch(e) {
+    console.error("keel token stats failed", e);
+    document.getElementById("kt-tranches").innerHTML =
+      '<div class="empty-state" style="padding:20px 0"><div class="empty-anchor">⚓</div><div class="empty-title">Couldn\'t load token data</div></div>';
+  }
+
+  // ── Usage stats from on-chain trip history (all time, this wallet) ──
+  try {
+    const total = Number(await ledger.tripCount());
+    const BATCH = 20, MAX = 500;
+    const indices = Array.from({length: Math.min(total, MAX)}, (_,k) => total-1-k);
+    const ids = [];
+    for(let b = 0; b < indices.length; b += BATCH){
+      const got = await Promise.all(indices.slice(b,b+BATCH).map(i => ledger.tripIds(i).catch(()=>null)));
+      ids.push(...got);
+    }
+    const validIds = ids.filter(Boolean);
+    const records = [];
+    for(let b = 0; b < validIds.length; b += BATCH){
+      const got = await Promise.all(validIds.slice(b,b+BATCH).map(id => ledger.trips(id).catch(()=>null)));
+      records.push(...got);
+    }
+    const mine      = records.filter(t => t && t.member.toLowerCase() === walletAddress.toLowerCase());
+    const active    = mine.filter(t => !t.cancelled);
+    const cancelled = mine.filter(t => t.cancelled);
+    const burned    = active.reduce((s,t) => s + Number(t.tokensBurned)/1e18, 0);
+    const hours     = active.reduce((s,t) => s + Number(t.totalTenths)/10, 0);
+    document.getElementById("kt-voyages").textContent   = active.length.toString();
+    document.getElementById("kt-hours").textContent    = hours.toFixed(1)+" h";
+    document.getElementById("kt-burned").textContent   = burned.toFixed(2)+" KEEL";
+    document.getElementById("kt-cancelled").textContent = cancelled.length.toString();
+    document.getElementById("kt-avg").textContent      = active.length ? (burned/active.length).toFixed(2)+" KEEL" : "—";
+  } catch(e) { console.warn("keel token usage stats failed", e); }
+}
+
+function renderKtTranches(tranches, balance, nowSec) {
+  const el = document.getElementById("kt-tranches");
+  const amounts    = tranches.amounts    || tranches[0] || [];
+  const expiresAts = tranches.expiresAts || tranches[1] || [];
+  const LIFE = 90*24*3600;
+
+  const rows = [];
+  let trancheTotal = 0;
+  for(let i = 0; i < amounts.length; i++){
+    const amt = parseFloat(ethers.utils.formatUnits(amounts[i], 18));
+    if(amt <= 0) continue;
+    trancheTotal += amt;
+    const exp      = Number(expiresAts[i]);
+    const secsLeft = exp - nowSec;
+    const daysLeft = Math.max(0, Math.ceil(secsLeft / 86400));
+    const pctLeft  = Math.max(0, Math.min(100, (secsLeft / LIFE) * 100));
+    const expDate  = new Date(exp*1000).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+    const urgency  = daysLeft <= 14 ? "var(--danger)" : daysLeft <= 30 ? "var(--brass)" : "var(--teal)";
+    const status   = secsLeft <= 0
+      ? '<span style="color:var(--danger);font-weight:600">Expired — swept on next use</span>'
+      : `<span style="color:${urgency};font-weight:600">${daysLeft} day${daysLeft===1?"":"s"} left</span>`;
+    rows.push(`<div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid rgba(26,48,80,0.5)">
+      <div style="font-family:var(--mono);font-weight:700;font-size:15px;color:var(--foam);min-width:90px">${amt.toFixed(2)} <span style="font-size:11px;opacity:0.6">KEEL</span></div>
+      <div style="flex:1">
+        <div style="height:6px;background:var(--surface3);border-radius:6px;overflow:hidden">
+          <div style="height:100%;width:${pctLeft}%;background:${urgency};border-radius:6px"></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted2);margin-top:5px">Expires ${expDate} · ${status}</div>
+      </div>
+    </div>`);
+  }
+
+  // Legacy tokens minted before the expiry upgrade have no tranche — never expire.
+  const legacy = balance - trancheTotal;
+  if(legacy > 0.005){
+    rows.push(`<div style="display:flex;align-items:center;gap:14px;padding:12px 0">
+      <div style="font-family:var(--mono);font-weight:700;font-size:15px;color:var(--foam);min-width:90px">${legacy.toFixed(2)} <span style="font-size:11px;opacity:0.6">KEEL</span></div>
+      <div style="flex:1">
+        <div style="height:6px;background:var(--surface3);border-radius:6px;overflow:hidden">
+          <div style="height:100%;width:100%;background:#9664ff;border-radius:6px;opacity:0.5"></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted2);margin-top:5px">Issued before the expiry policy · <span style="color:#9664ff;font-weight:600">Never expires</span></div>
+      </div>
+    </div>`);
+  }
+
+  el.innerHTML = rows.length
+    ? rows.join("")
+    : '<div class="empty-state" style="padding:20px 0"><div class="empty-anchor">◈</div><div class="empty-title">No tokens yet</div><div class="empty-sub">Your monthly allocation will appear here once issued.</div></div>';
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ── SETTINGS PAGE ────────────────────────────────────────────────────────────
 const PROFILES_KEY = "keel_member_profiles"; // localStorage — private fields only
 
