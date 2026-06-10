@@ -1542,6 +1542,9 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 </div><!-- /main-wrap -->
 
 <script>
+// Cloudflare Worker that serves voyage .ics files with a text/calendar
+// Content-Type — required for iOS Safari to show the native calendar preview.
+const KEEL_ICS_ENDPOINT = "https://keel-ics.sartau.workers.dev/";
 const KEEL_TOKEN_ADDRESS  = "0xd4Ca4D559ccE5025e198B0EBb351BD7cE9C4164A";
 const KEEL_LEDGER_ADDRESS = "0x5c27f0399C3737a68e0933183609b8a273A98eC0";
 const AMOY_CHAIN_ID = 80002;
@@ -3641,16 +3644,15 @@ function addToCalendar(startTs, endTs, typeLabel, burnAmt) {
     + "&details="  + encodeURIComponent(`KEEL Token Voyage\nType: ${typeLabel}\nDuration: ${hrs}h\nKEEL burned: ${burnAmt}`)
     + "&location=" + encodeURIComponent("Boat · All times US Eastern");
 
-  // ── iOS: open the .ics blob in a new tab WITHOUT a download attribute —
-  //    Safari renders the event inline with an "Add All" button straight into
-  //    Apple Calendar. (The share sheet doesn't offer Calendar for .ics, and a
-  //    download attribute shoves the file into iCloud Drive instead.) ──
+  // ── iOS: open the ICS endpoint (Cloudflare Worker) — it serves the event
+  //    with a real text/calendar Content-Type, so Safari shows the native
+  //    calendar preview with "Add All". Blob/data URLs don't get this. ──
   if (isIOS) {
-    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
-    const url  = URL.createObjectURL(blob);
-    const win  = window.open(url, "_blank");
-    if (!win) window.open(gcalUrl, "_blank"); // popup blocked → Google Calendar fallback
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    const icsUrl = KEEL_ICS_ENDPOINT
+      + "?s=" + startTs + "&e=" + endTs
+      + "&t=" + encodeURIComponent(typeLabel)
+      + "&b=" + encodeURIComponent(burnAmt);
+    window.location.href = icsUrl; // same-tab nav triggers the calendar sheet
     return;
   }
 
