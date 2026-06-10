@@ -42,6 +42,15 @@ A working end-to-end usage + reservation system:
 
 ---
 
+## Token expiry (built)
+
+- Every mint creates a **tranche** expiring **90 days** after issuance (`expiryDuration`, admin-settable via `setExpiryDuration`).
+- Burns consume **oldest tranches first (FIFO)**; expired tranches are swept (burned, `TokensExpired` event) automatically on every issue/burn, or via public `sweepExpired(member)`.
+- Refunded cancellations get a fresh 90-day tranche. Legacy balances minted before the upgrade have no tranche and never expire.
+- Token is now **non-transferable** (mint/burn only) so the 300 cap and expiry can't be dodged via a second wallet.
+- Views: `expiringWithin(member, window)`, `pendingExpiry(member)`, `nextExpiryAt(member)`.
+- Dashboard "This Month" card shows an **Expiring Soon** row (30-day window) when nonzero.
+
 ## Current state
 
 - Contract v5 is **deployed and live** at the address above, and **LEDGER_ROLE has been granted** to it (confirmed: `✓ LEDGER_ROLE granted.`).

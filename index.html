@@ -1385,6 +1385,16 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
           </div>
           <div class="ms-val purple" id="ms-cap" style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;line-height:1.1"><span>0 / 300</span><span style="font-size:10px;font-weight:400;opacity:0.7">KEEL</span></div>
         </div>
+        <div class="month-stat" id="ms-expiring-row" style="display:none">
+          <div class="ms-left">
+            <div class="ms-icon" style="background:rgba(255,83,112,0.12)">⌛</div>
+            <div>
+              <div class="ms-label">Expiring Soon</div>
+              <div class="ms-bar" style="width:80px"><div class="ms-bar-fill" id="expiring-bar" style="width:0%;background:var(--danger)"></div></div>
+            </div>
+          </div>
+          <div class="ms-val" id="ms-expiring" style="color:var(--danger);display:flex;flex-direction:column;align-items:flex-end;gap:1px;line-height:1.1"><span>0 KEEL</span><span style="font-size:10px;font-weight:400;opacity:0.7" id="ms-expiring-date"></span></div>
+        </div>
         <div style="margin-top:12px">
           <a href="#" style="font-size:12px;color:var(--accent);text-decoration:none">↗ View full analytics</a>
         </div>
@@ -1444,6 +1454,10 @@ const TOKEN_ABI  = [
   "function issueMonthlyAllocation(address member, uint256 year, uint256 month) external returns (uint256 issued)",
   "function walletCap() view returns (uint256)",
   "function monthlyAllocation() view returns (uint256)",
+  "function expiringWithin(address member, uint256 window) view returns (uint256)",
+  "function pendingExpiry(address member) view returns (uint256)",
+  "function nextExpiryAt(address member) view returns (uint64)",
+  "function sweepExpired(address member) external returns (uint256)",
   "function setWalletCap(uint256 newCap) external",
   "function setMonthlyAllocation(uint256 newAmount) external",
   "function hasRole(bytes32 role, address account) view returns (bool)",
@@ -1629,6 +1643,31 @@ async function loadMonthlyStats(){
     monthlyIssued = parseFloat(ethers.utils.formatUnits(mintedWei, 18));
     updateBalanceUI();
   } catch(e){ console.warn("monthly stats load failed", e); }
+  try { await loadExpiryStats(); } catch(e){ console.warn("expiry stats load failed", e); }
+}
+
+// Show how much KEEL will expire within the next 30 days (90-day token life, FIFO).
+async function loadExpiryStats(){
+  const row = document.getElementById("ms-expiring-row");
+  if(!walletAddress){ if(row) row.style.display = "none"; return; }
+  const rp = getReadProvider();
+  const token = new ethers.Contract(KEEL_TOKEN_ADDRESS, TOKEN_ABI, rp);
+  const THIRTY_DAYS = 30*24*3600;
+  const [expWei, nextAt] = await Promise.all([
+    token.expiringWithin(walletAddress, THIRTY_DAYS),
+    token.nextExpiryAt(walletAddress)
+  ]);
+  const expiring = parseFloat(ethers.utils.formatUnits(expWei, 18));
+  if(expiring <= 0){ row.style.display = "none"; return; }
+  row.style.display = "";
+  document.querySelector("#ms-expiring span").textContent = expiring.toFixed(2)+" KEEL";
+  const dateEl = document.getElementById("ms-expiring-date");
+  if(dateEl && Number(nextAt) > 0){
+    dateEl.textContent = "by "+new Date(Number(nextAt)*1000)
+      .toLocaleDateString("en-US",{month:"short",day:"numeric"});
+  }
+  const bar = document.getElementById("expiring-bar");
+  if(bar) bar.style.width = Math.min((expiring/MAX_CAP)*100,100)+"%";
 }
 
 async function connectWallet() {
@@ -1806,6 +1845,7 @@ async function disconnectWallet(e) {
   // Reset all state and restore the Connect button
   provider = null; signer = null; walletAddress = null;
   keelBalance = 0; walletDisplayName = "";
+  const expRow = document.getElementById("ms-expiring-row"); if(expRow) expRow.style.display = "none";
   monthlyUsed = 0; monthlyIssued = 0; monthlyCap = MAX_CAP;
   // Reset trips + admin page state
   tripsData = []; tripsLoaded = false;
