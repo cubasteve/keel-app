@@ -3629,11 +3629,46 @@ function addToCalendar(startTs, endTs, typeLabel, burnAmt) {
     "END:VCALENDAR"
   ].join("\r\n");
 
+  const fileName = `keel-voyage-${new Date(startTs*1000).toISOString().slice(0,10)}.ics`;
+  const isIOS     = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/.test(navigator.userAgent);
+
+  // Google Calendar event-template URL — works everywhere with no file handling.
+  const gcalUrl = "https://calendar.google.com/calendar/render?action=TEMPLATE"
+    + "&text="     + encodeURIComponent(`⛵ ${typeLabel} — KEEL Boat Share`)
+    + "&dates="    + icsDate(startTs) + "/" + icsDate(endTs)
+    + "&details="  + encodeURIComponent(`KEEL Token Voyage\nType: ${typeLabel}\nDuration: ${hrs}h\nKEEL burned: ${burnAmt}`)
+    + "&location=" + encodeURIComponent("Boat · All times US Eastern");
+
+  // ── iOS: blob downloads get dumped to iCloud Drive, so use the native share
+  //    sheet with the .ics file — it offers Calendar directly. ──
+  if (isIOS && navigator.share) {
+    const file = new File([ics], fileName, { type: "text/calendar" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: "KEEL Voyage" }).catch(err => {
+        // User dismissed the sheet → do nothing. Real failure → Google Calendar.
+        if (err && err.name !== "AbortError") window.open(gcalUrl, "_blank");
+      });
+      return;
+    }
+    // Old iOS without file sharing — Google Calendar works in any browser.
+    window.open(gcalUrl, "_blank");
+    return;
+  }
+
+  // ── Android: Google Calendar is the native experience. ──
+  if (isAndroid) {
+    window.open(gcalUrl, "_blank");
+    return;
+  }
+
+  // ── Desktop: plain .ics download (opens in Outlook/Apple Calendar/etc). ──
   const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
   a.href     = url;
-  a.download = `keel-voyage-${new Date(startTs*1000).toISOString().slice(0,10)}.ics`;
+  a.download = fileName;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
