@@ -155,7 +155,9 @@ body.embedded .topbar { padding: 10px 16px; }
 .layer-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(74,179,255,0.12); }
 .layer-btn:disabled { opacity: 0.5; cursor: default; }
 .radar-time { font-family: var(--mono); font-size: 9px; color: var(--muted2); background: rgba(2,9,18,0.6); padding: 2px 6px; border-radius: 6px; display: none; }
+.radar-time.future { color: var(--amber); }
 #wind-canvas { position: absolute; inset: 0; z-index: 450; pointer-events: none; }
+#cast-canvas { position: absolute; inset: 0; z-index: 440; pointer-events: none; }
 </style>
 </head>
 <body>
@@ -228,6 +230,7 @@ function initMap(){
   map.on("click", e => setPoint(e.latlng.lat, e.latlng.lng, false));
   initWindLayer();
   initRain();
+  initCast();
 }
 
 // ── Animated wind particle layer ─────────────────────────────────────────────
@@ -353,7 +356,7 @@ function toggleWind(){
 
 // ── Animated rain radar layer (RainViewer, free/no key) ─────────────────────
 // Loops the last hour of radar frames plus the first nowcast frame.
-let rainOn = true, rainLayers = [], rainFrames = [], rainTimer = null, rainIdx = 0;
+let rainOn = true, rainLayers = [], rainFrames = [], rainTimer = null;
 async function initRain(){
   map.createPane("rain");
   map.getPane("rain").style.zIndex = 350;          // above base tiles, below markers
@@ -363,7 +366,7 @@ async function initRain(){
     if(!res.ok) throw new Error("rainviewer http " + res.status);
     const data = await res.json();
     rainFrames = ((data.radar && data.radar.past) || []).slice(-6)
-      .concat(((data.radar && data.radar.nowcast) || []).slice(0, 1));
+      .concat((data.radar && data.radar.nowcast) || []);
     if(!rainFrames.length) throw new Error("no radar frames");
     rainLayers = rainFrames.map(f =>
       L.tileLayer(data.host + f.path + "/256/{z}/{x}/{y}/2/1_1.png",
@@ -379,16 +382,32 @@ async function initRain(){
     btn.disabled = true; btn.classList.remove("active"); btn.textContent = "🌧 Rain n/a";
   }
 }
+// Plays radar tile frames (past + RainViewer nowcast), then model futurecast
+// frames out to +2h drawn on the cast canvas, as one continuous loop.
 function startRain(){
   if(rainTimer) clearInterval(rainTimer);
+  const lastRadarTime = rainFrames.length ? rainFrames[rainFrames.length - 1].time : 0;
+  const playlist = rainFrames.map((f, i) => ({
+      kind: "tile", idx: i, time: f.time,
+      label: f.time * 1000 > Date.now() ? "nowcast" : "radar"
+    }))
+    .concat(castSteps.filter(s => s.time > lastRadarTime)
+      .map(s => ({ kind: "cast", step: s, time: s.time, label: "cast" })));
+  if(!playlist.length) return;
+  let pi = -1;
   rainTimer = setInterval(() => {
-    rainLayers[rainIdx].setOpacity(0);
-    rainIdx = (rainIdx + 1) % rainLayers.length;
-    rainLayers[rainIdx].setOpacity(0.65);
-    const f = rainFrames[rainIdx], el = document.getElementById("radar-time");
+    pi = (pi + 1) % playlist.length;
+    const fr = playlist[pi];
+    rainLayers.forEach(l => l.setOpacity(0));
+    clearCast();
+    if(fr.kind === "tile") rainLayers[fr.idx].setOpacity(0.65);
+    else drawCastStep(fr.step);
+    const el = document.getElementById("radar-time");
+    const mins = Math.round((fr.time - Date.now() / 1000) / 60);
     el.style.display = "block";
-    el.textContent = "radar " + time12(new Date(f.time * 1000).toTimeString().slice(0, 5)) +
-                     (f.time * 1000 > Date.now() ? " ·cast" : "");
+    el.textContent = fr.label + " " + time12(new Date(fr.time * 1000).toTimeString().slice(0, 5)) +
+                     (mins > 0 ? " (+" + mins + "m)" : "");
+    el.classList.toggle("future", mins > 0);
   }, 700);
 }
 function toggleRain(){
@@ -398,8 +417,95 @@ function toggleRain(){
   if(!rainOn){
     if(rainTimer){ clearInterval(rainTimer); rainTimer = null; }
     rainLayers.forEach(l => l.setOpacity(0));
+    clearCast();
     document.getElementById("radar-time").style.display = "none";
-  } else if(rainLayers.length) startRain();
+  } else if(rainLayers.length || castSteps.length) startRain();
+}
+
+// ── 2-hour model futurecast (Open-Meteo 15-minute precipitation grid) ───────
+// Picks up where the RainViewer nowcast ends; sampled on a CAST_N×CAST_N grid
+// over the visible map and rendered as a smoothed canvas overlay.
+let castCanvas, castCtx, castSteps = [], castGrid = null, castFetchTimer = null;
+const CAST_N = 10, CAST_HOURS = 2;
+
+function initCast(){
+  castCanvas = document.createElement("canvas");
+  castCanvas.id = "cast-canvas";
+  map.getContainer().appendChild(castCanvas);
+  castCtx = castCanvas.getContext("2d");
+  sizeCastCanvas();
+  map.on("resize", sizeCastCanvas);
+  map.on("movestart zoomstart", clearCast);
+  map.on("moveend zoomend", () => {
+    if(castFetchTimer) clearTimeout(castFetchTimer);
+    castFetchTimer = setTimeout(refreshCastGrid, 800);
+  });
+  refreshCastGrid();
+}
+function sizeCastCanvas(){
+  const s = map.getSize();
+  castCanvas.width = s.x; castCanvas.height = s.y;
+}
+function clearCast(){
+  if(castCtx) castCtx.clearRect(0, 0, castCanvas.width, castCanvas.height);
+}
+async function refreshCastGrid(){
+  const b = map.getBounds().pad(0.15);
+  const lat0 = b.getNorth(), lat1 = b.getSouth(), lon0 = b.getWest(), lon1 = b.getEast();
+  const lats = [], lons = [];
+  for(let r = 0; r < CAST_N; r++) for(let c = 0; c < CAST_N; c++){
+    lats.push((lat0 + (lat1 - lat0) * r / (CAST_N - 1)).toFixed(3));
+    lons.push((lon0 + (lon1 - lon0) * c / (CAST_N - 1)).toFixed(3));
+  }
+  try {
+    const steps = CAST_HOURS * 4 + 2; // 15-min steps, plus slack for the current block
+    const url = "https://api.open-meteo.com/v1/forecast?latitude=" + lats.join(",") +
+      "&longitude=" + lons.join(",") + "&minutely_15=precipitation" +
+      "&forecast_minutely_15=" + steps + "&timeformat=unixtime";
+    const res = await fetch(url);
+    if(!res.ok) throw new Error("cast http " + res.status);
+    let arr = await res.json();
+    if(!Array.isArray(arr)) arr = [arr];
+    const times = arr[0].minutely_15.time;
+    const now = Date.now() / 1000;
+    const newSteps = [];
+    for(let t = 0; t < times.length && newSteps.length < CAST_HOURS * 4; t++){
+      if(times[t] <= now) continue;
+      const cells = new Float32Array(CAST_N * CAST_N);
+      for(let i = 0; i < arr.length; i++) cells[i] = arr[i].minutely_15.precipitation[t] || 0;
+      newSteps.push({ time: times[t], cells });
+    }
+    castGrid = { lat0, lat1, lon0, lon1 };
+    castSteps = newSteps;
+    if(rainOn && rainTimer) startRain(); // rebuild the playlist with fresh frames
+  } catch(e){ /* keep whatever we had; radar frames still play */ }
+}
+// Precip (mm per 15min → mm/h) to radar-style color
+function castColor(mmh){
+  if(mmh < 0.15) return [0, 0, 0, 0];
+  if(mmh < 1)    return [110, 175, 255, 110];
+  if(mmh < 3)    return [45, 125, 255, 150];
+  if(mmh < 8)    return [255, 179, 71, 170];
+  return [255, 83, 112, 190];
+}
+function drawCastStep(step){
+  if(!castGrid) return;
+  const N = CAST_N;
+  const off = drawCastStep._off || (drawCastStep._off = document.createElement("canvas"));
+  off.width = N; off.height = N;
+  const octx = off.getContext("2d");
+  const img = octx.createImageData(N, N);
+  for(let i = 0; i < N * N; i++){
+    const c = castColor(step.cells[i] * 4); // mm/15min → mm/h
+    img.data[i * 4] = c[0]; img.data[i * 4 + 1] = c[1];
+    img.data[i * 4 + 2] = c[2]; img.data[i * 4 + 3] = c[3];
+  }
+  octx.putImageData(img, 0, 0);
+  const tl = map.latLngToContainerPoint([castGrid.lat0, castGrid.lon0]);
+  const br = map.latLngToContainerPoint([castGrid.lat1, castGrid.lon1]);
+  clearCast();
+  castCtx.imageSmoothingEnabled = true;
+  castCtx.drawImage(off, tl.x, tl.y, br.x - tl.x, br.y - tl.y);
 }
 
 function setPoint(lat, lon, recenter){
