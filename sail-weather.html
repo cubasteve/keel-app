@@ -291,6 +291,26 @@ const COMPASS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW",
 function compass(deg){ return deg == null ? "" : COMPASS[Math.round(deg/22.5) % 16]; }
 function mToFt(m){ return m == null ? null : m * 3.28084; }
 
+// ── 12-hour / US-format display helpers ──
+function time12(hhmm){            // "06:28" → "6:28am"
+  let h = parseInt(hhmm.slice(0,2), 10);
+  const m = hhmm.slice(3,5);
+  const ap = h < 12 ? "am" : "pm";
+  h = h % 12; if(h === 0) h = 12;
+  return h + ":" + m + ap;
+}
+function hr12(h){                 // 16 → "4pm", 0/24 → "12am"
+  h = ((h % 24) + 24) % 24;
+  const ap = h < 12 ? "am" : "pm";
+  let hh = h % 12; if(hh === 0) hh = 12;
+  return hh + ap;
+}
+function usDateTime(iso){         // "2026-06-12T10:00" → "6/12/2026 10:00am"
+  const [d, t] = iso.split("T");
+  const p = d.split("-");
+  return Number(p[1]) + "/" + Number(p[2]) + "/" + p[0] + " " + time12(t);
+}
+
 // ── Hour scoring: good / marginal / nogo / calm ──
 function scoreHour(windKn, gustKn, waveFt, precip, cape){
   if(windKn == null) return "nogo";
@@ -348,7 +368,7 @@ function renderDays(fc, marine){
   dayKeys.forEach((day, di) => {
     const idxs = byDay[day];
     const dt = new Date(day + "T12:00:00");
-    const name = dt.toLocaleDateString(undefined, { weekday: "short", month: "numeric", day: "numeric" });
+    const name = dt.toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" });
     const sr = d && d.sunrise && d.sunrise[di] ? d.sunrise[di].slice(11,16) : "07:00";
     const ss = d && d.sunset  && d.sunset[di]  ? d.sunset[di].slice(11,16)  : "19:00";
     const srH = parseInt(sr.slice(0,2),10), ssH = parseInt(ss.slice(0,2),10);
@@ -368,14 +388,14 @@ function renderDays(fc, marine){
         if(run.len > best.len) best = { len: run.len, start: run.start, end: hour + 1 };
       } else { run.len = 0; }
       cells += '<div class="hr ' + score + (daylight ? "" : " night") + '" data-i="' + i + '"' +
-        ' title="' + h.time[i].slice(11,16) + " · " + Math.round(h.wind_speed_10m[i]) + ' kn"></div>';
+        ' title="' + time12(h.time[i].slice(11,16)) + " · " + Math.round(h.wind_speed_10m[i]) + ' kn"></div>';
     });
 
     const bestTxt = best.len >= 2
-      ? '<span class="day-best">best ' + String(best.start).padStart(2,"0") + ":00–" + String(best.end).padStart(2,"0") + ":00</span>"
+      ? '<span class="day-best">best ' + hr12(best.start) + "–" + hr12(best.end) + "</span>"
       : '<span class="day-best none">no window</span>';
     html += '<div class="day"><div class="day-head"><span class="day-name">' + name + '</span>' +
-      '<span class="day-sun">☀ ' + sr + "–" + ss + "</span>" + bestTxt + "</div>" +
+      '<span class="day-sun">☀ ' + time12(sr) + "–" + time12(ss) + "</span>" + bestTxt + "</div>" +
       '<div class="hours">' + cells + "</div>" +
       (di === dayKeys.length - 1 ? hourTicks() : "") + "</div>";
   });
@@ -386,7 +406,8 @@ function renderDays(fc, marine){
 
 function hourTicks(){
   let t = "";
-  for(let i = 0; i < 24; i++) t += "<span>" + (i % 6 === 0 ? i : "") + "</span>";
+  const tickLabels = { 0: "12a", 6: "6a", 12: "12p", 18: "6p" };
+  for(let i = 0; i < 24; i++) t += "<span>" + (tickLabels[i] || "") + "</span>";
   return '<div class="hr-ticks">' + t + "</div>";
 }
 
@@ -396,7 +417,7 @@ function showHour(i, el){
   const h = state.hourly, m = state.marine;
   const waveFt = m && m.hourly.wave_height[i] != null ? mToFt(m.hourly.wave_height[i]) : null;
   const parts = [
-    "<b>" + h.time[i].replace("T", " ") + "</b>",
+    "<b>" + usDateTime(h.time[i]) + "</b>",
     "wind <b>" + Math.round(h.wind_speed_10m[i]) + " kn " + compass(h.wind_direction_10m[i]) + "</b>",
     "gusts <b>" + Math.round(h.wind_gusts_10m[i]) + " kn</b>"
   ];
