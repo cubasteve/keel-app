@@ -239,7 +239,7 @@ function initMap(){
 let windCanvas, windCtx, windGrid = null, windAnim = null, windOn = true;
 let windFetchTimer = null, particles = [], lastWindTs = 0;
 // Motion is time-based (px/sec) so speed looks identical at 60Hz and 120Hz.
-const WIND_N = 7, WIND_KN_TO_PX_S = 5, PARTICLE_LIFE_S = 1.6, TRAIL_KEEP_PER_S = 0.013;
+const WIND_N = 7, WIND_KN_TO_PX_S = 4, PARTICLE_LIFE_S = 1.6, TRAIL_KEEP_PER_S = 0.013;
 
 function initWindLayer(){
   windCanvas = document.createElement("canvas");
