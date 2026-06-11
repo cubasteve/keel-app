@@ -191,7 +191,7 @@ body.embedded .topbar { padding: 10px 16px; }
         <span><i class="lg-good"></i> Good (7–17 kn)</span>
         <span><i class="lg-marg"></i> Marginal</span>
         <span><i class="lg-nogo"></i> No-go</span>
-        <span><i class="lg-calm"></i> Becalmed</span>
+        <span><i class="lg-calm"></i> Too calm (&lt;4 kn)</span>
       </div>
       <div class="hour-detail" id="hour-detail">Tap any hour for details.</div>
       <div id="days"><div class="loading">Waiting for a location…</div></div>
@@ -653,7 +653,7 @@ function renderNow(fc, marine){
     good: "Good sailing right now — wind in the sweet spot.",
     marginal: "Sailable, but keep an eye on it.",
     nogo: "Stand down — conditions over your limits.",
-    calm: "Becalmed — not enough wind to sail."
+    calm: "Too calm — not enough wind to sail."
   }[score];
   document.getElementById("verdict").innerHTML = '<div class="verdict ' + score + '">' + msg + '</div>';
 }
