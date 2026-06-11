@@ -242,7 +242,10 @@ function initMap(){
 let windCanvas, windCtx, windGrid = null, windAnim = null, windOn = true;
 let windFetchTimer = null, particles = [], lastWindTs = 0;
 // Motion is time-based (px/sec) so speed looks identical at 60Hz and 120Hz.
-const WIND_N = 7, WIND_KN_TO_PX_S = 4, PARTICLE_LIFE_S = 1.6, TRAIL_KEEP_PER_S = 0.013;
+// Grid sizes are kept small and refetches throttled: Open-Meteo counts every
+// grid point as one API call toward its per-IP rate limits (~600/min, 5k/hr).
+const WIND_N = 6, WIND_KN_TO_PX_S = 4, PARTICLE_LIFE_S = 1.6, TRAIL_KEEP_PER_S = 0.013;
+const WIND_GRID_MAX_AGE_MS = 180000; // reuse a covering wind grid for 3 min
 
 function initWindLayer(){
   windCanvas = document.createElement("canvas");
@@ -253,7 +256,8 @@ function initWindLayer(){
   map.on("resize", sizeWindCanvas);
   map.on("movestart zoomstart", pauseWind);
   map.on("moveend zoomend", resumeWind);
-  refreshWindGrid();
+  // Let the main forecast call go first so it isn't starved of rate-limit quota
+  setTimeout(refreshWindGrid, 2500);
 }
 function sizeWindCanvas(){
   const s = map.getSize();
@@ -269,8 +273,19 @@ function resumeWind(){
   windFetchTimer = setTimeout(refreshWindGrid, 600);
   if(windOn && windGrid && !windAnim){ seedParticles(); stepWind(); }
 }
+function gridCovers(g, fetchedAt, maxAgeMs){
+  if(!g || Date.now() - fetchedAt > maxAgeMs) return false;
+  const b = map.getBounds();
+  return b.getNorth() <= g.lat0 && b.getSouth() >= g.lat1 &&
+         b.getWest() >= g.lon0 && b.getEast() <= g.lon1;
+}
+let windGridFetchedAt = 0;
 async function refreshWindGrid(){
   if(!windOn) return;
+  if(gridCovers(windGrid, windGridFetchedAt, WIND_GRID_MAX_AGE_MS)){
+    if(!windAnim){ seedParticles(); stepWind(); }
+    return;
+  }
   const b = map.getBounds().pad(0.15);
   const lat0 = b.getNorth(), lat1 = b.getSouth(), lon0 = b.getWest(), lon1 = b.getEast();
   const lats = [], lons = [];
@@ -292,6 +307,7 @@ async function refreshWindGrid(){
       return { u: spd * Math.sin(rad), v: -spd * Math.cos(rad), s: spd };
     });
     windGrid = { cells, lat0, lat1, lon0, lon1 };
+    windGridFetchedAt = Date.now();
     if(windOn && !windAnim){ seedParticles(); stepWind(); }
   } catch(e){ /* keep the previous grid; particles just stay on old data */ }
 }
@@ -437,7 +453,9 @@ function toggleRain(){
 // Picks up where the RainViewer nowcast ends; sampled on a CAST_N×CAST_N grid
 // over the visible map and rendered as a smoothed canvas overlay.
 let castCanvas, castCtx, castSteps = [], castGrid = null, castFetchTimer = null;
-const CAST_N = 10, CAST_HOURS = 2;
+let castGridFetchedAt = 0;
+const CAST_N = 8, CAST_HOURS = 2;
+const CAST_GRID_MAX_AGE_MS = 450000; // reuse a covering cast grid for 7.5 min
 
 function initCast(){
   castCanvas = document.createElement("canvas");
@@ -451,7 +469,8 @@ function initCast(){
     if(castFetchTimer) clearTimeout(castFetchTimer);
     castFetchTimer = setTimeout(refreshCastGrid, 800);
   });
-  refreshCastGrid();
+  // Stagger behind the main forecast and wind grid to spread rate-limit load
+  setTimeout(refreshCastGrid, 4500);
 }
 function sizeCastCanvas(){
   const s = map.getSize();
@@ -461,6 +480,7 @@ function clearCast(){
   if(castCtx) castCtx.clearRect(0, 0, castCanvas.width, castCanvas.height);
 }
 async function refreshCastGrid(){
+  if(gridCovers(castGrid, castGridFetchedAt, CAST_GRID_MAX_AGE_MS)) return;
   const b = map.getBounds().pad(0.15);
   const lat0 = b.getNorth(), lat1 = b.getSouth(), lon0 = b.getWest(), lon1 = b.getEast();
   const lats = [], lons = [];
@@ -487,6 +507,7 @@ async function refreshCastGrid(){
       newSteps.push({ time: times[t], cells });
     }
     castGrid = { lat0, lat1, lon0, lon1 };
+    castGridFetchedAt = Date.now();
     castSteps = newSteps;
     if(rainOn && rainTimer) startRain(); // rebuild the playlist with fresh frames
   } catch(e){ /* keep whatever we had; radar frames still play */ }
@@ -567,14 +588,23 @@ async function loadForecast(lat, lon){
   const mUrl = "https://marine-api.open-meteo.com/v1/marine?latitude="+lat+"&longitude="+lon+
     "&current=wave_height,wave_period&hourly=wave_height,wave_period&timezone=auto&forecast_days=7";
 
-  let fc = null, marine = null;
-  try {
-    const res = await fetch(fUrl);
-    if(!res.ok) throw new Error("forecast http " + res.status);
-    fc = await res.json();
-  } catch(e){
+  let fc = null, marine = null, lastStatus = 0;
+  // Two attempts: transient hiccups and brief rate-limit windows often clear fast
+  for(let attempt = 0; attempt < 2 && !fc; attempt++){
+    if(attempt) await new Promise(r => setTimeout(r, 2500));
+    try {
+      const res = await fetch(fUrl);
+      lastStatus = res.status;
+      if(!res.ok) throw new Error("forecast http " + res.status);
+      fc = await res.json();
+    } catch(e){ /* retry once, then report below */ }
+  }
+  if(!fc){
     if(reqId !== state.reqId) return;
-    document.getElementById("now-grid").innerHTML = '<div class="err">Forecast fetch failed — check connection and retry.</div>';
+    const msg = lastStatus === 429
+      ? "Weather service is rate-limited right now — give it a minute, then tap the map to retry."
+      : "Forecast fetch failed — check connection, then tap the map to retry.";
+    document.getElementById("now-grid").innerHTML = '<div class="err">' + msg + '</div>';
     document.getElementById("days").innerHTML = "";
     return;
   }
