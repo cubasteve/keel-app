@@ -367,7 +367,10 @@ async function initRain(){
     if(!rainFrames.length) throw new Error("no radar frames");
     rainLayers = rainFrames.map(f =>
       L.tileLayer(data.host + f.path + "/256/{z}/{x}/{y}/2/1_1.png",
-        { pane: "rain", opacity: 0, maxNativeZoom: 12, maxZoom: 19,
+        // RainViewer's free radar tiles only contain data through z7 (~1km/px,
+        // the radar's real resolution) — deeper zooms return blank placeholders,
+        // so upscale from z7 to keep radar visible at every zoom level.
+        { pane: "rain", opacity: 0, maxNativeZoom: 7, maxZoom: 19,
           attribution: '<a href="https://www.rainviewer.com/">RainViewer</a>' }
       ).addTo(map));
     if(rainOn) startRain();
