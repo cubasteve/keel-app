@@ -2804,8 +2804,10 @@ function showPage(page) {
 
   if(page === "weather"){
     // Lazy-load the weather page so Leaflet/forecast fetches only happen if visited
+    // Bump the ?v= number whenever sail-weather.html changes, or the iframe
+    // can keep serving a stale cached copy even after a hard refresh.
     const wf = document.getElementById("weather-frame");
-    if(wf && !wf.getAttribute("src")) wf.setAttribute("src", "sail-weather.html");
+    if(wf && !wf.getAttribute("src")) wf.setAttribute("src", "sail-weather.html?v=2");
   }
   if(page === "trips")     loadTripsPage();
   if(page === "keeltoken") loadKeelTokenPage();
