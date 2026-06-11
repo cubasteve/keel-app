@@ -103,7 +103,8 @@ body.embedded .topbar { padding: 10px 16px; }
   outline: 1px solid transparent;
 }
 .hr:hover { transform: scaleY(1.18); outline-color: var(--foam); z-index: 2; }
-.hr.sel { outline: 2px solid var(--accent); z-index: 2; }
+.hr.now { outline: 2px solid var(--foam); z-index: 2; }
+.hr.sel { outline: 2px solid var(--accent); z-index: 3; }
 .hr.good     { background: rgba(0,200,160,0.75); }
 .hr.marginal { background: rgba(255,179,71,0.65); }
 .hr.nogo     { background: rgba(255,83,112,0.60); }
@@ -128,6 +129,7 @@ body.embedded .topbar { padding: 10px 16px; }
 .legend .lg-marg { background: rgba(255,179,71,0.65); }
 .legend .lg-nogo { background: rgba(255,83,112,0.60); }
 .legend .lg-calm { background: rgba(96,144,176,0.28); }
+.legend .lg-now { background: transparent; outline: 2px solid var(--foam); outline-offset: -2px; }
 
 .loading { color: var(--muted2); font-size: 13px; padding: 20px 0; text-align: center; }
 .err { color: var(--danger); font-size: 12px; }
@@ -191,7 +193,8 @@ body.embedded .topbar { padding: 10px 16px; }
         <span><i class="lg-good"></i> Good (7–17 kn)</span>
         <span><i class="lg-marg"></i> Marginal</span>
         <span><i class="lg-nogo"></i> No-go</span>
-        <span><i class="lg-calm"></i> Too calm (&lt;4 kn)</span>
+        <span><i class="lg-calm"></i> Becalmed (&lt;4 kn)</span>
+        <span><i class="lg-now"></i> Now</span>
       </div>
       <div class="hour-detail" id="hour-detail">Tap any hour for details.</div>
       <div id="days"><div class="loading">Waiting for a location…</div></div>
@@ -653,7 +656,7 @@ function renderNow(fc, marine){
     good: "Good sailing right now — wind in the sweet spot.",
     marginal: "Sailable, but keep an eye on it.",
     nogo: "Stand down — conditions over your limits.",
-    calm: "Too calm — not enough wind to sail."
+    calm: "Becalmed — not enough wind to sail."
   }[score];
   document.getElementById("verdict").innerHTML = '<div class="verdict ' + score + '">' + msg + '</div>';
 }
@@ -661,6 +664,9 @@ function renderNow(fc, marine){
 // ── 7-day sailable windows strip ──
 function renderDays(fc, marine){
   const h = fc.hourly, d = fc.daily;
+  // Current hour in the forecast point's local time, e.g. "2026-06-11T19"
+  const nowKey = new Date(Date.now() + (fc.utc_offset_seconds || 0) * 1000)
+    .toISOString().slice(0, 13);
   const byDay = {};
   for(let i = 0; i < h.time.length; i++){
     const day = h.time[i].slice(0, 10);
@@ -692,7 +698,8 @@ function renderDays(fc, marine){
         run.len++;
         if(run.len > best.len) best = { len: run.len, start: run.start, end: hour + 1 };
       } else { run.len = 0; }
-      cells += '<div class="hr ' + score + (daylight ? "" : " night") + '" data-i="' + i + '"' +
+      cells += '<div class="hr ' + score + (daylight ? "" : " night") +
+        (h.time[i].slice(0, 13) === nowKey ? " now" : "") + '" data-i="' + i + '"' +
         ' title="' + time12(h.time[i].slice(11,16)) + " · " + Math.round(h.wind_speed_10m[i]) + ' kn"></div>';
     });
 
@@ -707,6 +714,9 @@ function renderDays(fc, marine){
   const wrap = document.getElementById("days");
   wrap.innerHTML = html;
   wrap.querySelectorAll(".hr").forEach(el => el.addEventListener("click", () => showHour(parseInt(el.dataset.i, 10), el)));
+  // Start the detail readout on the current hour so "now" is obvious at a glance
+  const nowEl = wrap.querySelector(".hr.now");
+  if(nowEl) showHour(parseInt(nowEl.dataset.i, 10), nowEl);
 }
 
 function hourTicks(){
