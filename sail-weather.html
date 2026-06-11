@@ -237,8 +237,9 @@ function initMap(){
 // Samples a WIND_N×WIND_N grid of current wind over the visible map from
 // Open-Meteo, then advects particles through the bilinearly-interpolated field.
 let windCanvas, windCtx, windGrid = null, windAnim = null, windOn = true;
-let windFetchTimer = null, particles = [];
-const WIND_N = 7, PARTICLES = 600, PARTICLE_LIFE = 90, WIND_PX_PER_KN = 0.18;
+let windFetchTimer = null, particles = [], lastWindTs = 0;
+// Motion is time-based (px/sec) so speed looks identical at 60Hz and 120Hz.
+const WIND_N = 7, WIND_KN_TO_PX_S = 5, PARTICLE_LIFE_S = 1.6, TRAIL_KEEP_PER_S = 0.013;
 
 function initWindLayer(){
   windCanvas = document.createElement("canvas");
@@ -292,12 +293,14 @@ async function refreshWindGrid(){
   } catch(e){ /* keep the previous grid; particles just stay on old data */ }
 }
 function seedParticles(){
+  // Density scales with map area so phones aren't overdrawn
+  const count = Math.round(Math.max(250, Math.min(700, windCanvas.width * windCanvas.height / 1800)));
   particles = [];
-  for(let i = 0; i < PARTICLES; i++) particles.push(spawnParticle());
+  for(let i = 0; i < count; i++) particles.push(spawnParticle());
 }
 function spawnParticle(){
   return { x: Math.random() * windCanvas.width, y: Math.random() * windCanvas.height,
-           age: Math.random() * PARTICLE_LIFE };
+           age: Math.random() * PARTICLE_LIFE_S };
 }
 function gridAt(lat, lon){
   const g = windGrid;
@@ -321,14 +324,18 @@ function windColor(s){
   if(s <= T.margWindMax) return "rgba(255,179,71,0.75)";
   return "rgba(255,83,112,0.8)";
 }
-function stepWind(){
+function stepWind(ts){
   windAnim = requestAnimationFrame(stepWind);
   const w = windCanvas.width, h = windCanvas.height;
   if(!windGrid || !w || !h) return;
+  if(!ts) ts = performance.now();
+  let dt = (ts - lastWindTs) / 1000;
+  lastWindTs = ts;
+  if(dt <= 0 || dt > 0.1) dt = 0.016; // first frame, or resume after a pause
   // Approximate linear px→lat/lon mapping for the frame (fine at these zooms)
   const nw = map.containerPointToLatLng([0, 0]), se = map.containerPointToLatLng([w, h]);
   windCtx.globalCompositeOperation = "destination-in";
-  windCtx.fillStyle = "rgba(0,0,0,0.93)";
+  windCtx.fillStyle = "rgba(0,0,0," + Math.pow(TRAIL_KEEP_PER_S, dt).toFixed(4) + ")";
   windCtx.fillRect(0, 0, w, h);
   windCtx.globalCompositeOperation = "source-over";
   windCtx.lineWidth = 1.3;
@@ -336,8 +343,9 @@ function stepWind(){
     const lat = nw.lat + (p.y / h) * (se.lat - nw.lat);
     const lon = nw.lng + (p.x / w) * (se.lng - nw.lng);
     const wv = gridAt(lat, lon);
-    const nx = p.x + wv.u * WIND_PX_PER_KN, ny = p.y + wv.v * WIND_PX_PER_KN;
-    if(++p.age > PARTICLE_LIFE || nx < 0 || nx > w || ny < 0 || ny > h){
+    const nx = p.x + wv.u * WIND_KN_TO_PX_S * dt, ny = p.y + wv.v * WIND_KN_TO_PX_S * dt;
+    p.age += dt;
+    if(p.age > PARTICLE_LIFE_S || nx < 0 || nx > w || ny < 0 || ny > h){
       Object.assign(p, spawnParticle(), { age: 0 });
       continue;
     }
