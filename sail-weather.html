@@ -144,6 +144,18 @@ body.embedded .topbar { padding: 10px 16px; }
   border-radius: 6px; width: 32px; height: 32px; font-size: 16px; cursor: pointer; line-height: 1;
 }
 .locate-btn:hover { background: var(--surface3); }
+
+/* ── Animated layer toggles ── */
+.layer-toggles { position: absolute; top: 10px; right: 10px; z-index: 1000; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+.layer-btn {
+  background: var(--surface2); color: var(--muted2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 10px; font-family: var(--mono); font-size: 11px; cursor: pointer;
+}
+.layer-btn:hover { color: var(--foam); }
+.layer-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(74,179,255,0.12); }
+.layer-btn:disabled { opacity: 0.5; cursor: default; }
+.radar-time { font-family: var(--mono); font-size: 9px; color: var(--muted2); background: rgba(2,9,18,0.6); padding: 2px 6px; border-radius: 6px; display: none; }
+#wind-canvas { position: absolute; inset: 0; z-index: 450; pointer-events: none; }
 </style>
 </head>
 <body>
@@ -158,6 +170,11 @@ body.embedded .topbar { padding: 10px 16px; }
   <div class="map-pane">
     <div id="map"></div>
     <button class="locate-btn" onclick="locateMe()" title="Use my location">⌖</button>
+    <div class="layer-toggles">
+      <button id="btn-wind" class="layer-btn active" onclick="toggleWind()">≋ Wind</button>
+      <button id="btn-rain" class="layer-btn active" onclick="toggleRain()">🌧 Rain</button>
+      <div class="radar-time" id="radar-time"></div>
+    </div>
   </div>
   <div class="panel">
     <div class="card">
@@ -209,6 +226,176 @@ function initMap(){
     maxZoom: 18, opacity: 0.9
   }).addTo(map);
   map.on("click", e => setPoint(e.latlng.lat, e.latlng.lng, false));
+  initWindLayer();
+  initRain();
+}
+
+// ── Animated wind particle layer ─────────────────────────────────────────────
+// Samples a WIND_N×WIND_N grid of current wind over the visible map from
+// Open-Meteo, then advects particles through the bilinearly-interpolated field.
+let windCanvas, windCtx, windGrid = null, windAnim = null, windOn = true;
+let windFetchTimer = null, particles = [];
+const WIND_N = 7, PARTICLES = 600, PARTICLE_LIFE = 90, WIND_PX_PER_KN = 0.18;
+
+function initWindLayer(){
+  windCanvas = document.createElement("canvas");
+  windCanvas.id = "wind-canvas";
+  map.getContainer().appendChild(windCanvas);
+  windCtx = windCanvas.getContext("2d");
+  sizeWindCanvas();
+  map.on("resize", sizeWindCanvas);
+  map.on("movestart zoomstart", pauseWind);
+  map.on("moveend zoomend", resumeWind);
+  refreshWindGrid();
+}
+function sizeWindCanvas(){
+  const s = map.getSize();
+  windCanvas.width = s.x; windCanvas.height = s.y;
+}
+function pauseWind(){
+  if(windAnim){ cancelAnimationFrame(windAnim); windAnim = null; }
+  if(windCtx) windCtx.clearRect(0, 0, windCanvas.width, windCanvas.height);
+}
+function resumeWind(){
+  sizeWindCanvas();
+  if(windFetchTimer) clearTimeout(windFetchTimer);
+  windFetchTimer = setTimeout(refreshWindGrid, 600);
+  if(windOn && windGrid && !windAnim){ seedParticles(); stepWind(); }
+}
+async function refreshWindGrid(){
+  if(!windOn) return;
+  const b = map.getBounds().pad(0.15);
+  const lat0 = b.getNorth(), lat1 = b.getSouth(), lon0 = b.getWest(), lon1 = b.getEast();
+  const lats = [], lons = [];
+  for(let r = 0; r < WIND_N; r++) for(let c = 0; c < WIND_N; c++){
+    lats.push((lat0 + (lat1 - lat0) * r / (WIND_N - 1)).toFixed(3));
+    lons.push((lon0 + (lon1 - lon0) * c / (WIND_N - 1)).toFixed(3));
+  }
+  try {
+    const url = "https://api.open-meteo.com/v1/forecast?latitude=" + lats.join(",") +
+      "&longitude=" + lons.join(",") + "&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=kn";
+    const res = await fetch(url);
+    if(!res.ok) throw new Error("wind grid http " + res.status);
+    let arr = await res.json();
+    if(!Array.isArray(arr)) arr = [arr];
+    const cells = arr.map(p => {
+      const c = p.current || {};
+      const spd = c.wind_speed_10m || 0, dir = c.wind_direction_10m || 0;
+      const rad = (dir + 180) * Math.PI / 180; // direction is "from"; flow is toward dir+180
+      return { u: spd * Math.sin(rad), v: -spd * Math.cos(rad), s: spd };
+    });
+    windGrid = { cells, lat0, lat1, lon0, lon1 };
+    if(windOn && !windAnim){ seedParticles(); stepWind(); }
+  } catch(e){ /* keep the previous grid; particles just stay on old data */ }
+}
+function seedParticles(){
+  particles = [];
+  for(let i = 0; i < PARTICLES; i++) particles.push(spawnParticle());
+}
+function spawnParticle(){
+  return { x: Math.random() * windCanvas.width, y: Math.random() * windCanvas.height,
+           age: Math.random() * PARTICLE_LIFE };
+}
+function gridAt(lat, lon){
+  const g = windGrid;
+  let fx = (lon - g.lon0) / (g.lon1 - g.lon0) * (WIND_N - 1);
+  let fy = (g.lat0 - lat) / (g.lat0 - g.lat1) * (WIND_N - 1);
+  fx = Math.max(0, Math.min(WIND_N - 1.001, fx));
+  fy = Math.max(0, Math.min(WIND_N - 1.001, fy));
+  const x0 = Math.floor(fx), y0 = Math.floor(fy), tx = fx - x0, ty = fy - y0;
+  const at = (r, c) => g.cells[r * WIND_N + c];
+  const a = at(y0, x0), b = at(y0, x0 + 1), c = at(y0 + 1, x0), d = at(y0 + 1, x0 + 1);
+  return {
+    u: (a.u * (1 - tx) + b.u * tx) * (1 - ty) + (c.u * (1 - tx) + d.u * tx) * ty,
+    v: (a.v * (1 - tx) + b.v * tx) * (1 - ty) + (c.v * (1 - tx) + d.v * tx) * ty,
+    s: (a.s * (1 - tx) + b.s * tx) * (1 - ty) + (c.s * (1 - tx) + d.s * tx) * ty
+  };
+}
+// Trail color follows the same speed bands as the sailable-windows strip
+function windColor(s){
+  if(s < T.calmBelow) return "rgba(96,144,176,0.5)";
+  if(s <= T.goodWindMax) return "rgba(0,200,160,0.7)";
+  if(s <= T.margWindMax) return "rgba(255,179,71,0.75)";
+  return "rgba(255,83,112,0.8)";
+}
+function stepWind(){
+  windAnim = requestAnimationFrame(stepWind);
+  const w = windCanvas.width, h = windCanvas.height;
+  if(!windGrid || !w || !h) return;
+  // Approximate linear px→lat/lon mapping for the frame (fine at these zooms)
+  const nw = map.containerPointToLatLng([0, 0]), se = map.containerPointToLatLng([w, h]);
+  windCtx.globalCompositeOperation = "destination-in";
+  windCtx.fillStyle = "rgba(0,0,0,0.93)";
+  windCtx.fillRect(0, 0, w, h);
+  windCtx.globalCompositeOperation = "source-over";
+  windCtx.lineWidth = 1.3;
+  for(const p of particles){
+    const lat = nw.lat + (p.y / h) * (se.lat - nw.lat);
+    const lon = nw.lng + (p.x / w) * (se.lng - nw.lng);
+    const wv = gridAt(lat, lon);
+    const nx = p.x + wv.u * WIND_PX_PER_KN, ny = p.y + wv.v * WIND_PX_PER_KN;
+    if(++p.age > PARTICLE_LIFE || nx < 0 || nx > w || ny < 0 || ny > h){
+      Object.assign(p, spawnParticle(), { age: 0 });
+      continue;
+    }
+    windCtx.strokeStyle = windColor(wv.s);
+    windCtx.beginPath(); windCtx.moveTo(p.x, p.y); windCtx.lineTo(nx, ny); windCtx.stroke();
+    p.x = nx; p.y = ny;
+  }
+}
+function toggleWind(){
+  windOn = !windOn;
+  document.getElementById("btn-wind").classList.toggle("active", windOn);
+  if(!windOn) pauseWind();
+  else if(windGrid){ seedParticles(); stepWind(); }
+  else refreshWindGrid();
+}
+
+// ── Animated rain radar layer (RainViewer, free/no key) ─────────────────────
+// Loops the last hour of radar frames plus the first nowcast frame.
+let rainOn = true, rainLayers = [], rainFrames = [], rainTimer = null, rainIdx = 0;
+async function initRain(){
+  map.createPane("rain");
+  map.getPane("rain").style.zIndex = 350;          // above base tiles, below markers
+  map.getPane("rain").style.pointerEvents = "none";
+  try {
+    const res = await fetch("https://api.rainviewer.com/public/weather-maps.json");
+    if(!res.ok) throw new Error("rainviewer http " + res.status);
+    const data = await res.json();
+    rainFrames = ((data.radar && data.radar.past) || []).slice(-6)
+      .concat(((data.radar && data.radar.nowcast) || []).slice(0, 1));
+    if(!rainFrames.length) throw new Error("no radar frames");
+    rainLayers = rainFrames.map(f =>
+      L.tileLayer(data.host + f.path + "/256/{z}/{x}/{y}/2/1_1.png",
+        { pane: "rain", opacity: 0, attribution: '<a href="https://www.rainviewer.com/">RainViewer</a>' }
+      ).addTo(map));
+    if(rainOn) startRain();
+  } catch(e){
+    const btn = document.getElementById("btn-rain");
+    btn.disabled = true; btn.classList.remove("active"); btn.textContent = "🌧 Rain n/a";
+  }
+}
+function startRain(){
+  if(rainTimer) clearInterval(rainTimer);
+  rainTimer = setInterval(() => {
+    rainLayers[rainIdx].setOpacity(0);
+    rainIdx = (rainIdx + 1) % rainLayers.length;
+    rainLayers[rainIdx].setOpacity(0.65);
+    const f = rainFrames[rainIdx], el = document.getElementById("radar-time");
+    el.style.display = "block";
+    el.textContent = "radar " + time12(new Date(f.time * 1000).toTimeString().slice(0, 5)) +
+                     (f.time * 1000 > Date.now() ? " ·cast" : "");
+  }, 700);
+}
+function toggleRain(){
+  if(document.getElementById("btn-rain").disabled) return;
+  rainOn = !rainOn;
+  document.getElementById("btn-rain").classList.toggle("active", rainOn);
+  if(!rainOn){
+    if(rainTimer){ clearInterval(rainTimer); rainTimer = null; }
+    rainLayers.forEach(l => l.setOpacity(0));
+    document.getElementById("radar-time").style.display = "none";
+  } else if(rainLayers.length) startRain();
 }
 
 function setPoint(lat, lon, recenter){
