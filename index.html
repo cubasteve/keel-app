@@ -927,6 +927,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   <div class="nav-section-label">Navigation</div>
   <div class="nav-item active" onclick="showPage('dashboard')"><span class="nav-icon">⊞</span> Dashboard</div>
   <div class="nav-item" onclick="showPage('trips')"><span class="nav-icon">⛵</span> Trips</div>
+  <div class="nav-item" onclick="showPage('weather')"><span class="nav-icon">🌤</span> Weather</div>
   <div class="nav-item" onclick="showPage('keeltoken')"><span class="nav-icon">◈</span> Keel Token</div>
 
   <div class="nav-section-label" style="margin-top:8px">Account</div>
@@ -1167,6 +1168,13 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
       </div><!-- /trips-content -->
 
     </div><!-- /page-trips -->
+
+    <!-- WEATHER PAGE (embeds the standalone sail-weather.html; src set lazily on first visit) -->
+    <div class="page center-panel" id="page-weather">
+      <iframe id="weather-frame" title="Sailing weather"
+              allow="geolocation"
+              style="width:100%; height:calc(100vh - 130px); min-height:520px; border:1px solid var(--border); border-radius:14px; background:var(--surface); display:block;"></iframe>
+    </div>
 
     <!-- KEEL TOKEN PAGE -->
     <div class="page center-panel" id="page-keeltoken">
@@ -2772,18 +2780,19 @@ function showPage(page) {
   // Toggle page panels
   document.getElementById("page-dashboard").classList.toggle("active", page === "dashboard");
   document.getElementById("page-trips").classList.toggle("active", page === "trips");
+  document.getElementById("page-weather").classList.toggle("active", page === "weather");
   document.getElementById("page-keeltoken").classList.toggle("active", page === "keeltoken");
   document.getElementById("page-settings").classList.toggle("active", page === "settings");
   document.getElementById("page-admin").classList.toggle("active", page === "admin");
 
   // Update nav active state
   document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
-  const navMap = { dashboard: 0, trips: 1, keeltoken: 2, settings: 3, admin: 4 };
+  const navMap = { dashboard: 0, trips: 1, weather: 2, keeltoken: 3, settings: 4, admin: 5 };
   const navItems = document.querySelectorAll(".nav-item");
   if(navMap[page] !== undefined) navItems[navMap[page]].classList.add("active");
 
   // Update topbar title + settle toggle visibility
-  const titles = { dashboard: "⚓ Dashboard", trips: "⛵ Trips", keeltoken: "◈ Keel Token", settings: "⚙ Settings", admin: "🔑 Admin Panel" };
+  const titles = { dashboard: "⚓ Dashboard", trips: "⛵ Trips", weather: "🌤 Weather", keeltoken: "◈ Keel Token", settings: "⚙ Settings", admin: "🔑 Admin Panel" };
   document.getElementById("page-title").textContent = titles[page] || "";
   document.getElementById("settle-toggle").style.display = page === "dashboard" ? "" : "none";
   // Hide the burn bar on non-dashboard pages, restore it on dashboard
@@ -2793,6 +2802,11 @@ function showPage(page) {
   // On mobile, close the nav drawer after navigation
   if(isMobile()) { document.body.classList.remove("nav-open"); syncBackdrop(); }
 
+  if(page === "weather"){
+    // Lazy-load the weather page so Leaflet/forecast fetches only happen if visited
+    const wf = document.getElementById("weather-frame");
+    if(wf && !wf.getAttribute("src")) wf.setAttribute("src", "sail-weather.html");
+  }
   if(page === "trips")     loadTripsPage();
   if(page === "keeltoken") loadKeelTokenPage();
   if(page === "settings")  loadSettingsPage();

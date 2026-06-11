@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KEEL Helm — Sailing Weather</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root {
+  --bg: #020912;
+  --surface: #071525;
+  --surface2: #0b1d30;
+  --surface3: #102540;
+  --border: #1a3050;
+  --accent: #4ab3ff;
+  --accent-glow: rgba(74,179,255,0.2);
+  --rope: #c8a96e;
+  --brass: #d4a840;
+  --teal: #00c8a0;
+  --foam: #e8f4ff;
+  --danger: #ff5370;
+  --amber: #ffb347;
+  --text: #ddeeff;
+  --muted: #3a607a;
+  --muted2: #6090b0;
+  --mono: 'Space Mono', monospace;
+  --sans: 'Inter', sans-serif;
+  --display: 'Space Grotesk', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; }
+body { font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* ── Top bar ── */
+.topbar {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #051022, var(--bg));
+  flex-wrap: wrap;
+}
+.brand { font-family: var(--display); font-weight: 700; font-size: 18px; color: var(--foam); letter-spacing: 0.5px; }
+.brand .helm { color: var(--accent); }
+.coords {
+  font-family: var(--mono); font-size: 11px; color: var(--muted2); letter-spacing: 1px;
+  cursor: pointer; user-select: none;
+}
+.coords:hover { color: var(--accent); }
+.topbar .hint { font-size: 11px; color: var(--muted); }
+/* Embedded inside the keel-app Weather page: the app topbar already shows the title */
+body.embedded .brand { display: none; }
+body.embedded .topbar { padding: 10px 16px; }
+
+/* ── Layout ── */
+.layout { display: flex; min-height: calc(100vh - 57px); }
+.map-pane { flex: 1.2; min-width: 0; position: relative; }
+#map { position: absolute; inset: 0; background: #04101e; }
+.panel {
+  flex: 1; min-width: 360px; max-width: 560px;
+  border-left: 1px solid var(--border);
+  padding: 18px 18px 40px; overflow-y: auto; max-height: calc(100vh - 57px);
+}
+@media (max-width: 900px) {
+  .layout { flex-direction: column; }
+  .map-pane { min-height: 44vh; flex: none; }
+  #map { position: relative; height: 44vh; }
+  .panel { max-width: none; min-width: 0; border-left: none; border-top: 1px solid var(--border); max-height: none; }
+}
+
+/* ── Current conditions card ── */
+.card {
+  background: linear-gradient(160deg, var(--surface), var(--surface2));
+  border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 16px;
+}
+.card h2 { font-family: var(--display); font-size: 14px; color: var(--muted2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
+.now-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 10px; }
+.now-stat { background: rgba(74,179,255,0.05); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.now-stat .label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.now-stat .value { font-family: var(--mono); font-size: 17px; color: var(--foam); font-weight: 700; }
+.now-stat .value small { font-size: 11px; color: var(--muted2); font-weight: 400; }
+.dir-arrow { display: inline-block; color: var(--accent); }
+
+/* ── Verdict banner ── */
+.verdict { border-radius: 10px; padding: 10px 14px; font-weight: 600; font-size: 13px; margin-top: 12px; border: 1px solid; }
+.verdict.good     { background: rgba(0,200,160,0.10); border-color: rgba(0,200,160,0.4);  color: var(--teal); }
+.verdict.marginal { background: rgba(255,179,71,0.10); border-color: rgba(255,179,71,0.4); color: var(--amber); }
+.verdict.nogo     { background: rgba(255,83,112,0.10); border-color: rgba(255,83,112,0.4); color: var(--danger); }
+.verdict.calm     { background: rgba(96,144,176,0.10); border-color: rgba(96,144,176,0.4); color: var(--muted2); }
+
+/* ── Sailable windows strip ── */
+.day { margin-bottom: 14px; }
+.day-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 5px; flex-wrap: wrap; }
+.day-name { font-family: var(--display); font-weight: 600; font-size: 13px; color: var(--foam); min-width: 84px; }
+.day-sun { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.day-best { font-family: var(--mono); font-size: 10px; color: var(--teal); margin-left: auto; }
+.day-best.none { color: var(--muted); }
+.hours { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; }
+.hr {
+  height: 26px; border-radius: 4px; cursor: pointer; position: relative;
+  transition: transform 0.08s ease, outline-color 0.08s;
+  outline: 1px solid transparent;
+}
+.hr:hover { transform: scaleY(1.18); outline-color: var(--foam); z-index: 2; }
+.hr.sel { outline: 2px solid var(--accent); z-index: 2; }
+.hr.good     { background: rgba(0,200,160,0.75); }
+.hr.marginal { background: rgba(255,179,71,0.65); }
+.hr.nogo     { background: rgba(255,83,112,0.60); }
+.hr.calm     { background: rgba(96,144,176,0.28); }
+.hr.night    { opacity: 0.32; }
+.hr-ticks { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; margin-top: 3px; }
+.hr-ticks span { font-family: var(--mono); font-size: 8px; color: var(--muted); text-align: center; }
+
+/* ── Hour detail readout ── */
+.hour-detail {
+  font-family: var(--mono); font-size: 11.5px; color: var(--muted2);
+  background: var(--surface3); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 14px; margin-bottom: 16px; min-height: 42px; line-height: 1.7;
+}
+.hour-detail b { color: var(--foam); }
+
+/* ── Legend ── */
+.legend { display: flex; gap: 14px; flex-wrap: wrap; margin: 4px 0 16px; }
+.legend span { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted2); }
+.legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.legend .lg-good { background: rgba(0,200,160,0.75); }
+.legend .lg-marg { background: rgba(255,179,71,0.65); }
+.legend .lg-nogo { background: rgba(255,83,112,0.60); }
+.legend .lg-calm { background: rgba(96,144,176,0.28); }
+
+.loading { color: var(--muted2); font-size: 13px; padding: 20px 0; text-align: center; }
+.err { color: var(--danger); font-size: 12px; }
+.note { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+
+/* Leaflet dark-theme nudges */
+.leaflet-container { font-family: var(--sans); }
+.leaflet-control-attribution { background: rgba(2,9,18,0.7) !important; color: var(--muted) !important; font-size: 9px !important; }
+.leaflet-control-attribution a { color: var(--muted2) !important; }
+.leaflet-bar a { background: var(--surface2) !important; color: var(--foam) !important; border-color: var(--border) !important; }
+.locate-btn {
+  position: absolute; top: 80px; left: 10px; z-index: 1000;
+  background: var(--surface2); color: var(--foam); border: 1px solid var(--border);
+  border-radius: 6px; width: 32px; height: 32px; font-size: 16px; cursor: pointer; line-height: 1;
+}
+.locate-btn:hover { background: var(--surface3); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">⛵ KEEL <span class="helm">HELM</span> · Sailing Weather</div>
+  <div class="coords" id="coords" onclick="locateMe()" title="Tap to use your location">⚓ Locating…</div>
+  <div class="hint">Tap the map to move the forecast point</div>
+</div>
+
+<div class="layout">
+  <div class="map-pane">
+    <div id="map"></div>
+    <button class="locate-btn" onclick="locateMe()" title="Use my location">⌖</button>
+  </div>
+  <div class="panel">
+    <div class="card">
+      <h2>Right now</h2>
+      <div class="now-grid" id="now-grid"><div class="loading">Waiting for a location…</div></div>
+      <div id="verdict"></div>
+    </div>
+
+    <div class="card">
+      <h2>Sailable windows · next 7 days</h2>
+      <div class="legend">
+        <span><i class="lg-good"></i> Good (7–17 kn)</span>
+        <span><i class="lg-marg"></i> Marginal</span>
+        <span><i class="lg-nogo"></i> No-go</span>
+        <span><i class="lg-calm"></i> Becalmed</span>
+      </div>
+      <div class="hour-detail" id="hour-detail">Tap any hour for details.</div>
+      <div id="days"><div class="loading">Waiting for a location…</div></div>
+      <div class="note" id="wave-note"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ── Thresholds (knots, feet) — tune these to your boat ──
+const T = {
+  goodWindMin: 7,  goodWindMax: 17, goodGustMax: 23, goodWaveFt: 3.0, goodPrecip: 40,
+  margWindMin: 4,  margWindMax: 22, margGustMax: 27, margWaveFt: 4.5, margPrecip: 70,
+  calmBelow: 4, capeStorm: 2000
+};
+
+// Fallback start point until geolocation answers (Biscayne Bay).
+const FALLBACK = { lat: 25.73, lon: -80.21 };
+
+let map, marker, seamarks;
+let state = { lat: null, lon: null, hourly: null, daily: null, marine: null, reqId: 0 };
+
+// ── Map setup: dark base + OpenSeaMap seamark overlay ──
+function initMap(){
+  map = L.map("map", { zoomControl: true }).setView([FALLBACK.lat, FALLBACK.lon], 9);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    maxZoom: 19
+  }).addTo(map);
+  seamarks = L.tileLayer("https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png", {
+    attribution: '&copy; <a href="https://www.openseamap.org/">OpenSeaMap</a>',
+    maxZoom: 18, opacity: 0.9
+  }).addTo(map);
+  map.on("click", e => setPoint(e.latlng.lat, e.latlng.lng, false));
+}
+
+function setPoint(lat, lon, recenter){
+  state.lat = lat; state.lon = lon;
+  if(marker) marker.setLatLng([lat, lon]);
+  else marker = L.marker([lat, lon]).addTo(map);
+  if(recenter) map.setView([lat, lon], Math.max(map.getZoom(), 9));
+  document.getElementById("coords").textContent =
+    "⚓ " + formatCoord(lat,"N","S") + " · " + formatCoord(lon,"E","W");
+  loadForecast(lat, lon);
+}
+
+// Same degree-minute formatting as the keel-app hero.
+function formatCoord(value, posLabel, negLabel){
+  const dir = value >= 0 ? posLabel : negLabel;
+  const abs = Math.abs(value);
+  const deg = Math.floor(abs);
+  const min = Math.round((abs - deg) * 60);
+  return deg + "°" + String(min).padStart(2,"0") + "′" + dir;
+}
+
+function locateMe(){
+  const el = document.getElementById("coords");
+  if(!("geolocation" in navigator)){ el.textContent = "⚓ Location unavailable"; setPoint(FALLBACK.lat, FALLBACK.lon, true); return; }
+  el.textContent = "⚓ Locating…";
+  navigator.geolocation.getCurrentPosition(
+    pos => setPoint(pos.coords.latitude, pos.coords.longitude, true),
+    err => {
+      el.textContent = (err && err.code === 1) ? "⚓ Location off · tap to retry" : "⚓ Tap to locate";
+      if(state.lat == null) setPoint(FALLBACK.lat, FALLBACK.lon, true);
+    },
+    { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }
+  );
+}
+
+// ── Data fetch: Open-Meteo forecast + marine (marine fails politely inland) ──
+async function loadForecast(lat, lon){
+  const reqId = ++state.reqId;
+  document.getElementById("now-grid").innerHTML = '<div class="loading">Reading the wind…</div>';
+  document.getElementById("days").innerHTML = '<div class="loading">Charting the week…</div>';
+  document.getElementById("verdict").innerHTML = "";
+  document.getElementById("hour-detail").textContent = "Tap any hour for details.";
+
+  const fUrl = "https://api.open-meteo.com/v1/forecast?latitude="+lat+"&longitude="+lon+
+    "&current=temperature_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code" +
+    "&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,precipitation_probability,cape,temperature_2m,weather_code" +
+    "&daily=sunrise,sunset&wind_speed_unit=kn&temperature_unit=fahrenheit&timezone=auto&forecast_days=7";
+  const mUrl = "https://marine-api.open-meteo.com/v1/marine?latitude="+lat+"&longitude="+lon+
+    "&current=wave_height,wave_period&hourly=wave_height,wave_period&timezone=auto&forecast_days=7";
+
+  let fc = null, marine = null;
+  try {
+    const res = await fetch(fUrl);
+    if(!res.ok) throw new Error("forecast http " + res.status);
+    fc = await res.json();
+  } catch(e){
+    if(reqId !== state.reqId) return;
+    document.getElementById("now-grid").innerHTML = '<div class="err">Forecast fetch failed — check connection and retry.</div>';
+    document.getElementById("days").innerHTML = "";
+    return;
+  }
+  try {
+    const res = await fetch(mUrl);
+    if(res.ok){
+      const m = await res.json();
+      if(m && m.hourly && m.hourly.wave_height && m.hourly.wave_height.some(v => v != null)) marine = m;
+    }
+  } catch(e){ /* inland or marine model gap — proceed without waves */ }
+
+  if(reqId !== state.reqId) return; // a newer tap superseded this one
+  state.hourly = fc.hourly; state.daily = fc.daily; state.marine = marine;
+  renderNow(fc, marine);
+  renderDays(fc, marine);
+  document.getElementById("wave-note").textContent = marine
+    ? "Wave data: Open-Meteo Marine (significant wave height)."
+    : "No wave data for this point (inland or outside marine model coverage) — windows scored on wind alone.";
+}
+
+const COMPASS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+function compass(deg){ return deg == null ? "" : COMPASS[Math.round(deg/22.5) % 16]; }
+function mToFt(m){ return m == null ? null : m * 3.28084; }
+
+// ── Hour scoring: good / marginal / nogo / calm ──
+function scoreHour(windKn, gustKn, waveFt, precip, cape){
+  if(windKn == null) return "nogo";
+  const p = precip == null ? 0 : precip, c = cape == null ? 0 : cape;
+  if(windKn > T.margWindMax || (gustKn != null && gustKn > T.margGustMax) ||
+     (waveFt != null && waveFt > T.margWaveFt) || p >= T.margPrecip || c >= T.capeStorm) return "nogo";
+  if(windKn < T.calmBelow) return "calm";
+  if(windKn >= T.goodWindMin && windKn <= T.goodWindMax &&
+     (gustKn == null || gustKn <= T.goodGustMax) &&
+     (waveFt == null || waveFt <= T.goodWaveFt) && p < T.goodPrecip && c < T.capeStorm/2) return "good";
+  return "marginal";
+}
+
+// ── Current conditions card ──
+function renderNow(fc, marine){
+  const c = fc.current || {};
+  const grid = document.getElementById("now-grid");
+  const dir = c.wind_direction_10m;
+  // wind_direction is "coming from"; arrow shows where it's blowing toward
+  const arrow = dir == null ? "" :
+    '<span class="dir-arrow" style="transform:rotate(' + ((dir + 180) % 360) + 'deg);display:inline-block">↑</span> ';
+  const waveNow = marine && marine.current ? mToFt(marine.current.wave_height) : null;
+  const stats = [
+    ["Wind", c.wind_speed_10m != null ? arrow + Math.round(c.wind_speed_10m) + " <small>kn " + compass(dir) + "</small>" : "n/a"],
+    ["Gusts", c.wind_gusts_10m != null ? Math.round(c.wind_gusts_10m) + " <small>kn</small>" : "n/a"],
+    ["Waves", waveNow != null ? waveNow.toFixed(1) + " <small>ft" + (marine.current.wave_period != null ? " @ " + Math.round(marine.current.wave_period) + "s" : "") + "</small>" : "—"],
+    ["Air", c.temperature_2m != null ? Math.round(c.temperature_2m) + "° <small>F</small>" : "n/a"]
+  ];
+  grid.innerHTML = stats.map(s =>
+    '<div class="now-stat"><div class="label">' + s[0] + '</div><div class="value">' + s[1] + '</div></div>'
+  ).join("");
+
+  const score = scoreHour(c.wind_speed_10m, c.wind_gusts_10m, waveNow, null, null);
+  const msg = {
+    good: "Good sailing right now — wind in the sweet spot.",
+    marginal: "Sailable, but keep an eye on it.",
+    nogo: "Stand down — conditions over your limits.",
+    calm: "Becalmed — not enough wind to sail."
+  }[score];
+  document.getElementById("verdict").innerHTML = '<div class="verdict ' + score + '">' + msg + '</div>';
+}
+
+// ── 7-day sailable windows strip ──
+function renderDays(fc, marine){
+  const h = fc.hourly, d = fc.daily;
+  const byDay = {};
+  for(let i = 0; i < h.time.length; i++){
+    const day = h.time[i].slice(0, 10);
+    (byDay[day] = byDay[day] || []).push(i);
+  }
+  const waveH = marine ? marine.hourly : null;
+
+  let html = "";
+  const dayKeys = Object.keys(byDay).slice(0, 7);
+  dayKeys.forEach((day, di) => {
+    const idxs = byDay[day];
+    const dt = new Date(day + "T12:00:00");
+    const name = dt.toLocaleDateString(undefined, { weekday: "short", month: "numeric", day: "numeric" });
+    const sr = d && d.sunrise && d.sunrise[di] ? d.sunrise[di].slice(11,16) : "07:00";
+    const ss = d && d.sunset  && d.sunset[di]  ? d.sunset[di].slice(11,16)  : "19:00";
+    const srH = parseInt(sr.slice(0,2),10), ssH = parseInt(ss.slice(0,2),10);
+
+    let cells = "", best = { len: 0, start: -1, end: -1 }, run = { len: 0, start: -1 };
+    idxs.forEach(i => {
+      const hour = parseInt(h.time[i].slice(11,13), 10);
+      const waveFt = waveH && waveH.wave_height[i] != null ? mToFt(waveH.wave_height[i]) : null;
+      const score = scoreHour(h.wind_speed_10m[i], h.wind_gusts_10m[i], waveFt,
+                              h.precipitation_probability ? h.precipitation_probability[i] : null,
+                              h.cape ? h.cape[i] : null);
+      const daylight = hour >= srH && hour <= ssH;
+      // Track the longest daylight run of sailable hours (good or marginal)
+      if(daylight && (score === "good" || score === "marginal")){
+        if(run.len === 0) run.start = hour;
+        run.len++;
+        if(run.len > best.len) best = { len: run.len, start: run.start, end: hour + 1 };
+      } else { run.len = 0; }
+      cells += '<div class="hr ' + score + (daylight ? "" : " night") + '" data-i="' + i + '"' +
+        ' title="' + h.time[i].slice(11,16) + " · " + Math.round(h.wind_speed_10m[i]) + ' kn"></div>';
+    });
+
+    const bestTxt = best.len >= 2
+      ? '<span class="day-best">best ' + String(best.start).padStart(2,"0") + ":00–" + String(best.end).padStart(2,"0") + ":00</span>"
+      : '<span class="day-best none">no window</span>';
+    html += '<div class="day"><div class="day-head"><span class="day-name">' + name + '</span>' +
+      '<span class="day-sun">☀ ' + sr + "–" + ss + "</span>" + bestTxt + "</div>" +
+      '<div class="hours">' + cells + "</div>" +
+      (di === dayKeys.length - 1 ? hourTicks() : "") + "</div>";
+  });
+  const wrap = document.getElementById("days");
+  wrap.innerHTML = html;
+  wrap.querySelectorAll(".hr").forEach(el => el.addEventListener("click", () => showHour(parseInt(el.dataset.i, 10), el)));
+}
+
+function hourTicks(){
+  let t = "";
+  for(let i = 0; i < 24; i++) t += "<span>" + (i % 6 === 0 ? i : "") + "</span>";
+  return '<div class="hr-ticks">' + t + "</div>";
+}
+
+function showHour(i, el){
+  document.querySelectorAll(".hr.sel").forEach(x => x.classList.remove("sel"));
+  el.classList.add("sel");
+  const h = state.hourly, m = state.marine;
+  const waveFt = m && m.hourly.wave_height[i] != null ? mToFt(m.hourly.wave_height[i]) : null;
+  const parts = [
+    "<b>" + h.time[i].replace("T", " ") + "</b>",
+    "wind <b>" + Math.round(h.wind_speed_10m[i]) + " kn " + compass(h.wind_direction_10m[i]) + "</b>",
+    "gusts <b>" + Math.round(h.wind_gusts_10m[i]) + " kn</b>"
+  ];
+  if(waveFt != null){
+    let w = "waves <b>" + waveFt.toFixed(1) + " ft</b>";
+    if(m.hourly.wave_period && m.hourly.wave_period[i] != null) w += " @ <b>" + Math.round(m.hourly.wave_period[i]) + "s</b>";
+    parts.push(w);
+  }
+  if(h.precipitation_probability) parts.push("rain <b>" + h.precipitation_probability[i] + "%</b>");
+  if(h.temperature_2m) parts.push("<b>" + Math.round(h.temperature_2m[i]) + "°F</b>");
+  document.getElementById("hour-detail").innerHTML = parts.join(" · ");
+}
+
+if(window.self !== window.top) document.body.classList.add("embedded");
+initMap();
+locateMe();
+</script>
+</body>
+</html>
