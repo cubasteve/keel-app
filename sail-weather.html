@@ -160,6 +160,33 @@ body.embedded .topbar { padding: 10px 16px; }
 .radar-time.future { color: var(--amber); }
 #wind-canvas { position: absolute; inset: 0; z-index: 450; pointer-events: none; }
 #cast-canvas { position: absolute; inset: 0; z-index: 440; pointer-events: none; }
+
+/* ── Rain time scrubber ── */
+.time-slider {
+  position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%);
+  z-index: 1000; display: none; align-items: center; gap: 8px;
+  width: min(72%, 420px); padding: 7px 12px;
+  background: rgba(7,21,37,0.88); border: 1px solid var(--border); border-radius: 10px;
+}
+.time-slider button {
+  background: none; border: none; color: var(--accent); font-size: 12px;
+  cursor: pointer; padding: 2px 4px; line-height: 1; flex-shrink: 0;
+}
+.ts-end { font-family: var(--mono); font-size: 9px; color: var(--muted); flex-shrink: 0; }
+.ts-end.future { color: var(--amber); }
+#rain-scrub {
+  flex: 1; -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--muted) 0%, var(--accent) 70%, var(--amber) 100%);
+  outline: none; cursor: pointer;
+}
+#rain-scrub::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--foam); border: 2px solid var(--accent); cursor: pointer;
+}
+#rain-scrub::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--foam); border: 2px solid var(--accent); cursor: pointer;
+}
 </style>
 </head>
 <body>
@@ -178,6 +205,13 @@ body.embedded .topbar { padding: 10px 16px; }
       <button id="btn-wind" class="layer-btn active" onclick="toggleWind()">≋ Wind</button>
       <button id="btn-rain" class="layer-btn active" onclick="toggleRain()">🌧 Rain</button>
       <div class="radar-time" id="radar-time"></div>
+    </div>
+    <div class="time-slider" id="time-slider">
+      <button id="rain-play" onclick="toggleRainPlay()" title="Play/pause">❚❚</button>
+      <span class="ts-end">past</span>
+      <input type="range" id="rain-scrub" min="0" max="7" value="0" step="1"
+             oninput="scrubRain(this.value)">
+      <span class="ts-end future">+2h</span>
     </div>
   </div>
   <div class="panel">
@@ -500,37 +534,61 @@ async function initRain(){
     btn.disabled = true; btn.classList.remove("active"); btn.textContent = "🌧 Rain n/a";
   }
 }
-// Plays radar tile frames (past + RainViewer nowcast), then model futurecast
-// frames out to +2h drawn on the cast canvas, as one continuous loop.
-function startRain(){
-  if(rainTimer) clearInterval(rainTimer);
+// The rain timeline: radar tile frames (past + RainViewer nowcast), then
+// futurecast frames out to +2h. Auto-plays as a loop, and the slider under
+// the map scrubs through the same playlist from past to future.
+let rainPlaylist = [], rainPos = -1, rainPlaying = true;
+
+function buildRainPlaylist(){
   const lastRadarTime = rainFrames.length ? rainFrames[rainFrames.length - 1].time : 0;
   // Future frames: Tomorrow.io forecast tiles when healthy, else model canvas
   const future = (!tmrDead && tmrFrames.length)
     ? tmrFrames.map(f => ({ kind: "tmr", frame: f, time: f.time, label: "cast" }))
     : castSteps.filter(s => s.time > lastRadarTime)
         .map(s => ({ kind: "cast", step: s, time: s.time, label: "cast" }));
-  const playlist = rainFrames.map((f, i) => ({
+  rainPlaylist = rainFrames.map((f, i) => ({
       kind: "tile", idx: i, time: f.time,
       label: f.time * 1000 > Date.now() ? "nowcast" : "radar"
     })).concat(future);
-  if(!playlist.length) return;
-  let pi = -1;
-  rainTimer = setInterval(() => {
-    pi = (pi + 1) % playlist.length;
-    const fr = playlist[pi];
-    rainLayers.forEach(l => l.setOpacity(0));
-    clearCast();
-    if(fr.kind === "tile") rainLayers[fr.idx].setOpacity(0.65);
-    else if(fr.kind === "tmr") drawTmrFrame(fr.frame);
-    else drawCastStep(fr.step);
-    const el = document.getElementById("radar-time");
-    const mins = Math.round((fr.time - Date.now() / 1000) / 60);
-    el.style.display = "block";
-    el.textContent = fr.label + " " + time12(new Date(fr.time * 1000).toTimeString().slice(0, 5)) +
-                     (mins > 0 ? " (+" + mins + "m)" : "");
-    el.classList.toggle("future", mins > 0);
-  }, 700);
+  const s = document.getElementById("rain-scrub");
+  s.max = Math.max(0, rainPlaylist.length - 1);
+  if(rainPos >= rainPlaylist.length) rainPos = 0;
+}
+function showRainFrame(i){
+  if(!rainPlaylist.length) return;
+  rainPos = i;
+  const fr = rainPlaylist[i];
+  rainLayers.forEach(l => l.setOpacity(0));
+  clearCast();
+  if(fr.kind === "tile") rainLayers[fr.idx].setOpacity(0.65);
+  else if(fr.kind === "tmr") drawTmrFrame(fr.frame);
+  else drawCastStep(fr.step);
+  const el = document.getElementById("radar-time");
+  const mins = Math.round((fr.time - Date.now() / 1000) / 60);
+  el.style.display = "block";
+  el.textContent = fr.label + " " + time12(new Date(fr.time * 1000).toTimeString().slice(0, 5)) +
+                   (mins > 0 ? " (+" + mins + "m)" : "");
+  el.classList.toggle("future", mins > 0);
+  document.getElementById("rain-scrub").value = i;
+}
+function startRain(){
+  if(rainTimer){ clearInterval(rainTimer); rainTimer = null; }
+  buildRainPlaylist();
+  if(!rainPlaylist.length) return;
+  document.getElementById("time-slider").style.display = "flex";
+  if(rainPlaying) rainTimer = setInterval(() => showRainFrame((rainPos + 1) % rainPlaylist.length), 700);
+}
+function toggleRainPlay(){
+  rainPlaying = !rainPlaying;
+  document.getElementById("rain-play").textContent = rainPlaying ? "❚❚" : "▶";
+  if(rainTimer){ clearInterval(rainTimer); rainTimer = null; }
+  if(rainPlaying && rainOn && rainPlaylist.length)
+    rainTimer = setInterval(() => showRainFrame((rainPos + 1) % rainPlaylist.length), 700);
+}
+// Dragging the slider pauses playback and shows that frame
+function scrubRain(v){
+  if(rainPlaying) toggleRainPlay();
+  showRainFrame(Math.min(parseInt(v, 10), rainPlaylist.length - 1));
 }
 function toggleRain(){
   if(document.getElementById("btn-rain").disabled) return;
@@ -541,7 +599,8 @@ function toggleRain(){
     rainLayers.forEach(l => l.setOpacity(0));
     clearCast();
     document.getElementById("radar-time").style.display = "none";
-  } else if(rainLayers.length || castSteps.length) startRain();
+    document.getElementById("time-slider").style.display = "none";
+  } else if(rainLayers.length || castSteps.length || tmrFrames.length) startRain();
 }
 
 // ── 2-hour model futurecast (Open-Meteo 15-minute precipitation grid) ───────
