@@ -2807,7 +2807,7 @@ function showPage(page) {
     // Bump the ?v= number whenever sail-weather.html changes, or the iframe
     // can keep serving a stale cached copy even after a hard refresh.
     const wf = document.getElementById("weather-frame");
-    if(wf && !wf.getAttribute("src")) wf.setAttribute("src", "sail-weather.html?v=9");
+    if(wf && !wf.getAttribute("src")) wf.setAttribute("src", "sail-weather.html?v=10");
   }
   if(page === "trips")     loadTripsPage();
   if(page === "keeltoken") loadKeelTokenPage();

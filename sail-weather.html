@@ -582,8 +582,9 @@ async function loadForecast(lat, lon){
   document.getElementById("hour-detail").textContent = "Tap any hour for details.";
 
   const fUrl = "https://api.open-meteo.com/v1/forecast?latitude="+lat+"&longitude="+lon+
-    "&current=temperature_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code" +
+    "&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code" +
     "&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,precipitation_probability,cape,temperature_2m,weather_code" +
+    "&minutely_15=precipitation&forecast_minutely_15=10&precipitation_unit=inch" +
     "&daily=sunrise,sunset&wind_speed_unit=kn&temperature_unit=fahrenheit&timezone=auto&forecast_days=7";
   const mUrl = "https://marine-api.open-meteo.com/v1/marine?latitude="+lat+"&longitude="+lon+
     "&current=wave_height,wave_period&hourly=wave_height,wave_period&timezone=auto&forecast_days=7";
@@ -623,6 +624,24 @@ async function loadForecast(lat, lon){
   document.getElementById("wave-note").textContent = marine
     ? "Wave data: Open-Meteo Marine (significant wave height)."
     : "No wave data for this point (inland or outside marine model coverage) — windows scored on wind alone.";
+}
+
+// Sum of forecast precipitation (inches) over the next 8 15-min blocks (2h)
+// at the marker point. Returns null if the model has no 15-minute data here.
+function rainNext2h(fc){
+  const m = fc.minutely_15;
+  if(!m || !m.time || !m.precipitation) return null;
+  const offsetMs = (fc.utc_offset_seconds || 0) * 1000;
+  const now = Date.now();
+  let sum = 0, n = 0;
+  for(let i = 0; i < m.time.length && n < 8; i++){
+    // times are local ISO; convert each block's end to real UTC ms
+    const blockEnd = Date.parse(m.time[i] + "Z") - offsetMs + 15 * 60000;
+    if(blockEnd <= now) continue;
+    sum += m.precipitation[i] || 0;
+    n++;
+  }
+  return n ? sum : null;
 }
 
 const COMPASS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
@@ -671,11 +690,12 @@ function renderNow(fc, marine){
   const arrow = dir == null ? "" :
     '<span class="dir-arrow" style="transform:rotate(' + ((dir + 180) % 360) + 'deg);display:inline-block">↑</span> ';
   const waveNow = marine && marine.current ? mToFt(marine.current.wave_height) : null;
+  const rain2h = rainNext2h(fc);
   const stats = [
     ["Wind", c.wind_speed_10m != null ? arrow + Math.round(c.wind_speed_10m) + " <small>kn " + compass(dir) + "</small>" : "n/a"],
     ["Gusts", c.wind_gusts_10m != null ? Math.round(c.wind_gusts_10m) + " <small>kn</small>" : "n/a"],
     ["Waves", waveNow != null ? waveNow.toFixed(1) + " <small>ft" + (marine.current.wave_period != null ? " @ " + Math.round(marine.current.wave_period) + "s" : "") + "</small>" : "—"],
-    ["Air", c.temperature_2m != null ? Math.round(c.temperature_2m) + "° <small>F</small>" : "n/a"]
+    ["Rain · 2h", rain2h != null ? (rain2h < 0.005 ? "0" : rain2h.toFixed(2)) + ' <small>in</small>' : "—"]
   ];
   grid.innerHTML = stats.map(s =>
     '<div class="now-stat"><div class="label">' + s[0] + '</div><div class="value">' + s[1] + '</div></div>'
