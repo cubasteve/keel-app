@@ -333,20 +333,59 @@ function tmrPump(){
   const url = tmrQueue.shift();
   tmrInFlight = true;
   const img = new Image();
+  img.crossOrigin = "anonymous"; // worker sends CORS headers; lets us recolor pixels
   img.onload = () => { tmrCache.set(url, img); tmrInFlight = false; setTimeout(tmrPump, 450); };
   img.onerror = () => {
     tmrCache.delete(url);
     tmrInFlight = false;
     if(++tmrFails > 5 && !tmrDead){
       tmrDead = true; tmrQueue = [];
-      if(rainOn && rainTimer) startRain(); // rebuild playlist on the fallback
+      if(rainOn) startRain(); // rebuild playlist on the fallback
     } else setTimeout(tmrPump, 900);
   };
   img.src = url;
 }
-// Paint whatever tiles are cached for this frame; queue fetches for the rest.
-function drawTmrFrame(frame){
-  clearCast();
+// Remap Tomorrow.io's green/yellow/red palette onto the same ramp RainViewer
+// uses (sand → gold → cyan → deep blue by intensity) so past and future
+// overlays read as one continuous product. Result cached per tile image.
+function recolorTmr(img){
+  if(img._rc) return img._rc;
+  try {
+    const cv = document.createElement("canvas");
+    cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+    const cx = cv.getContext("2d");
+    cx.drawImage(img, 0, 0);
+    const im = cx.getImageData(0, 0, cv.width, cv.height);
+    const d = im.data;
+    for(let i = 0; i < d.length; i += 4){
+      const a = d[i + 3];
+      if(!a) continue;
+      const r = d[i], g = d[i + 1], b = d[i + 2];
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      let hue = 0;
+      if(mx > mn){
+        if(mx === r) hue = ((g - b) / (mx - mn) + 6) % 6;
+        else if(mx === g) hue = (b - r) / (mx - mn) + 2;
+        else hue = (r - g) / (mx - mn) + 4;
+        hue *= 60;
+      }
+      let c;
+      if(hue >= 75 && hue < 170)      c = [150, 140, 115, 115]; // light (greens) → sand
+      else if(hue >= 45 && hue < 75)  c = [214, 200, 143, 155]; // moderate (yellow) → gold
+      else if(hue >= 15 && hue < 45)  c = [48, 171, 214, 190];  // heavy (orange) → cyan
+      else if(hue < 15 || hue >= 300) c = [0, 110, 170, 215];   // intense (red/violet) → deep blue
+      else                            c = [150, 140, 115, 105];
+      d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = Math.min(a, c[3]);
+    }
+    cx.putImageData(im, 0, 0);
+    img._rc = cv;
+  } catch(e){ img._rc = img; } // tainted canvas → fall back to original colors
+  return img._rc;
+}
+// Paint whatever tiles are cached for this frame at the given blend weight;
+// queue fetches for the rest. Caller is responsible for clearing the canvas.
+function drawTmrFrame(frame, w){
+  if(w === undefined) w = 1;
   let drawn = 0;
   for(const t of tmrTilesForView()){
     const url = tmrUrl(frame.iso, t);
@@ -355,9 +394,9 @@ function drawTmrFrame(frame){
     if(img){
       const p0 = map.latLngToContainerPoint([tile2lat(t.y, t.z), tile2lon(t.x, t.z)]);
       const p1 = map.latLngToContainerPoint([tile2lat(t.y + 1, t.z), tile2lon(t.x + 1, t.z)]);
-      castCtx.globalAlpha = 0.75;
+      castCtx.globalAlpha = 0.85 * w;
       castCtx.imageSmoothingEnabled = true;
-      castCtx.drawImage(img, p0.x, p0.y, p1.x - p0.x, p1.y - p0.y);
+      castCtx.drawImage(recolorTmr(img), p0.x, p0.y, p1.x - p0.x, p1.y - p0.y);
       castCtx.globalAlpha = 1;
       drawn++;
     }
@@ -512,7 +551,7 @@ function toggleWind(){
 
 // ── Animated rain radar layer (RainViewer, free/no key) ─────────────────────
 // Loops the last hour of radar frames plus the first nowcast frame.
-let rainOn = true, rainLayers = [], rainFrames = [], rainTimer = null;
+let rainOn = true, rainLayers = [], rainFrames = [];
 async function initRain(){
   map.createPane("rain");
   map.getPane("rain").style.zIndex = 350;          // above base tiles, below markers
@@ -541,7 +580,9 @@ async function initRain(){
 // The rain timeline: radar tile frames (past + RainViewer nowcast), then
 // futurecast frames out to +2h. Auto-plays as a loop, and the slider under
 // the map scrubs through the same playlist from past to future.
-let rainPlaylist = [], rainPos = -1, rainPlaying = true;
+let rainPlaylist = [], rainPlaying = true;
+let rainAnim = null, rainPosF = 0, lastRainTs = 0;
+const RAIN_FRAME_MS = 900; // dwell per frame; crossfade runs continuously
 
 function buildRainPlaylist(){
   const lastRadarTime = rainFrames.length ? rainFrames[rainFrames.length - 1].time : 0;
@@ -556,51 +597,87 @@ function buildRainPlaylist(){
     })).concat(future);
   const s = document.getElementById("rain-scrub");
   s.max = Math.max(0, rainPlaylist.length - 1);
-  if(rainPos >= rainPlaylist.length) rainPos = 0;
+  if(rainPosF >= rainPlaylist.length) rainPosF = 0;
 }
-function showRainFrame(i){
-  if(!rainPlaylist.length) return;
-  rainPos = i;
+function updateRainChip(i){
   const fr = rainPlaylist[i];
-  rainLayers.forEach(l => l.setOpacity(0));
-  clearCast();
-  if(fr.kind === "tile") rainLayers[fr.idx].setOpacity(0.65);
-  else if(fr.kind === "tmr") drawTmrFrame(fr.frame);
-  else drawCastStep(fr.step);
   const el = document.getElementById("radar-time");
   const mins = Math.round((fr.time - Date.now() / 1000) / 60);
   el.style.display = "block";
   el.textContent = fr.label + " " + time12(new Date(fr.time * 1000).toTimeString().slice(0, 5)) +
                    (mins > 0 ? " (+" + mins + "m)" : "");
   el.classList.toggle("future", mins > 0);
-  document.getElementById("rain-scrub").value = i;
+}
+// Render the timeline at a fractional position: crossfades neighbouring
+// frames so playback flows at display refresh rate instead of stuttering
+// through hard 700ms swaps. The loop seam (last → first) snaps, no fade.
+function renderRainAt(p){
+  if(!rainPlaylist.length) return;
+  rainPosF = p;
+  const i = Math.min(Math.floor(p), rainPlaylist.length - 1);
+  const f = p - i, j = i + 1;
+  rainLayers.forEach(l => l.setOpacity(0));
+  clearCast();
+  const apply = (fr, w) => {
+    if(w < 0.02) return;
+    if(fr.kind === "tile") rainLayers[fr.idx].setOpacity(0.65 * w);
+    else if(fr.kind === "tmr") drawTmrFrame(fr.frame, w);
+    else drawCastStep(fr.step, w);
+  };
+  if(j < rainPlaylist.length && f > 0.02){
+    apply(rainPlaylist[i], 1 - f);
+    apply(rainPlaylist[j], f);
+  } else {
+    apply(rainPlaylist[i], 1);
+  }
+  if(i !== renderRainAt._idx){
+    renderRainAt._idx = i;
+    updateRainChip(i);
+    document.getElementById("rain-scrub").value = i;
+  }
+}
+function rainLoop(ts){
+  rainAnim = requestAnimationFrame(rainLoop);
+  if(!lastRainTs) lastRainTs = ts;
+  let dt = ts - lastRainTs;
+  lastRainTs = ts;
+  if(dt < 0 || dt > 200) dt = 16; // first frame or tab was hidden
+  let p = rainPosF + dt / RAIN_FRAME_MS;
+  if(p >= rainPlaylist.length) p = 0;
+  renderRainAt(p);
+}
+function stopRainLoop(){
+  if(rainAnim){ cancelAnimationFrame(rainAnim); rainAnim = null; }
+  lastRainTs = 0;
 }
 function startRain(){
-  if(rainTimer){ clearInterval(rainTimer); rainTimer = null; }
+  stopRainLoop();
   buildRainPlaylist();
   if(!rainPlaylist.length) return;
   document.getElementById("scrub-row").style.display = "flex";
   document.getElementById("rain-play").style.display = "";
-  if(rainPlaying) rainTimer = setInterval(() => showRainFrame((rainPos + 1) % rainPlaylist.length), 700);
+  renderRainAt._idx = undefined;
+  if(rainPlaying) rainAnim = requestAnimationFrame(rainLoop);
+  else renderRainAt(Math.min(rainPosF, rainPlaylist.length - 1));
 }
 function toggleRainPlay(){
   rainPlaying = !rainPlaying;
   document.getElementById("rain-play").textContent = rainPlaying ? "❚❚" : "▶";
-  if(rainTimer){ clearInterval(rainTimer); rainTimer = null; }
-  if(rainPlaying && rainOn && rainPlaylist.length)
-    rainTimer = setInterval(() => showRainFrame((rainPos + 1) % rainPlaylist.length), 700);
+  stopRainLoop();
+  if(rainPlaying && rainOn && rainPlaylist.length) rainAnim = requestAnimationFrame(rainLoop);
 }
 // Dragging the slider pauses playback and shows that frame
 function scrubRain(v){
   if(rainPlaying) toggleRainPlay();
-  showRainFrame(Math.min(parseInt(v, 10), rainPlaylist.length - 1));
+  renderRainAt._idx = undefined;
+  renderRainAt(Math.min(parseInt(v, 10), rainPlaylist.length - 1));
 }
 function toggleRain(){
   if(document.getElementById("btn-rain").disabled) return;
   rainOn = !rainOn;
   document.getElementById("btn-rain").classList.toggle("active", rainOn);
   if(!rainOn){
-    if(rainTimer){ clearInterval(rainTimer); rainTimer = null; }
+    stopRainLoop();
     rainLayers.forEach(l => l.setOpacity(0));
     clearCast();
     document.getElementById("radar-time").style.display = "none";
@@ -669,7 +746,7 @@ async function refreshCastGrid(){
     castGrid = { lat0, lat1, lon0, lon1 };
     castGridFetchedAt = Date.now();
     castSteps = newSteps;
-    if(rainOn && rainTimer) startRain(); // rebuild the playlist with fresh frames
+    if(rainOn) startRain(); // rebuild the playlist with fresh frames
   } catch(e){ /* keep whatever we had; radar frames still play */ }
 }
 // Precip (mm per 15min → mm/h) to radar-style color
@@ -680,8 +757,9 @@ function castColor(mmh){
   if(mmh < 8)    return [255, 179, 71, 170];
   return [255, 83, 112, 190];
 }
-function drawCastStep(step){
+function drawCastStep(step, w){
   if(!castGrid) return;
+  if(w === undefined) w = 1;
   const N = CAST_N;
   const off = drawCastStep._off || (drawCastStep._off = document.createElement("canvas"));
   off.width = N; off.height = N;
@@ -695,9 +773,10 @@ function drawCastStep(step){
   octx.putImageData(img, 0, 0);
   const tl = map.latLngToContainerPoint([castGrid.lat0, castGrid.lon0]);
   const br = map.latLngToContainerPoint([castGrid.lat1, castGrid.lon1]);
-  clearCast();
+  castCtx.globalAlpha = w;
   castCtx.imageSmoothingEnabled = true;
   castCtx.drawImage(off, tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+  castCtx.globalAlpha = 1;
 }
 
 function setPoint(lat, lon, recenter){
