@@ -512,28 +512,13 @@ async function refreshCastGrid(){
     if(rainOn && rainTimer) startRain(); // rebuild the playlist with fresh frames
   } catch(e){ /* keep whatever we had; radar frames still play */ }
 }
-// Precip (mm/h) to color, interpolated along a ramp sampled from the actual
-// RainViewer tiles we display (warm translucent sand for light rain, bright
-// cyan cores for heavy), with alphas pre-scaled to match the tiles' 0.65
-// layer opacity — so cast frames read as a continuation of the radar.
-const CAST_RAMP = [
-  [0.08, [134, 126, 107,   0]],
-  [0.20, [150, 140, 115,  90]],
-  [0.60, [190, 175, 130, 140]],
-  [1.50, [225, 210, 150, 175]],
-  [3.00, [ 48, 171, 214, 210]],
-  [8.00, [ 20, 120, 190, 235]]
-];
+// Precip (mm per 15min → mm/h) to radar-style color
 function castColor(mmh){
-  if(mmh < CAST_RAMP[0][0]) return [0, 0, 0, 0];
-  for(let i = 1; i < CAST_RAMP.length; i++){
-    if(mmh <= CAST_RAMP[i][0]){
-      const [m0, c0] = CAST_RAMP[i - 1], [m1, c1] = CAST_RAMP[i];
-      const t = (mmh - m0) / (m1 - m0);
-      return c0.map((v, k) => Math.round(v + (c1[k] - v) * t));
-    }
-  }
-  return CAST_RAMP[CAST_RAMP.length - 1][1];
+  if(mmh < 0.15) return [0, 0, 0, 0];
+  if(mmh < 1)    return [110, 175, 255, 110];
+  if(mmh < 3)    return [45, 125, 255, 150];
+  if(mmh < 8)    return [255, 179, 71, 170];
+  return [255, 83, 112, 190];
 }
 function drawCastStep(step){
   if(!castGrid) return;
@@ -552,12 +537,7 @@ function drawCastStep(step){
   const br = map.latLngToContainerPoint([castGrid.lat1, castGrid.lon1]);
   clearCast();
   castCtx.imageSmoothingEnabled = true;
-  castCtx.imageSmoothingQuality = "high";
-  // Just enough blur to soften cell edges without washing the field out
-  const cellPx = (br.x - tl.x) / N;
-  castCtx.filter = "blur(" + Math.min(8, Math.max(2, Math.round(cellPx / 12))) + "px)";
   castCtx.drawImage(off, tl.x, tl.y, br.x - tl.x, br.y - tl.y);
-  castCtx.filter = "none";
 }
 
 function setPoint(lat, lon, recenter){
