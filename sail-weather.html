@@ -517,12 +517,12 @@ async function refreshCastGrid(){
 // cyan cores for heavy), with alphas pre-scaled to match the tiles' 0.65
 // layer opacity — so cast frames read as a continuation of the radar.
 const CAST_RAMP = [
-  [0.10, [134, 126, 107,   0]],
-  [0.25, [134, 126, 107,  42]],
-  [0.80, [169, 156, 120,  80]],
-  [2.50, [214, 200, 143, 118]],
-  [6.00, [ 48, 171, 214, 165]],
-  [12.0, [ 20, 120, 190, 180]]
+  [0.08, [134, 126, 107,   0]],
+  [0.20, [150, 140, 115,  90]],
+  [0.60, [190, 175, 130, 140]],
+  [1.50, [225, 210, 150, 175]],
+  [3.00, [ 48, 171, 214, 210]],
+  [8.00, [ 20, 120, 190, 235]]
 ];
 function castColor(mmh){
   if(mmh < CAST_RAMP[0][0]) return [0, 0, 0, 0];
@@ -553,9 +553,9 @@ function drawCastStep(step){
   clearCast();
   castCtx.imageSmoothingEnabled = true;
   castCtx.imageSmoothingQuality = "high";
-  // Soft radar-like edges instead of hard grid-cell bands
+  // Just enough blur to soften cell edges without washing the field out
   const cellPx = (br.x - tl.x) / N;
-  castCtx.filter = "blur(" + Math.max(2, Math.round(cellPx / 5)) + "px)";
+  castCtx.filter = "blur(" + Math.min(8, Math.max(2, Math.round(cellPx / 12))) + "px)";
   castCtx.drawImage(off, tl.x, tl.y, br.x - tl.x, br.y - tl.y);
   castCtx.filter = "none";
 }
