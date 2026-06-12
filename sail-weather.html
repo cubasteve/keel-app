@@ -162,7 +162,7 @@ body.embedded .topbar { padding: 10px 16px; }
 .layer-btn:disabled { opacity: 0.5; cursor: default; }
 .radar-time { font-family: var(--mono); font-size: 10px; color: var(--muted2); background: rgba(2,9,18,0.75); padding: 3px 10px; border-radius: 6px; display: none; }
 .radar-time.future { color: var(--amber); }
-.hud-controls { display: flex; gap: 8px; align-items: center; }
+.hud-controls { display: flex; gap: 8px; align-items: center; align-self: flex-end; }
 #wind-canvas { position: absolute; inset: 0; z-index: 450; pointer-events: none; }
 #cast-canvas { position: absolute; inset: 0; z-index: 440; pointer-events: none; }
 
@@ -170,6 +170,10 @@ body.embedded .topbar { padding: 10px 16px; }
 .scrub-row {
   display: none; align-items: center; gap: 8px; width: 100%; padding: 7px 12px;
   background: rgba(7,21,37,0.88); border: 1px solid var(--border); border-radius: 10px;
+}
+.scrub-row button {
+  background: none; border: none; color: var(--accent); font-size: 12px;
+  cursor: pointer; padding: 2px 4px; line-height: 1; flex-shrink: 0;
 }
 .ts-end { font-family: var(--mono); font-size: 9px; color: var(--muted); flex-shrink: 0; }
 .ts-end.future { color: var(--amber); }
@@ -203,13 +207,13 @@ body.embedded .topbar { padding: 10px 16px; }
     <div class="map-hud">
       <div class="radar-time" id="radar-time"></div>
       <div class="scrub-row" id="scrub-row">
+        <button id="rain-play" onclick="toggleRainPlay()" title="Play/pause">❚❚</button>
         <span class="ts-end">past</span>
         <input type="range" id="rain-scrub" min="0" max="7" value="0" step="1"
                oninput="scrubRain(this.value)">
         <span class="ts-end future">+2h</span>
       </div>
       <div class="hud-controls">
-        <button id="rain-play" class="layer-btn" onclick="toggleRainPlay()" title="Play/pause">❚❚</button>
         <button id="btn-wind" class="layer-btn active" onclick="toggleWind()">≋ Wind</button>
         <button id="btn-rain" class="layer-btn active" onclick="toggleRain()">🌧 Rain</button>
       </div>
