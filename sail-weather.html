@@ -234,6 +234,95 @@ function initMap(){
   initWindLayer();
   initRain();
   initCast();
+  initTomorrow();
+}
+
+// ── Tomorrow.io forecast tiles for the futurecast frames ────────────────────
+// Real km-scale precipitation forecast imagery at +1h and +2h. The free tier
+// allows only a trickle of requests, so we never use a Leaflet tile layer
+// (which bursts dozens of fetches): instead we pick a zoom ≤7 where the view
+// fits in ≤6 tiles, fetch them one at a time through a throttled queue with a
+// session cache, and paint them on the cast canvas. Repeated failures flip
+// tmrDead and the loop falls back to the Open-Meteo canvas cast.
+const TOMORROW_KEY = "RrQ9i9LfN0TNR79YjhJcQiC4nMg27vKt";
+let tmrFrames = [], tmrCache = new Map(), tmrQueue = [], tmrInFlight = false;
+let tmrDead = false, tmrFails = 0;
+
+function initTomorrow(){
+  tmrFrames = [1, 2].map(hh => {
+    const t = new Date(Date.now() + hh * 3600000);
+    t.setUTCMinutes(Math.floor(t.getUTCMinutes() / 15) * 15, 0, 0);
+    return { time: t.getTime() / 1000, iso: t.toISOString().slice(0, 19) + "Z" };
+  });
+}
+function lon2tile(lon, z){ return Math.floor((lon + 180) / 360 * Math.pow(2, z)); }
+function lat2tile(lat, z){
+  const r = lat * Math.PI / 180;
+  return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z));
+}
+function tile2lon(x, z){ return x / Math.pow(2, z) * 360 - 180; }
+function tile2lat(y, z){
+  const n = Math.PI - 2 * Math.PI * y / Math.pow(2, z);
+  return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+}
+function tmrTilesForView(){
+  const b = map.getBounds();
+  for(let z = 7; z >= 3; z--){
+    const x0 = lon2tile(b.getWest(), z), x1 = lon2tile(b.getEast(), z);
+    const y0 = lat2tile(b.getNorth(), z), y1 = lat2tile(b.getSouth(), z);
+    if((x1 - x0 + 1) * (y1 - y0 + 1) <= 6 || z === 3){
+      const list = [];
+      for(let x = x0; x <= x1; x++) for(let y = y0; y <= y1; y++) list.push({ z, x, y });
+      return list;
+    }
+  }
+  return [];
+}
+function tmrUrl(iso, t){
+  return "https://api.tomorrow.io/v4/map/tile/" + t.z + "/" + t.x + "/" + t.y +
+         "/precipitationIntensity/" + iso + ".png?apikey=" + TOMORROW_KEY;
+}
+function tmrFetch(url){
+  if(tmrDead || tmrCache.has(url)) return;
+  tmrCache.set(url, null); // requested, not yet loaded
+  tmrQueue.push(url);
+  tmrPump();
+}
+function tmrPump(){
+  if(tmrInFlight || tmrDead || !tmrQueue.length) return;
+  const url = tmrQueue.shift();
+  tmrInFlight = true;
+  const img = new Image();
+  img.onload = () => { tmrCache.set(url, img); tmrInFlight = false; setTimeout(tmrPump, 450); };
+  img.onerror = () => {
+    tmrCache.delete(url);
+    tmrInFlight = false;
+    if(++tmrFails > 5 && !tmrDead){
+      tmrDead = true; tmrQueue = [];
+      if(rainOn && rainTimer) startRain(); // rebuild playlist on the fallback
+    } else setTimeout(tmrPump, 900);
+  };
+  img.src = url;
+}
+// Paint whatever tiles are cached for this frame; queue fetches for the rest.
+function drawTmrFrame(frame){
+  clearCast();
+  let drawn = 0;
+  for(const t of tmrTilesForView()){
+    const url = tmrUrl(frame.iso, t);
+    const img = tmrCache.get(url);
+    if(img === undefined) tmrFetch(url);
+    if(img){
+      const p0 = map.latLngToContainerPoint([tile2lat(t.y, t.z), tile2lon(t.x, t.z)]);
+      const p1 = map.latLngToContainerPoint([tile2lat(t.y + 1, t.z), tile2lon(t.x + 1, t.z)]);
+      castCtx.globalAlpha = 0.75;
+      castCtx.imageSmoothingEnabled = true;
+      castCtx.drawImage(img, p0.x, p0.y, p1.x - p0.x, p1.y - p0.y);
+      castCtx.globalAlpha = 1;
+      drawn++;
+    }
+  }
+  return drawn;
 }
 
 // ── Animated wind particle layer ─────────────────────────────────────────────
@@ -414,12 +503,15 @@ async function initRain(){
 function startRain(){
   if(rainTimer) clearInterval(rainTimer);
   const lastRadarTime = rainFrames.length ? rainFrames[rainFrames.length - 1].time : 0;
+  // Future frames: Tomorrow.io forecast tiles when healthy, else model canvas
+  const future = (!tmrDead && tmrFrames.length)
+    ? tmrFrames.map(f => ({ kind: "tmr", frame: f, time: f.time, label: "cast" }))
+    : castSteps.filter(s => s.time > lastRadarTime)
+        .map(s => ({ kind: "cast", step: s, time: s.time, label: "cast" }));
   const playlist = rainFrames.map((f, i) => ({
       kind: "tile", idx: i, time: f.time,
       label: f.time * 1000 > Date.now() ? "nowcast" : "radar"
-    }))
-    .concat(castSteps.filter(s => s.time > lastRadarTime)
-      .map(s => ({ kind: "cast", step: s, time: s.time, label: "cast" })));
+    })).concat(future);
   if(!playlist.length) return;
   let pi = -1;
   rainTimer = setInterval(() => {
@@ -428,6 +520,7 @@ function startRain(){
     rainLayers.forEach(l => l.setOpacity(0));
     clearCast();
     if(fr.kind === "tile") rainLayers[fr.idx].setOpacity(0.65);
+    else if(fr.kind === "tmr") drawTmrFrame(fr.frame);
     else drawCastStep(fr.step);
     const el = document.getElementById("radar-time");
     const mins = Math.round((fr.time - Date.now() / 1000) / 60);
