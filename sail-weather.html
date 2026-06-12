@@ -203,10 +203,10 @@ body.embedded .topbar { padding: 10px 16px; }
       <div class="radar-time" id="radar-time"></div>
       <div class="scrub-row" id="scrub-row">
         <button id="rain-play" onclick="toggleRainPlay()" title="Play/pause">❚❚</button>
-        <span class="ts-end">past</span>
+        <span class="ts-end">−2h</span>
         <input type="range" id="rain-scrub" min="0" max="7" value="0" step="1"
                oninput="scrubRain(this.value)">
-        <span class="ts-end future">+2h</span>
+        <span class="ts-end future">+3h</span>
       </div>
       <div class="hud-controls">
         <button id="btn-wind" class="layer-btn active" onclick="toggleWind()">≋ Wind</button>
@@ -276,7 +276,7 @@ function initMap(){
 }
 
 // ── Tomorrow.io forecast tiles for the futurecast frames ────────────────────
-// Real km-scale precipitation forecast imagery at +1h and +2h, proxied through
+// Real km-scale precipitation forecast imagery at +1h, +2h and +3h, proxied through
 // the keel-ics Cloudflare Worker (/tile route) which holds the Tomorrow.io API
 // key as a secret and caches each tile at the edge for 15 min — so the tiny
 // free-tier quota is shared across all devices instead of burned per-browser.
@@ -290,7 +290,7 @@ let tmrFrames = [], tmrCache = new Map(), tmrQueue = [], tmrInFlight = false;
 let tmrDead = false, tmrFails = 0;
 
 function initTomorrow(){
-  tmrFrames = [1, 2].map(hh => {
+  tmrFrames = [1, 2, 3].map(hh => {
     const t = new Date(Date.now() + hh * 3600000);
     t.setUTCMinutes(Math.floor(t.getUTCMinutes() / 15) * 15, 0, 0);
     return { time: t.getTime() / 1000, iso: t.toISOString().slice(0, 19) + "Z" };
@@ -560,7 +560,7 @@ async function initRain(){
     const res = await fetch("https://api.rainviewer.com/public/weather-maps.json");
     if(!res.ok) throw new Error("rainviewer http " + res.status);
     const data = await res.json();
-    rainFrames = ((data.radar && data.radar.past) || []).slice(-6)
+    rainFrames = ((data.radar && data.radar.past) || []).slice(-12)
       .concat((data.radar && data.radar.nowcast) || []);
     if(!rainFrames.length) throw new Error("no radar frames");
     rainLayers = rainFrames.map(f =>
@@ -691,7 +691,7 @@ function toggleRain(){
 // over the visible map and rendered as a smoothed canvas overlay.
 let castCanvas, castCtx, castSteps = [], castGrid = null, castFetchTimer = null;
 let castGridFetchedAt = 0;
-const CAST_N = 8, CAST_HOURS = 2;
+const CAST_N = 8, CAST_HOURS = 3;
 const CAST_GRID_MAX_AGE_MS = 450000; // reuse a covering cast grid for 7.5 min
 
 function initCast(){
