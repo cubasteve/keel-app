@@ -3,7 +3,14 @@
 //
 // GET /?s=<startUnix>&e=<endUnix>&t=<typeLabel>&b=<keelBurned>
 //
+// Also proxies Tomorrow.io precipitation forecast tiles for the weather page,
+// with the API key kept in a Worker secret (TOMORROW_KEY) and tiles cached at
+// the Cloudflare edge so the tiny free-tier quota is shared, not per-browser:
+//
+// GET /tile/<z>/<x>/<y>/<isoTime>.png
+//
 // Deploy: npx wrangler deploy   (from this folder)
+// Key:    npx wrangler secret put TOMORROW_KEY
 
 function icsDate(ts) {
   const d = new Date(ts * 1000);
@@ -17,9 +24,42 @@ function icsEscape(s) {
   return s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,");
 }
 
+async function handleTile(request, env, ctx) {
+  const url = new URL(request.url);
+  const m = url.pathname.match(/^\/tile\/(\d{1,2})\/(\d+)\/(\d+)\/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\.png$/);
+  if (!m) return new Response("Bad tile path", { status: 400 });
+  const [, z, x, y, iso] = m;
+  if (+z > 12) return new Response("Zoom too deep", { status: 400 });
+
+  const cache = caches.default;
+  const cacheKey = new Request("https://keel-tile-cache/" + z + "/" + x + "/" + y + "/" + iso);
+  let res = await cache.match(cacheKey);
+  if (res) return res;
+
+  const up = await fetch("https://api.tomorrow.io/v4/map/tile/" + z + "/" + x + "/" + y +
+    "/precipitationIntensity/" + iso + ".png?apikey=" + env.TOMORROW_KEY);
+  if (!up.ok) {
+    // Pass 429 through so the client can fall back; don't cache failures
+    return new Response("upstream " + up.status, {
+      status: up.status === 429 ? 429 : 502,
+      headers: { "Access-Control-Allow-Origin": "*" }
+    });
+  }
+  res = new Response(up.body, {
+    headers: {
+      "Content-Type": "image/png",
+      "Cache-Control": "public, max-age=900",
+      "Access-Control-Allow-Origin": "*"
+    }
+  });
+  ctx.waitUntil(cache.put(cacheKey, res.clone()));
+  return res;
+}
+
 export default {
-  fetch(request) {
+  async fetch(request, env, ctx) {
     const url   = new URL(request.url);
+    if (url.pathname.startsWith("/tile/")) return handleTile(request, env, ctx);
     const start = parseInt(url.searchParams.get("s"), 10);
     const end   = parseInt(url.searchParams.get("e"), 10);
     const type  = icsEscape((url.searchParams.get("t") || "Voyage").slice(0, 60));

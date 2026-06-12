@@ -238,13 +238,16 @@ function initMap(){
 }
 
 // ── Tomorrow.io forecast tiles for the futurecast frames ────────────────────
-// Real km-scale precipitation forecast imagery at +1h and +2h. The free tier
-// allows only a trickle of requests, so we never use a Leaflet tile layer
-// (which bursts dozens of fetches): instead we pick a zoom ≤7 where the view
-// fits in ≤6 tiles, fetch them one at a time through a throttled queue with a
-// session cache, and paint them on the cast canvas. Repeated failures flip
-// tmrDead and the loop falls back to the Open-Meteo canvas cast.
-const TOMORROW_KEY = "RrQ9i9LfN0TNR79YjhJcQiC4nMg27vKt";
+// Real km-scale precipitation forecast imagery at +1h and +2h, proxied through
+// the keel-ics Cloudflare Worker (/tile route) which holds the Tomorrow.io API
+// key as a secret and caches each tile at the edge for 15 min — so the tiny
+// free-tier quota is shared across all devices instead of burned per-browser.
+// The free tier allows only a trickle of requests, so we never use a Leaflet
+// tile layer (which bursts dozens of fetches): instead we pick a zoom ≤7 where
+// the view fits in ≤6 tiles, fetch them one at a time through a throttled
+// queue with a session cache, and paint them on the cast canvas. Repeated
+// failures flip tmrDead and the loop falls back to the Open-Meteo canvas cast.
+const TMR_TILE_BASE = "https://keel-ics.keel-app.workers.dev/tile/";
 let tmrFrames = [], tmrCache = new Map(), tmrQueue = [], tmrInFlight = false;
 let tmrDead = false, tmrFails = 0;
 
@@ -279,8 +282,7 @@ function tmrTilesForView(){
   return [];
 }
 function tmrUrl(iso, t){
-  return "https://api.tomorrow.io/v4/map/tile/" + t.z + "/" + t.x + "/" + t.y +
-         "/precipitationIntensity/" + iso + ".png?apikey=" + TOMORROW_KEY;
+  return TMR_TILE_BASE + t.z + "/" + t.x + "/" + t.y + "/" + iso + ".png";
 }
 function tmrFetch(url){
   if(tmrDead || tmrCache.has(url)) return;
