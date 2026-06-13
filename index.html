@@ -909,9 +909,9 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 
 <!-- Wallet-approval banner: on the mobile WalletConnect path, sending a tx does
      not auto-foreground MetaMask (esp. iOS home-screen PWA), so cue the user. -->
-<div id="wallet-prompt" onclick="openWallet()" role="button" tabindex="0" aria-label="Open MetaMask to approve the transaction">
-  <span class="wp-icon" aria-hidden="true">🦊</span>
-  <span class="wp-text"><b>Waiting for MetaMask…</b><br>Tap here to open your wallet and approve</span>
+<div id="wallet-prompt" onclick="openWallet()" role="button" tabindex="0" aria-label="Open your wallet to approve the transaction">
+  <span class="wp-icon" aria-hidden="true">👛</span>
+  <span class="wp-text"><b>Waiting for your wallet…</b><br>Tap here to open your wallet and approve</span>
   <span class="wp-arrow" aria-hidden="true">→</span>
 </div>
 
@@ -1894,6 +1894,7 @@ window.keelOnAppKitAccount = async function(addr){
       name: "polygon-amoy", chainId: AMOY_CHAIN_ID
     });
     window.__keelViaWalletConnect = true; // let the wallet manage gas itself
+    try { captureWalletLink(eip1193); } catch(_){} // wallet name + deep link for the approval banner
     await finishConnect();
     // Re-run balance after a short delay — the chain switch needs a moment to
     // settle before contract reads on Amoy will succeed reliably.
@@ -2650,14 +2651,49 @@ function dayStatus(dayKey){
 function showStatus(msg,type){const el=document.getElementById("settle-status-msg");if(el){el.textContent=msg;el.className="status-msg "+type;}}
 function clearStatus(){const el=document.getElementById("settle-status-msg");if(el){el.textContent="";el.className="status-msg";}}
 
-// ── Wallet-approval prompt (mobile WalletConnect) ──
+// ── Wallet-approval prompt (mobile WalletConnect, any wallet) ──
 // Sending a tx over WalletConnect doesn't foreground the wallet on iOS
 // home-screen PWAs, so we show a tappable banner and best-effort deep-link.
-function openWallet(){ try { window.location.href = "metamask://"; } catch(_){} }
+// The wallet's name + deep link are captured from the WalletConnect session
+// on connect (captureWalletLink) so this works for any wallet, not just MetaMask.
+function captureWalletLink(eip1193){
+  let name = "", link = "";
+  try {
+    const wi = window.keelAppKit && window.keelAppKit.getWalletInfo && window.keelAppKit.getWalletInfo();
+    if(wi && wi.name) name = wi.name;
+  } catch(_){}
+  try {
+    const sess = eip1193 && (eip1193.session ||
+      (eip1193.signer && eip1193.signer.session) ||
+      (eip1193.provider && eip1193.provider.session));
+    const md = sess && sess.peer && sess.peer.metadata;
+    if(md){
+      if(!name && md.name) name = md.name;
+      const rd = md.redirect || {};
+      link = rd.native || rd.universal || "";
+    }
+  } catch(_){}
+  window.__keelWalletName = (name || "your wallet").replace(/[<>]/g, "");
+  window.__keelWalletLink = link || "";
+}
+function openWallet(){
+  try {
+    if(window.__keelWalletLink){ window.location.href = window.__keelWalletLink; return; }
+    // No session deep link captured: only guess MetaMask if that's the wallet/unknown.
+    if(!window.__keelWalletName || /metamask/i.test(window.__keelWalletName)){
+      window.location.href = "metamask://";
+    }
+  } catch(_){}
+}
 function walletPromptShow(){
-  if(!window.__keelViaWalletConnect) return; // injected/desktop MetaMask pops itself
+  if(!window.__keelViaWalletConnect) return; // injected/desktop wallets pop themselves
   const el = document.getElementById("wallet-prompt");
-  if(el) el.classList.add("show");
+  if(el){
+    const name = window.__keelWalletName || "your wallet";
+    const t = el.querySelector(".wp-text");
+    if(t) t.innerHTML = "<b>Waiting for " + name + "…</b><br>Tap here to open your wallet and approve";
+    el.classList.add("show");
+  }
   // Best-effort auto-foreground; iOS may ignore it, the banner is the fallback.
   setTimeout(openWallet, 350);
 }
@@ -3285,8 +3321,11 @@ async function saveProfile() {
     const fee    = await provider.getFeeData().catch(()=>({}));
     const prio   = (fee.maxPriorityFeePerGas?.gt(AMOY_MIN_TIP)) ? fee.maxPriorityFeePerGas : AMOY_MIN_TIP;
     const maxFee = (fee.maxFeePerGas?.gt(prio)) ? fee.maxFeePerGas : prio.add(ethers.utils.parseUnits("20","gwei"));
-    const tx = await ledger.setMemberProfile(walletAddress, displayName, experienceLevel,
+    const txPromise = ledger.setMemberProfile(walletAddress, displayName, experienceLevel,
       { maxPriorityFeePerGas: prio, maxFeePerGas: maxFee });
+    walletPromptShow();
+    let tx;
+    try { tx = await txPromise; } finally { walletPromptHide(); }
     showSettingsResult("info", "Transaction submitted — waiting for confirmation…");
     await tx.wait();
     showSettingsResult("success", "✓ Profile saved on-chain.");
@@ -3542,8 +3581,11 @@ async function adminBatchMint() {
       const toMintF = parseFloat(ethers.utils.formatUnits(toMint,18)).toFixed(2);
 
       statusEl.textContent = `(${i+1}/${addrs.length}) Issuing ${toMintF} KEEL to ${short}…`;
-      const tx = await token.issueMonthlyAllocation(addr, yr, mo,
+      const txP = token.issueMonthlyAllocation(addr, yr, mo,
         { maxPriorityFeePerGas: prio, maxFeePerGas: maxFee });
+      walletPromptShow();
+      let tx;
+      try { tx = await txP; } finally { walletPromptHide(); }
       await tx.wait();
       succeeded++;
       totalIssued += parseFloat(toMintF);
