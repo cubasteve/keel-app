@@ -3100,7 +3100,7 @@ async function cancelTrip(tripId, burnAmt) {
   if(!confirm(`Cancel this reservation?\n\n${burnAmt} KEEL will be refunded to your wallet and the time slot will be freed.`)) return;
 
   btn.disabled = true;
-  btn.textContent = "Cancelling…";
+  showStatus("Waiting for wallet confirmation…","pending");
   try {
     const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, signer);
     const overrides = {};
@@ -3124,8 +3124,11 @@ async function cancelTrip(tripId, burnAmt) {
     walletPromptShow();                                     // cue user to approve in MetaMask
     let tx;
     try { tx = await txPromise; } finally { walletPromptHide(); }
-    btn.textContent = "Confirming…";
+    showStatus("Transaction submitted — waiting for confirmation…","pending");
     await tx.wait();
+
+    showStatus("Reservation cancelled. "+burnAmt.toFixed(2)+" KEEL refunded.","success");
+    setTimeout(clearStatus, 4000);
 
     // Update local state and re-render without a full reload
     const trip = tripsData.find(t => t.id === tripId);
@@ -3138,8 +3141,8 @@ async function cancelTrip(tripId, burnAmt) {
     ]);
   } catch(e) {
     btn.disabled = false;
-    btn.textContent = "Cancel";
-    alert("Cancellation failed: " + (e.reason || e.message));
+    showStatus("Cancellation failed: " + (e.reason || e.message), "error");
+    setTimeout(clearStatus, 5000);
   }
 }
 // ── KEEL TOKEN PAGE ──────────────────────────────────────────────────────────
@@ -3359,14 +3362,16 @@ async function saveProfile() {
     walletPromptShow();
     let tx;
     try { tx = await txPromise; } finally { walletPromptHide(); }
-    showSettingsResult("info", "Transaction submitted — waiting for confirmation…");
+    showStatus("Transaction submitted — waiting for confirmation…","pending");
     await tx.wait();
-    showSettingsResult("success", "✓ Profile saved on-chain.");
+    showStatus("Profile saved on-chain.","success");
+    setTimeout(clearStatus, 4000);
     walletDisplayName = displayName; // keep cache in sync
     updateSettingsAvatar({ displayName, experienceLevel });
     updateWalletPillName();
   } catch(e) {
-    showSettingsResult("error", "On-chain save failed: "+(e.reason||e.message));
+    showStatus("On-chain save failed: "+(e.reason||e.message),"error");
+    setTimeout(clearStatus, 5000);
   }
 
   btn.disabled = false; btn.textContent = "💾 Save Profile";
@@ -3616,9 +3621,10 @@ async function adminBatchMint() {
       statusEl.textContent = `(${i+1}/${addrs.length}) Issuing ${toMintF} KEEL to ${short}…`;
       const txP = token.issueMonthlyAllocation(addr, yr, mo,
         { maxPriorityFeePerGas: prio, maxFeePerGas: maxFee });
+      showStatus(`Approve in wallet — issuing to ${short}…`,"pending");
       walletPromptShow();
       let tx;
-      try { tx = await txP; } finally { walletPromptHide(); }
+      try { tx = await txP; } finally { walletPromptHide(); clearStatus(); }
       await tx.wait();
       succeeded++;
       totalIssued += parseFloat(toMintF);
@@ -3632,6 +3638,8 @@ async function adminBatchMint() {
   const summary = `✓ Done — ${succeeded} issued (${totalIssued.toFixed(0)} KEEL total), ${skipped} skipped, ${failed} failed.`;
   statusEl.textContent = summary;
   showAdminResult("admin-batch-result", failed > 0 ? "error" : "success", summary);
+  showStatus(summary, failed > 0 ? "error" : "success");
+  setTimeout(clearStatus, 5000);
   btn.disabled = false; btn.textContent = "⚡ Issue Monthly Allocation";
 
   await Promise.all([adminLoadStats(), adminLoadMemberBalances()]);
