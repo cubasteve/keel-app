@@ -879,19 +879,31 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 .btn-cancel-trip:hover { background:rgba(255,83,112,0.15); border-color:var(--danger); }
 .btn-cancel-trip:disabled { opacity:0.4; cursor:default; }
 
-/* Wallet-approval banner (mobile WalletConnect: cue user to switch to MetaMask) */
+/* Unified notification banner — wallet cues + write-method status messages */
 #wallet-prompt {
   position:fixed; top:0; left:0; right:0; z-index:99999; display:none;
-  align-items:center; gap:12px; cursor:pointer; color:var(--foam); font-family:var(--sans);
+  align-items:center; gap:12px; color:var(--foam); font-family:var(--sans);
   padding:13px 18px; padding-top:calc(13px + env(safe-area-inset-top));
   background:#14110a; border-bottom:2px solid var(--brass);
-  box-shadow:0 6px 24px rgba(0,0,0,0.5);
+  box-shadow:0 6px 24px rgba(0,0,0,0.5); transition:background 0.3s, border-color 0.3s;
 }
 #wallet-prompt.show { display:flex; }
-.wp-icon { font-size:24px; flex-shrink:0; animation:wpNudge 1.4s ease-in-out infinite; }
+/* wallet-cue mode: tappable, nudging arrow */
+#wallet-prompt.wp-wallet { cursor:pointer; }
+#wallet-prompt.wp-wallet .wp-arrow { display:flex; }
+/* status modes */
+#wallet-prompt.wp-pending { background:#080e1a; border-bottom-color:var(--accent); cursor:default; }
+#wallet-prompt.wp-success { background:#07160f; border-bottom-color:var(--teal);   cursor:default; }
+#wallet-prompt.wp-error   { background:#160708; border-bottom-color:var(--danger); cursor:default; }
+.wp-icon { font-size:22px; flex-shrink:0; }
+#wallet-prompt.wp-wallet .wp-icon { animation:wpNudge 1.4s ease-in-out infinite; }
 .wp-text { flex:1; font-size:13px; line-height:1.35; }
-.wp-text b { color:var(--brass); font-size:14px; }
-.wp-arrow { font-size:20px; color:var(--brass); flex-shrink:0; }
+.wp-text b { font-size:14px; }
+#wallet-prompt.wp-wallet .wp-text b { color:var(--brass); }
+#wallet-prompt.wp-pending .wp-text { color:var(--accent); }
+#wallet-prompt.wp-success .wp-text { color:var(--teal); }
+#wallet-prompt.wp-error   .wp-text { color:var(--danger); }
+.wp-arrow { font-size:20px; color:var(--brass); flex-shrink:0; display:none; }
 @keyframes wpNudge { 0%,100%{ transform:translateX(0);} 50%{ transform:translateX(3px);} }
 .btn-add-cal { font-size:12px; font-weight:600; padding:5px 14px; border-radius:8px; border:1px solid rgba(74,179,255,0.3); background:rgba(74,179,255,0.06); color:var(--accent); cursor:pointer; transition:all 0.2s; font-family:var(--sans); text-decoration:none; display:inline-block; }
 .btn-add-cal:hover { background:rgba(74,179,255,0.15); border-color:var(--accent); }
@@ -1564,7 +1576,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
         <div id="confirm-burn-wrap" style="display:none;margin-top:10px">
           <button class="btn btn-burn" onclick="logTrip()">🔥 Confirm Burn</button>
         </div>
-        <div class="status-msg" id="settle-status-msg" style="margin-top:10px"></div>
+
         <div class="settle-note">🔒 You will sign a settlement transaction</div>
       </div>
 
@@ -2655,8 +2667,20 @@ function dayStatus(dayKey){
   return covered >= winLen ? "full" : "part";
 }
 
-function showStatus(msg,type){const el=document.getElementById("settle-status-msg");if(el){el.textContent=msg;el.className="status-msg "+type;}}
-function clearStatus(){const el=document.getElementById("settle-status-msg");if(el){el.textContent="";el.className="status-msg";}}
+function showStatus(msg,type){
+  const el=document.getElementById("wallet-prompt");
+  if(!el) return;
+  if(el.classList.contains("wp-wallet")) return; // wallet cue takes priority
+  el.className="show wp-"+type;
+  el.onclick=null;
+  const icon=type==="success"?"✓":type==="error"?"✗":"⏳";
+  el.innerHTML=`<span class="wp-icon" aria-hidden="true">${icon}</span><span class="wp-text">${msg}</span>`;
+}
+function clearStatus(){
+  const el=document.getElementById("wallet-prompt");
+  if(!el||el.classList.contains("wp-wallet")) return;
+  el.classList.remove("show","wp-pending","wp-success","wp-error");
+}
 
 // ── Wallet-approval prompt (mobile WalletConnect, any wallet) ──
 // Sending a tx over WalletConnect doesn't foreground the wallet on iOS
@@ -2697,16 +2721,18 @@ function walletPromptShow(){
   const el = document.getElementById("wallet-prompt");
   if(el){
     const name = window.__keelWalletName || "your wallet";
-    const t = el.querySelector(".wp-text");
-    if(t) t.innerHTML = "<b>Waiting for " + name + "…</b><br>Tap here to open your wallet and approve";
-    el.classList.add("show");
+    el.className = "show wp-wallet";
+    el.onclick = openWallet;
+    el.innerHTML = `<span class="wp-icon" aria-hidden="true">👛</span>`
+      + `<span class="wp-text"><b>Waiting for ${name}…</b><br>Tap here to open your wallet and approve</span>`
+      + `<span class="wp-arrow" aria-hidden="true">→</span>`;
   }
   // Best-effort auto-foreground; iOS may ignore it, the banner is the fallback.
   setTimeout(openWallet, 350);
 }
 function walletPromptHide(){
   const el = document.getElementById("wallet-prompt");
-  if(el) el.classList.remove("show");
+  if(el) el.classList.remove("show","wp-wallet");
 }
 
 // ── Drawer (slide-out) controls ──
