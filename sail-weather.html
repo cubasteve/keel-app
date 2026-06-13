@@ -166,6 +166,7 @@ body.embedded .topbar { padding: 10px 16px; }
 #now-card.tense-future #now-head { color: var(--amber); }
 .hud-controls { display: flex; gap: 8px; align-items: center; width: 100%; }
 .hud-spacer { flex: 1; }
+.layer-btn.locate-pill { font-size: 17px; padding: 5px 12px; line-height: 1.1; font-weight: 700; }
 #wind-canvas { position: absolute; inset: 0; z-index: 450; pointer-events: none; }
 #cast-canvas { position: absolute; inset: 0; z-index: 440; pointer-events: none; }
 
@@ -218,7 +219,7 @@ body.embedded .topbar { padding: 10px 16px; }
         <button id="btn-wind" class="layer-btn active" onclick="toggleWind()">≋ Wind</button>
         <button id="btn-rain" class="layer-btn active" onclick="toggleRain()">🌧 Rain</button>
         <span class="hud-spacer"></span>
-        <button class="layer-btn" onclick="locateMe()" title="Use my location">⌖ Locate</button>
+        <button class="layer-btn locate-pill" onclick="locateMe()" title="Use my location">⌖</button>
       </div>
     </div>
   </div>
