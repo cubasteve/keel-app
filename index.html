@@ -2014,6 +2014,14 @@ async function disconnectWallet(e) {
   document.getElementById("kt-connect-prompt").style.display = "";
   document.getElementById("kt-content").style.display = "none";
   monthlyUsed = 0; monthlyIssued = 0; monthlyCap = MAX_CAP;
+  // Reset settings page
+  document.getElementById("settings-display-name").value = "";
+  document.getElementById("settings-experience").value   = "";
+  document.getElementById("settings-avatar").textContent = "⚓";
+  document.getElementById("settings-name-display").textContent = "—";
+  document.getElementById("settings-addr-display").textContent = "Connect wallet to save profile";
+  const spr = document.getElementById("settings-profile-result");
+  if(spr){ spr.className = "settings-result"; spr.textContent = ""; }
   // Reset trips + admin page state
   tripsData = []; tripsLoaded = false;
   resetAdminPage();
