@@ -51,6 +51,13 @@
         url: window.location.origin,
         icons: ["https://avatars.githubusercontent.com/u/179229932"]
       },
+      // Surface wallets that aren't in AppKit's default shortlist as tappable
+      // buttons. On a single device this matters: tapping deep-links to the
+      // wallet app with the pairing request, so there's no QR to scan (which
+      // is impossible same-device). Arculus only offers QR scan in its own app.
+      featuredWalletIds: [
+        "0e4915107da5b3408b38e248f7a710f4529d54cd30e9d12ff0eb886d45c18e92" // Arculus Wallet
+      ],
       features: { analytics: false, email: false, socials: [] }
     });
 
