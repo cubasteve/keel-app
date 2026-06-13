@@ -2016,30 +2016,54 @@ async function loadExpiryStats(){
   if(bar) bar.style.width = Math.min((expiring/MAX_CAP)*100,100)+"%";
 }
 
-// Splash connect: always opens the AppKit wallet picker.
-// If AppKit hasn't finished loading yet, waits for the keel-appkit-ready event
-// (up to 10 s) so the modal reliably opens on first tap.
+// Splash connect: opens the AppKit wallet picker.
+// The splash is at z-index 99998; the AppKit modal web-component uses a much
+// lower z-index, so we hide the splash before opening the modal and restore it
+// if the user cancels without connecting.
 async function splashConnect() {
+  // 1. Wait for AppKit to finish loading if needed
   if(!window.keelAppKit) {
     showStatus("Opening wallet connection…","pending");
     try {
       await new Promise((resolve, reject) => {
         if(window.keelAppKit){ resolve(); return; }
-        const t = setTimeout(() => reject(new Error("AppKit load timeout")), 10000);
+        const t = setTimeout(() => reject(new Error("timeout")), 10000);
         window.addEventListener("keel-appkit-ready", () => { clearTimeout(t); resolve(); }, {once:true});
       });
-    } catch(e) {
+    } catch(_) {
       clearStatus();
-      // AppKit timed out — fall back to direct injected wallet if available
       if(window.ethereum){ await connectWallet(); return; }
-      showStatus("Could not load wallet — please refresh and try again.","error");
+      showStatus("Could not load wallet — please refresh.","error");
       setTimeout(clearStatus, 5000);
       return;
     }
     clearStatus();
   }
-  try { await connectViaAppKit(); }
-  catch(e){ showStatus("Connection failed: "+e.message,"error"); }
+
+  // 2. Hide splash so AppKit modal (lower z-index) is visible
+  const sp = document.getElementById("splash");
+  sp.style.opacity = "0";
+  sp.style.pointerEvents = "none";
+
+  try {
+    await window.keelAppKit.open();
+  } catch(e) {
+    sp.style.opacity = "";
+    sp.style.pointerEvents = "";
+    showStatus("Connection failed: "+e.message,"error");
+    return;
+  }
+
+  // 3. Poll until connected or modal dismissed without connecting
+  const poll = setInterval(() => {
+    if(walletAddress) {
+      clearInterval(poll); // finishConnect() already hid splash permanently
+    } else if(!window.keelAppKit.isOpen()) {
+      clearInterval(poll);
+      sp.style.opacity = "";     // user cancelled — restore splash
+      sp.style.pointerEvents = "";
+    }
+  }, 400);
 }
 
 async function connectWallet() {
