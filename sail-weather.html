@@ -154,8 +154,8 @@ body.embedded .topbar { padding: 10px 16px; }
 .layer-btn:hover { color: var(--foam); }
 .layer-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(74,179,255,0.12); }
 .layer-btn:disabled { opacity: 0.5; cursor: default; }
-.radar-time { font-family: var(--mono); font-size: 10px; color: var(--muted2); background: rgba(2,9,18,0.75); padding: 3px 10px; border-radius: 6px; display: none; align-self: flex-start; }
-.radar-time.future { color: var(--amber); }
+.now-rel { font-family: var(--mono); font-size: 11px; color: var(--muted2); letter-spacing: 0; margin-left: 6px; text-transform: none; }
+.now-rel.future { color: var(--amber); }
 .hud-controls { display: flex; gap: 8px; align-items: center; width: 100%; }
 .hud-spacer { flex: 1; }
 .layer-btn.ctl { padding: 6px 9px; font-size: 13px; line-height: 1; }
@@ -200,7 +200,6 @@ body.embedded .topbar { padding: 10px 16px; }
   <div class="map-pane">
     <div id="map"></div>
     <div class="map-hud">
-      <div class="radar-time" id="radar-time"></div>
       <div class="scrub-row" id="scrub-row">
         <button id="rain-play" onclick="toggleRainPlay()" title="Play/pause">❚❚</button>
         <span class="ts-end">−2h</span>
@@ -220,7 +219,7 @@ body.embedded .topbar { padding: 10px 16px; }
   </div>
   <div class="panel">
     <div class="card">
-      <h2>Right now</h2>
+      <h2 id="now-head">Right now</h2>
       <div class="now-grid" id="now-grid"><div class="loading">Waiting for a location…</div></div>
       <div id="verdict"></div>
     </div>
@@ -618,14 +617,10 @@ function nearestCastStep(t){
   }
   return best;
 }
+// As the timeline frame changes, drive the conditions card to that time so
+// wind/gusts/waves/rain track the scrubber and playback.
 function updateRainChip(i){
-  const fr = rainPlaylist[i];
-  const el = document.getElementById("radar-time");
-  const mins = Math.round((fr.time - Date.now() / 1000) / 60);
-  el.style.display = "block";
-  el.textContent = fr.label + " " + time12(new Date(fr.time * 1000).toTimeString().slice(0, 5)) +
-                   (mins > 0 ? " (+" + mins + "m)" : "");
-  el.classList.toggle("future", mins > 0);
+  showConditions(rainPlaylist[i].time);
 }
 // Render the timeline at a fractional position: crossfades neighbouring
 // frames so playback flows at display refresh rate instead of stuttering
@@ -706,9 +701,9 @@ function toggleRain(){
     stopRainLoop();
     rainLayers.forEach(l => l.setOpacity(0));
     clearCast();
-    document.getElementById("radar-time").style.display = "none";
     document.getElementById("scrub-row").style.display = "none";
     document.getElementById("rain-play").style.display = "none";
+    showConditions(Date.now() / 1000); // back to live conditions
   } else if(rainLayers.length || castSteps.length || tmrFrames.length) startRain();
 }
 
@@ -884,6 +879,7 @@ async function loadForecast(lat, lon){
 
   if(reqId !== state.reqId) return; // a newer tap superseded this one
   state.hourly = fc.hourly; state.daily = fc.daily; state.marine = marine;
+  state.fc = fc; state.current = fc.current || {}; state.utcOffset = fc.utc_offset_seconds || 0;
   renderNow(fc, marine);
   renderDays(fc, marine);
   document.getElementById("wave-note").textContent = marine
@@ -947,32 +943,84 @@ function scoreHour(windKn, gustKn, waveFt, precip, cape){
 }
 
 // ── Current conditions card ──
-function renderNow(fc, marine){
-  const c = fc.current || {};
-  const grid = document.getElementById("now-grid");
-  const dir = c.wind_direction_10m;
-  // wind_direction is "coming from"; arrow shows where it's blowing toward
-  const arrow = dir == null ? "" :
-    '<span class="dir-arrow" style="transform:rotate(' + ((dir + 180) % 360) + 'deg);display:inline-block">↑</span> ';
-  const waveNow = marine && marine.current ? mToFt(marine.current.wave_height) : null;
-  const rain2h = rainNext2h(fc);
+function renderNow(fc, marine){ showConditions(Date.now() / 1000); }
+
+function windArrow(dir){
+  return dir == null ? "" :
+    '<span class="dir-arrow" style="transform:rotate(' + ((dir + 180) % 360) +
+    'deg);display:inline-block">↑</span> ';
+}
+// Nearest hourly index to a unix time, matched on the forecast point's local hour.
+function hourIndexForTime(unixSec){
+  const h = state.hourly;
+  if(!h || !h.time) return -1;
+  const key = new Date((unixSec + state.utcOffset) * 1000).toISOString().slice(0, 13);
+  const exact = h.time.findIndex(t => t.slice(0, 13) === key);
+  if(exact >= 0) return exact;
+  let best = -1, bd = Infinity;
+  for(let i = 0; i < h.time.length; i++){
+    const tsec = Date.parse(h.time[i] + "Z") / 1000 - state.utcOffset;
+    const d = Math.abs(tsec - unixSec);
+    if(d < bd){ bd = d; best = i; }
+  }
+  return best;
+}
+// Drive the conditions card from any time on the timeline so it tracks the
+// scrubber — live "current" values within ±30 min of now, else the nearest
+// forecast hour. The card heading shows the clock time and relative offset.
+function showConditions(unixSec){
+  if(!state.hourly) return;
+  const mins = Math.round((unixSec - Date.now() / 1000) / 60);
+  const isNow = Math.abs(mins) <= 30;
+  const idx = hourIndexForTime(unixSec);
+  const h = state.hourly, mar = state.marine;
+
+  let windKn, gustKn, dir, waveFt, wavePer, rainStat;
+  if(isNow && state.current && state.current.wind_speed_10m != null){
+    const c = state.current;
+    windKn = c.wind_speed_10m; gustKn = c.wind_gusts_10m; dir = c.wind_direction_10m;
+    if(mar && mar.current){ waveFt = mToFt(mar.current.wave_height); wavePer = mar.current.wave_period; }
+    const r2 = state.fc ? rainNext2h(state.fc) : null;
+    rainStat = ["Rain · 2h", r2 != null ? (r2 < 0.005 ? "0" : r2.toFixed(2)) + ' <small>in</small>' : "—"];
+  } else if(idx >= 0){
+    windKn = h.wind_speed_10m[idx]; gustKn = h.wind_gusts_10m[idx]; dir = h.wind_direction_10m[idx];
+    if(mar && mar.hourly && mar.hourly.wave_height[idx] != null){
+      waveFt = mToFt(mar.hourly.wave_height[idx]); wavePer = mar.hourly.wave_period[idx];
+    }
+    const pp = h.precipitation_probability ? h.precipitation_probability[idx] : null;
+    rainStat = ["Rain", pp != null ? pp + ' <small>% chance</small>' : "—"];
+  } else return;
+
+  // Heading: "Right now" near present, else clock time + relative offset
+  const clock = time12(new Date((unixSec + state.utcOffset) * 1000).toISOString().slice(11, 16));
+  document.getElementById("now-head").innerHTML = isNow ? "Right now"
+    : clock + ' <span class="now-rel' + (mins > 0 ? " future" : "") + '">' +
+      (mins > 0 ? "+" + mins + "m" : mins + "m") + "</span>";
+
   const stats = [
-    ["Wind", c.wind_speed_10m != null ? arrow + Math.round(c.wind_speed_10m) + " <small>kn " + compass(dir) + "</small>" : "n/a"],
-    ["Gusts", c.wind_gusts_10m != null ? Math.round(c.wind_gusts_10m) + " <small>kn</small>" : "n/a"],
-    ["Waves", waveNow != null ? waveNow.toFixed(1) + " <small>ft" + (marine.current.wave_period != null ? " @ " + Math.round(marine.current.wave_period) + "s" : "") + "</small>" : "—"],
-    ["Rain · 2h", rain2h != null ? (rain2h < 0.005 ? "0" : rain2h.toFixed(2)) + ' <small>in</small>' : "—"]
+    ["Wind", windKn != null ? windArrow(dir) + Math.round(windKn) + " <small>kn " + compass(dir) + "</small>" : "n/a"],
+    ["Gusts", gustKn != null ? Math.round(gustKn) + " <small>kn</small>" : "n/a"],
+    ["Waves", waveFt != null ? waveFt.toFixed(1) + " <small>ft" + (wavePer != null ? " @ " + Math.round(wavePer) + "s" : "") + "</small>" : "—"],
+    rainStat
   ];
-  grid.innerHTML = stats.map(s =>
+  document.getElementById("now-grid").innerHTML = stats.map(s =>
     '<div class="now-stat"><div class="label">' + s[0] + '</div><div class="value">' + s[1] + '</div></div>'
   ).join("");
 
-  const score = scoreHour(c.wind_speed_10m, c.wind_gusts_10m, waveNow, null, null);
-  const msg = {
+  const pp = idx >= 0 && h.precipitation_probability ? h.precipitation_probability[idx] : null;
+  const cape = idx >= 0 && h.cape ? h.cape[idx] : null;
+  const score = scoreHour(windKn, gustKn, waveFt, isNow ? null : pp, isNow ? null : cape);
+  const msg = (isNow ? {
     good: "Good sailing right now — wind in the sweet spot.",
     marginal: "Sailable, but keep an eye on it.",
     nogo: "Stand down — conditions over your limits.",
     calm: "Becalmed — not enough wind to sail."
-  }[score];
+  } : {
+    good: "Good sailing window at this time.",
+    marginal: "Sailable then, but keep an eye on it.",
+    nogo: "Over your limits at this time.",
+    calm: "Likely becalmed — not enough wind."
+  })[score];
   document.getElementById("verdict").innerHTML = '<div class="verdict ' + score + '">' + msg + '</div>';
 }
 
