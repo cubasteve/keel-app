@@ -967,15 +967,26 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   to{   opacity:1; transform:translateY(0); }
 }
 
-.sp-emblem {
-  font-size:clamp(56px,10vw,84px);
-  filter:drop-shadow(0 0 24px rgba(74,179,255,.5));
-  animation:spBob 4s ease-in-out infinite;
+/* SVG sailboat */
+#sp-boat-wrap {
+  position:relative; display:flex; justify-content:center;
+  transform-origin:50% 80%;   /* pivot near the waterline */
+  will-change:transform;
+  filter:drop-shadow(0 0 22px rgba(74,179,255,.38)) drop-shadow(0 0 8px rgba(0,200,160,.22));
 }
-@keyframes spBob {
-  0%,100%{ transform:translateY(0) rotate(-3deg); }
-  50%{ transform:translateY(-10px) rotate(3deg); }
+@keyframes spWake {
+  0%,100%{ opacity:.9; transform:scaleX(1); }
+  50%{ opacity:.35; transform:scaleX(1.06); }
 }
+.sp-wake1{ animation:spWake 3.2s ease-in-out infinite; transform-origin:center; }
+.sp-wake2{ animation:spWake 3.2s ease-in-out .9s infinite; transform-origin:center; }
+.sp-wake3{ animation:spWake 3.2s ease-in-out 1.8s infinite; transform-origin:center; }
+@keyframes spSailPuff {
+  0%,100%{ transform:scaleX(1); }
+  50%{ transform:scaleX(1.025); }
+}
+.sp-mainsail{ animation:spSailPuff 5.5s ease-in-out infinite; transform-origin:left 90%; }
+.sp-jib     { animation:spSailPuff 4.8s ease-in-out 1.2s infinite; transform-origin:right 90%; }
 
 .sp-title {
   font-family:var(--display);
@@ -1055,7 +1066,103 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   <div class="sp-horizon"></div>
   <!-- Main content -->
   <div class="sp-body">
-    <div class="sp-emblem" aria-hidden="true">⛵</div>
+    <div id="sp-boat-wrap" aria-hidden="true">
+      <svg id="sp-boat" viewBox="0 0 200 260" xmlns="http://www.w3.org/2000/svg"
+           style="overflow:visible;width:clamp(140px,22vw,188px)">
+        <defs>
+          <linearGradient id="sp-hg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="#1e3a52"/>
+            <stop offset="60%"  stop-color="#0d1e2f"/>
+            <stop offset="100%" stop-color="#081524"/>
+          </linearGradient>
+          <linearGradient id="sp-sg" x1="1" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="rgba(228,248,255,0.93)"/>
+            <stop offset="100%" stop-color="rgba(175,225,248,0.52)"/>
+          </linearGradient>
+          <linearGradient id="sp-jg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%"   stop-color="rgba(228,248,255,0.86)"/>
+            <stop offset="100%" stop-color="rgba(175,225,248,0.42)"/>
+          </linearGradient>
+          <filter id="sp-wlglow" x="-30%" y="-300%" width="160%" height="700%">
+            <feGaussianBlur stdDeviation="2.5" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- Keel fin -->
+        <path d="M 94,210 L 88,236 L 107,236 L 101,210 Z"
+              fill="#091522" stroke="rgba(74,179,255,0.18)" stroke-width="0.5"/>
+
+        <!-- Hull body -->
+        <path d="M 18,203 C 48,218 78,224 100,224 C 122,224 156,217 184,201
+                 L 181,194 C 154,210 122,216 100,216 C 78,216 49,210 23,196 Z"
+              fill="url(#sp-hg)" stroke="rgba(74,179,255,0.42)" stroke-width="0.8"/>
+
+        <!-- Waterline glow stripe -->
+        <path d="M 23,196 C 49,210 78,216 100,216 C 122,216 154,210 181,194"
+              fill="none" stroke="rgba(0,200,160,0.7)" stroke-width="1.6"
+              filter="url(#sp-wlglow)"/>
+
+        <!-- Deck surface -->
+        <path d="M 23,196 C 50,190 78,186 100,186 C 122,186 152,189 181,194
+                 L 179,189 C 152,184 122,181 100,181 C 78,181 50,185 25,191 Z"
+              fill="#16283a" stroke="none"/>
+
+        <!-- Cabin house -->
+        <rect x="82" y="179" width="52" height="9" rx="3"
+              fill="#1c3350" stroke="rgba(74,179,255,0.22)" stroke-width="0.5"/>
+        <!-- Cabin porthole -->
+        <circle cx="98" cy="183" r="2.5" fill="none" stroke="rgba(74,179,255,0.35)" stroke-width="0.7"/>
+        <circle cx="112" cy="183" r="2.5" fill="none" stroke="rgba(74,179,255,0.35)" stroke-width="0.7"/>
+
+        <!-- Mast -->
+        <line x1="97" y1="183" x2="97" y2="18"
+              stroke="rgba(162,208,232,0.92)" stroke-width="2.6" stroke-linecap="round"/>
+
+        <!-- Boom -->
+        <line x1="97" y1="193" x2="180" y2="206"
+              stroke="rgba(140,192,218,0.82)" stroke-width="2.1" stroke-linecap="round"/>
+
+        <!-- Backstay -->
+        <line x1="97" y1="22" x2="183" y2="192"
+              stroke="rgba(100,162,198,0.28)" stroke-width="0.85"/>
+        <!-- Forestay -->
+        <line x1="97" y1="24" x2="19" y2="200"
+              stroke="rgba(100,162,198,0.28)" stroke-width="0.85"/>
+        <!-- Port shroud -->
+        <line x1="97" y1="68" x2="32" y2="191"
+              stroke="rgba(100,162,198,0.18)" stroke-width="0.6"/>
+        <!-- Starboard shroud -->
+        <line x1="97" y1="68" x2="168" y2="194"
+              stroke="rgba(100,162,198,0.18)" stroke-width="0.6"/>
+
+        <!-- Jib sail -->
+        <path class="sp-jib"
+              d="M 97,28 L 19,200 L 97,184 Z"
+              fill="url(#sp-jg)" stroke="rgba(74,179,255,0.16)" stroke-width="0.5" opacity="0.92"/>
+
+        <!-- Mainsail -->
+        <path class="sp-mainsail"
+              d="M 97,22 Q 150,105 180,202 L 97,191 Z"
+              fill="url(#sp-sg)" stroke="rgba(74,179,255,0.16)" stroke-width="0.5"/>
+
+        <!-- Batten lines on mainsail (detail) -->
+        <line x1="97" y1="80"  x2="148" y2="96"  stroke="rgba(74,179,255,0.12)" stroke-width="0.5"/>
+        <line x1="97" y1="120" x2="160" y2="142" stroke="rgba(74,179,255,0.12)" stroke-width="0.5"/>
+        <line x1="97" y1="158" x2="168" y2="176" stroke="rgba(74,179,255,0.12)" stroke-width="0.5"/>
+
+        <!-- Masthead pennant -->
+        <path d="M 97,18 L 112,12 L 97,6 Z" fill="rgba(0,200,160,0.95)" stroke="none"/>
+
+        <!-- Wake ripples -->
+        <ellipse class="sp-wake1" cx="100" cy="220" rx="88" ry="5"
+                 fill="none" stroke="rgba(74,179,255,0.22)" stroke-width="1"/>
+        <ellipse class="sp-wake2" cx="100" cy="226" rx="70" ry="4"
+                 fill="none" stroke="rgba(74,179,255,0.14)" stroke-width="0.8"/>
+        <ellipse class="sp-wake3" cx="100" cy="232" rx="50" ry="3"
+                 fill="none" stroke="rgba(74,179,255,0.08)" stroke-width="0.6"/>
+      </svg>
+    </div>
     <div class="sp-title">KEEL</div>
     <div class="sp-sub">Boat Share Club</div>
     <div class="sp-rule"><span>⚓</span></div>
@@ -1088,6 +1195,63 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
       +'--hi:'+(Math.random()*.5+.3).toFixed(2)+';';
     sp.insertBefore(s,sp.firstChild);
   }
+
+  // ── Sailboat animation: accelerometer (mobile) + mouse parallax (desktop) ──
+  const wrap = document.getElementById('sp-boat-wrap');
+  const splash = document.getElementById('splash');
+  if (!wrap) return;
+
+  let targetHeel = 0, currentHeel = 0, bobPhase = 0;
+  let hasGyro = false, animActive = true;
+  const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+
+  // Device orientation → heel angle
+  function onOrientation(e) {
+    if (e.gamma == null) return;
+    hasGyro = true;
+    // gamma = left/right tilt °. Clamp to ±22° of heel.
+    targetHeel = Math.max(-22, Math.min(22, e.gamma * 0.52));
+  }
+  window.addEventListener('deviceorientation', onOrientation, true);
+
+  // iOS 13+ requires explicit permission — request on first touch of splash
+  function requestGyro() {
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission()
+        .then(s => { if (s === 'granted') window.addEventListener('deviceorientation', onOrientation, true); })
+        .catch(()=>{});
+    }
+  }
+  splash.addEventListener('touchstart', requestGyro, { once:true, passive:true });
+
+  // Desktop: mouse X → gentle heel parallax
+  if (!isMobile) {
+    document.addEventListener('mousemove', e => {
+      if (hasGyro) return;
+      const cx = window.innerWidth / 2;
+      targetHeel = (e.clientX - cx) / cx * 13;
+    });
+  }
+
+  // rAF loop: smooth lerp + sinusoidal bob
+  function animate() {
+    if (!animActive) return;
+    currentHeel += (targetHeel - currentHeel) * 0.038;
+    bobPhase += 0.011;
+    const bob  = Math.sin(bobPhase) * 7;
+    const sway = Math.sin(bobPhase * 0.65) * 1.4; // secondary roll
+    wrap.style.transform =
+      `translateY(${bob.toFixed(2)}px) rotate(${(currentHeel + sway).toFixed(2)}deg)`;
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+
+  // Pause loop when splash is hidden to save battery
+  new MutationObserver(() => {
+    animActive = !splash.classList.contains('hidden');
+    if (animActive) requestAnimationFrame(animate);
+  }).observe(splash, { attributes:true, attributeFilter:['class'] });
 })();
 </script>
 
