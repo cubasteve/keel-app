@@ -154,6 +154,19 @@ body.embedded .topbar { padding: 10px 16px; }
 .layer-btn:hover { color: var(--foam); }
 .layer-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(74,179,255,0.12); }
 .layer-btn:disabled { opacity: 0.5; cursor: default; }
+/* Tides card */
+.tide-head { display: flex; align-items: baseline; justify-content: space-between; }
+.tide-head h2 { margin-bottom: 0; }
+.tide-state { font-family: var(--mono); font-size: 10px; }
+.tide-state.rising { color: var(--teal); }
+.tide-state.falling { color: var(--amber); }
+.tide-sub { font-family: var(--mono); font-size: 10px; color: var(--muted); margin: 3px 0 12px; }
+.tide-next { display: flex; gap: 10px; margin-top: 14px; }
+.tide-stat { flex: 1; background: rgba(74,179,255,0.05); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.tide-stat .label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.tide-stat .value { font-family: var(--mono); font-size: 13px; color: var(--foam); }
+.tide-stat .sub { font-family: var(--mono); font-size: 10px; color: var(--muted2); margin-top: 2px; }
+
 .now-rel { font-family: var(--mono); font-size: 11px; color: var(--muted2); letter-spacing: 0; margin-left: 6px; text-transform: none; }
 .now-rel.future { color: var(--amber); }
 /* Conditions card tinted by tense: past, present, or future */
@@ -228,6 +241,12 @@ body.embedded .topbar { padding: 10px 16px; }
       <h2 id="now-head">Right now</h2>
       <div class="now-grid" id="now-grid"><div class="loading">Waiting for a location…</div></div>
       <div id="verdict"></div>
+    </div>
+
+    <div class="card" id="tide-card">
+      <div class="tide-head"><h2 id="tide-title">Tides</h2><span class="tide-state" id="tide-state"></span></div>
+      <div class="tide-sub" id="tide-sub"></div>
+      <div id="tide-body"><div class="loading">Waiting for a location…</div></div>
     </div>
 
     <div class="card">
@@ -888,6 +907,7 @@ async function loadForecast(lat, lon){
   state.fc = fc; state.current = fc.current || {}; state.utcOffset = fc.utc_offset_seconds || 0;
   renderNow(fc, marine);
   renderDays(fc, marine);
+  loadTides(lat, lon); // tide station data uses state.utcOffset, now set above
   document.getElementById("wave-note").textContent = marine
     ? "Wave data: Open-Meteo Marine (significant wave height)."
     : "No wave data for this point (inland or outside marine model coverage) — windows scored on wind alone.";
@@ -1119,6 +1139,137 @@ function showHour(i, el){
   if(h.precipitation_probability) parts.push("rain <b>" + h.precipitation_probability[i] + "%</b>");
   if(h.temperature_2m) parts.push("<b>" + Math.round(h.temperature_2m[i]) + "°F</b>");
   document.getElementById("hour-detail").innerHTML = parts.join(" · ");
+}
+
+// ── Tides (NOAA CO-OPS, free, open CORS) ─────────────────────────────────────
+// Nearest tide-prediction station's high/low predictions, drawn as a smooth
+// cosine-interpolated curve with a NOW marker and the next tides. Station list
+// is fetched once and cached for the session.
+let tideStations = null, tideReq = 0;
+function haversineNm(la1, lo1, la2, lo2){
+  const R = 3440.065, toR = Math.PI / 180;
+  const dla = (la2 - la1) * toR, dlo = (lo2 - lo1) * toR;
+  const a = Math.sin(dla / 2) ** 2 + Math.cos(la1 * toR) * Math.cos(la2 * toR) * Math.sin(dlo / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+function tideClock(unixSec){
+  return time12(new Date((unixSec + state.utcOffset) * 1000).toISOString().slice(11, 16));
+}
+function fmtDur(sec){
+  sec = Math.max(0, Math.round(sec));
+  const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+  return (h ? h + "h " : "") + m + "m";
+}
+function tideMsg(html){ document.getElementById("tide-body").innerHTML = html; }
+
+async function loadTides(lat, lon){
+  const reqId = ++tideReq;
+  document.getElementById("tide-state").textContent = "";
+  document.getElementById("tide-sub").textContent = "";
+  tideMsg('<div class="loading">Reading the tide…</div>');
+  try {
+    if(!tideStations){
+      const r = await fetch("https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions");
+      if(!r.ok) throw new Error("stations " + r.status);
+      tideStations = (await r.json()).stations || [];
+    }
+    if(reqId !== tideReq) return;
+    let st = null, bd = Infinity;
+    for(const s of tideStations){
+      const d = haversineNm(lat, lon, s.lat, s.lng);
+      if(d < bd){ bd = d; st = s; }
+    }
+    if(!st) throw new Error("no station");
+    const begin = new Date(Date.now() - 12 * 3600e3);
+    const ymd = begin.getUTCFullYear() + String(begin.getUTCMonth() + 1).padStart(2, "0") + String(begin.getUTCDate()).padStart(2, "0");
+    const url = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions&datum=MLLW" +
+      "&interval=hilo&units=english&time_zone=lst_ldt&format=json&begin_date=" + ymd + "&range=48&station=" + st.id;
+    const r2 = await fetch(url);
+    if(!r2.ok) throw new Error("preds " + r2.status);
+    const preds = (await r2.json()).predictions;
+    if(reqId !== tideReq) return;
+    if(!preds || !preds.length) throw new Error("no predictions");
+    renderTides(st, Math.round(bd * 10) / 10, preds);
+  } catch(e){
+    if(reqId !== tideReq) return;
+    tideMsg('<div class="note">No tide station within range of this point.</div>');
+  }
+}
+
+function renderTides(st, distNm, preds){
+  const pts = preds.map(p => ({
+    t: Date.parse(p.t.replace(" ", "T") + "Z") / 1000 - state.utcOffset,
+    v: parseFloat(p.v), type: p.type
+  })).filter(p => !isNaN(p.t) && !isNaN(p.v));
+  const now = Date.now() / 1000;
+  // cosine interpolation between consecutive extremes → smooth tide height
+  const heightAt = t => {
+    for(let i = 0; i < pts.length - 1; i++){
+      if(t >= pts[i].t && t <= pts[i + 1].t){
+        const mid = (pts[i].v + pts[i + 1].v) / 2, amp = (pts[i + 1].v - pts[i].v) / 2;
+        return mid - amp * Math.cos(Math.PI * (t - pts[i].t) / (pts[i + 1].t - pts[i].t));
+      }
+    }
+    return null;
+  };
+  const winStart = now - 3 * 3600, winEnd = now + 15 * 3600;
+  const W = 600, H = 120, padTop = 20, padBot = 22;
+  const xs = t => (t - winStart) / (winEnd - winStart) * W;
+  const samples = [];
+  let minv = Infinity, maxv = -Infinity;
+  for(let i = 0; i <= 120; i++){
+    const t = winStart + (winEnd - winStart) * i / 120;
+    const h = heightAt(t);
+    if(h != null){ samples.push([t, h]); if(h < minv) minv = h; if(h > maxv) maxv = h; }
+  }
+  if(samples.length < 2){ tideMsg('<div class="note">Tide data unavailable for this window.</div>'); return; }
+  const pad = (maxv - minv) * 0.18 || 0.5, lo = minv - pad, hi = maxv + pad;
+  const ys = v => padTop + (1 - (v - lo) / (hi - lo)) * (H - padTop - padBot);
+
+  let line = "";
+  samples.forEach(([t, h], i) => { line += (i ? "L" : "M") + xs(t).toFixed(1) + "," + ys(h).toFixed(1); });
+  const area = line + "L" + xs(samples[samples.length - 1][0]).toFixed(1) + "," + (H - padBot) +
+               "L" + xs(samples[0][0]).toFixed(1) + "," + (H - padBot) + "Z";
+
+  let marks = "";
+  for(const p of pts){
+    if(p.t < winStart || p.t > winEnd) continue;
+    const x = xs(p.t), y = ys(p.v), high = p.type === "H";
+    marks += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="3.5" fill="' + (high ? "#00c8a0" : "#6090b0") + '"/>' +
+      '<text x="' + x.toFixed(1) + '" y="' + (high ? y - 8 : y + 14).toFixed(1) + '" text-anchor="middle" ' +
+      'font-family="Space Mono,monospace" font-size="11" fill="' + (high ? "#00c8a0" : "#6090b0") + '">' +
+      (high ? "H " : "L ") + tideClock(p.t) + " · " + p.v.toFixed(1) + "ft</text>";
+  }
+  const nx = xs(now), nh = heightAt(now), ny = nh != null ? ys(nh) : padTop;
+
+  const svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" ' +
+    'aria-label="Tide curve with high and low water and a now marker">' +
+    '<path d="' + area + '" fill="#4ab3ff" opacity="0.10"/>' +
+    '<path d="' + line + '" stroke="#4ab3ff" stroke-width="2.5" fill="none"/>' + marks +
+    '<line x1="' + nx.toFixed(1) + '" y1="10" x2="' + nx.toFixed(1) + '" y2="' + (H - padBot) +
+      '" stroke="#e8f4ff" stroke-width="1.5" stroke-dasharray="2 3" opacity="0.8"/>' +
+    '<circle cx="' + nx.toFixed(1) + '" cy="' + ny.toFixed(1) + '" r="5" fill="#e8f4ff"/></svg>';
+
+  const next = pts.find(p => p.t > now);
+  const after = pts.find(p => next && p.t > next.t);
+  let nextHtml = "";
+  if(next){
+    nextHtml = '<div class="tide-next">' +
+      '<div class="tide-stat"><div class="label">Next</div><div class="value">' +
+        (next.type === "H" ? "High" : "Low") + " " + tideClock(next.t) + '</div>' +
+        '<div class="sub">in ' + fmtDur(next.t - now) + " · " + next.v.toFixed(1) + ' ft</div></div>' +
+      (after ? '<div class="tide-stat"><div class="label">Then</div><div class="value">' +
+        (after.type === "H" ? "High" : "Low") + " " + tideClock(after.t) + '</div>' +
+        '<div class="sub">' + after.v.toFixed(1) + ' ft</div></div>' : "") +
+      '</div>';
+  }
+  tideMsg(svg + nextHtml);
+
+  const state2 = document.getElementById("tide-state");
+  const rising = next ? next.type === "H" : null;
+  state2.textContent = rising == null ? "" : (rising ? "rising" : "falling");
+  state2.className = "tide-state " + (rising ? "rising" : "falling");
+  document.getElementById("tide-sub").textContent = st.name + " · " + distNm + " nm";
 }
 
 if(window.self !== window.top) document.body.classList.add("embedded");
