@@ -922,9 +922,186 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   .trips-summary { grid-template-columns:1fr 1fr; }
   .trip-card-full { flex-wrap:wrap; }
 }
+
+/* ── SPLASH / ONBOARDING SCREEN ─────────────────────────────────────────── */
+#splash {
+  position:fixed; inset:0; z-index:99998;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:radial-gradient(ellipse at 50% 35%, #0b1a30 0%, #060c18 55%, #020509 100%);
+  overflow:hidden;
+  opacity:1; visibility:visible;
+  transition:opacity 0.7s ease, visibility 0.7s;
+}
+#splash.hidden { opacity:0; visibility:hidden; pointer-events:none; }
+
+/* Star field */
+.sp-star {
+  position:absolute; border-radius:50%; background:#fff;
+  animation:spTwinkle var(--d,3s) ease-in-out var(--dl,0s) infinite;
+}
+@keyframes spTwinkle {
+  0%,100%{ opacity:var(--lo,.1); transform:scale(1); }
+  50%{ opacity:var(--hi,.7); transform:scale(1.4); }
+}
+
+/* Horizon glow */
+.sp-horizon {
+  position:absolute; bottom:28%; left:0; right:0; height:1px;
+  background:linear-gradient(90deg,transparent,rgba(74,179,255,.18),rgba(0,200,160,.22),rgba(74,179,255,.18),transparent);
+  box-shadow:0 0 40px 8px rgba(74,179,255,.07);
+}
+
+/* Ocean SVG */
+.sp-ocean { position:absolute; bottom:0; left:0; right:0; pointer-events:none; }
+.sp-ocean svg { display:block; }
+.sp-wave1 { animation:spWaveDrift 9s ease-in-out infinite alternate; transform-origin:center bottom; }
+.sp-wave2 { animation:spWaveDrift 12s ease-in-out infinite alternate-reverse; transform-origin:center bottom; }
+.sp-wave3 { animation:spWaveDrift 6s ease-in-out infinite alternate; transform-origin:center bottom; }
+@keyframes spWaveDrift { from{transform:scaleX(1);} to{transform:scaleX(1.06);} }
+
+/* Main content block */
+.sp-body {
+  position:relative; z-index:2;
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+  text-align:center; padding:20px;
+  animation:spEnter .9s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes spEnter {
+  from{ opacity:0; transform:translateY(28px); }
+  to{   opacity:1; transform:translateY(0); }
+}
+
+.sp-emblem {
+  font-size:clamp(56px,10vw,84px);
+  filter:drop-shadow(0 0 24px rgba(74,179,255,.5));
+  animation:spBob 4s ease-in-out infinite;
+}
+@keyframes spBob {
+  0%,100%{ transform:translateY(0) rotate(-3deg); }
+  50%{ transform:translateY(-10px) rotate(3deg); }
+}
+
+.sp-title {
+  font-family:var(--display);
+  font-size:clamp(60px,13vw,110px);
+  font-weight:900; letter-spacing:.18em; line-height:1;
+  background:linear-gradient(135deg,#d4a84b 0%,#f0e0a0 45%,#4ab3ff 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  margin-top:-4px;
+  text-shadow:none;
+}
+
+.sp-sub {
+  font-size:11px; letter-spacing:.45em; text-transform:uppercase;
+  color:var(--muted2); margin-top:2px;
+}
+
+.sp-rule {
+  display:flex; align-items:center; gap:10px;
+  width:min(300px,80vw); margin:10px 0;
+  color:rgba(74,179,255,.25); font-size:10px; letter-spacing:.3em;
+}
+.sp-rule::before,.sp-rule::after {
+  content:''; flex:1; height:1px;
+  background:linear-gradient(90deg,transparent,rgba(74,179,255,.3),transparent);
+}
+
+.sp-tagline {
+  font-size:13px; color:var(--muted2); line-height:1.9;
+  letter-spacing:.04em;
+}
+
+.sp-btn {
+  margin-top:20px;
+  padding:15px 44px; border-radius:50px;
+  border:1.5px solid rgba(212,168,75,.7);
+  background:linear-gradient(135deg,rgba(212,168,75,.12),rgba(74,179,255,.07));
+  color:#e8c46a; font-size:15px; font-weight:700;
+  letter-spacing:.1em; font-family:var(--sans);
+  cursor:pointer; transition:all .3s;
+  animation:spBtnGlow 2.8s ease-in-out infinite;
+}
+.sp-btn:hover {
+  background:linear-gradient(135deg,rgba(212,168,75,.25),rgba(74,179,255,.15));
+  border-color:var(--brass); transform:translateY(-2px);
+  box-shadow:0 8px 32px rgba(212,168,75,.3);
+  animation:none;
+}
+@keyframes spBtnGlow {
+  0%,100%{ box-shadow:0 0 20px rgba(212,168,75,.15); }
+  50%{ box-shadow:0 0 40px rgba(212,168,75,.3); }
+}
+
+.sp-chain {
+  margin-top:10px; font-size:10px; letter-spacing:.35em;
+  text-transform:uppercase; color:var(--muted); opacity:.5;
+}
+
+/* Decorative compass rose (background) */
+.sp-compass {
+  position:absolute; opacity:.025;
+  font-size:clamp(280px,45vw,480px);
+  user-select:none; pointer-events:none;
+  animation:spCompassSpin 60s linear infinite;
+  color:var(--accent);
+}
+@keyframes spCompassSpin { to{ transform:rotate(360deg); } }
+
+/* Settings connect prompt */
+#settings-connect-prompt {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:80px 20px; gap:14px; text-align:center;
+}
+#settings-connect-prompt .empty-anchor { font-size:48px; opacity:.3; }
+#settings-connect-prompt h3 { font-family:var(--display); font-size:18px; color:var(--foam); }
+#settings-connect-prompt p { font-size:13px; color:var(--muted2); max-width:280px; line-height:1.6; }
 </style>
 </head>
 <body>
+
+<!-- ── SPLASH SCREEN ─────────────────────────────────────────────────────── -->
+<div id="splash">
+  <!-- Decorative background compass -->
+  <div class="sp-compass" aria-hidden="true">✦</div>
+  <!-- Horizon glow line -->
+  <div class="sp-horizon"></div>
+  <!-- Main content -->
+  <div class="sp-body">
+    <div class="sp-emblem" aria-hidden="true">⛵</div>
+    <div class="sp-title">KEEL</div>
+    <div class="sp-sub">Boat Share Club</div>
+    <div class="sp-rule"><span>⚓</span></div>
+    <p class="sp-tagline">Burn tokens · Reserve voyages<br>Own the sea.</p>
+    <button class="sp-btn" onclick="connectWallet()">⬡ Connect Wallet</button>
+    <div class="sp-chain">Polygon Amoy · ERC-20 Usage Token</div>
+  </div>
+  <!-- Ocean waves -->
+  <div class="sp-ocean">
+    <svg viewBox="0 0 1440 160" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style="width:100%;height:160px">
+      <path class="sp-wave1" d="M0,80 C180,40 360,120 540,80 C720,40 900,120 1080,80 C1260,40 1380,100 1440,80 L1440,160 L0,160 Z" fill="rgba(0,200,160,0.06)"/>
+      <path class="sp-wave2" d="M0,100 C240,60 480,140 720,100 C960,60 1200,140 1440,100 L1440,160 L0,160 Z" fill="rgba(74,179,255,0.05)"/>
+      <path class="sp-wave3" d="M0,120 C200,100 400,140 600,120 C800,100 1000,140 1200,120 C1320,110 1400,128 1440,120 L1440,160 L0,160 Z" fill="rgba(10,22,48,0.9)"/>
+    </svg>
+  </div>
+</div>
+<script>
+// Generate star field for splash
+(function(){
+  const sp = document.getElementById('splash');
+  for(let i=0;i<130;i++){
+    const s = document.createElement('div');
+    s.className='sp-star';
+    const sz = (Math.random()*2+.5).toFixed(1);
+    s.style.cssText='left:'+Math.random()*100+'%;top:'+Math.random()*78+'%;'
+      +'width:'+sz+'px;height:'+sz+'px;'
+      +'--d:'+(Math.random()*3+2).toFixed(1)+'s;'
+      +'--dl:'+(Math.random()*5).toFixed(1)+'s;'
+      +'--lo:'+(Math.random()*.15+.04).toFixed(2)+';'
+      +'--hi:'+(Math.random()*.5+.3).toFixed(2)+';';
+    sp.insertBefore(s,sp.firstChild);
+  }
+})();
+</script>
 
 <!-- Wallet-approval banner: on the mobile WalletConnect path, sending a tx does
      not auto-foreground MetaMask (esp. iOS home-screen PWA), so cue the user. -->
@@ -1327,6 +1504,12 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 
     <!-- SETTINGS PAGE -->
     <div class="page center-panel" id="page-settings">
+      <div id="settings-connect-prompt" style="display:none">
+        <div class="empty-anchor">⚓</div>
+        <h3>Connect Your Wallet</h3>
+        <p>Connect your wallet to view and save your member profile.</p>
+      </div>
+      <div id="settings-content">
       <div class="settings-grid">
 
         <!-- Profile card -->
@@ -1388,6 +1571,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
         </div>
 
       </div>
+      </div><!-- /settings-content -->
     </div><!-- /page-settings -->
 
     <!-- ADMIN PAGE -->
@@ -1955,6 +2139,8 @@ async function finishConnect(){
   } catch(_) { walletDisplayName = ""; }
   updateWalletPillName();
   // If the user connected while already on another page, reload it now.
+  // Dismiss splash
+  document.getElementById("splash").classList.add("hidden");
   if(currentPage === "trips")     try { await loadTripsPage(); }     catch(e){ console.warn("trips load failed", e); }
   if(currentPage === "keeltoken") try { await loadKeelTokenPage(); } catch(e){ console.warn("keel token load failed", e); }
   if(currentPage === "settings")  try { loadSettingsPage(); }         catch(e){ console.warn("settings load failed", e); }
@@ -2006,6 +2192,8 @@ async function disconnectWallet(e) {
       await window.keelAppKit.disconnect();
     }
   } catch(_) {}
+  // Show splash
+  document.getElementById("splash").classList.remove("hidden");
   // Reset all state and restore the Connect button
   provider = null; signer = null; walletAddress = null;
   keelBalance = 0; walletDisplayName = "";
@@ -2014,7 +2202,9 @@ async function disconnectWallet(e) {
   document.getElementById("kt-connect-prompt").style.display = "";
   document.getElementById("kt-content").style.display = "none";
   monthlyUsed = 0; monthlyIssued = 0; monthlyCap = MAX_CAP;
-  // Reset settings page
+  // Reset settings page to connect prompt
+  document.getElementById("settings-connect-prompt").style.display = "";
+  document.getElementById("settings-content").style.display = "none";
   document.getElementById("settings-display-name").value = "";
   document.getElementById("settings-experience").value   = "";
   document.getElementById("settings-avatar").textContent = "⚓";
@@ -3332,12 +3522,12 @@ async function loadSettingsPage() {
   document.getElementById("settings-balance").textContent = keelBalance > 0 ? keelBalance.toFixed(2)+" KEEL" : "—";
 
   if(!walletAddress) {
-    document.getElementById("settings-wallet-addr").textContent = "Not connected";
-    document.getElementById("settings-addr-display").textContent = "Connect wallet to save profile";
-    document.getElementById("settings-save-btn").disabled = true;
-    updateSettingsAvatar(null);
+    document.getElementById("settings-connect-prompt").style.display = "";
+    document.getElementById("settings-content").style.display = "none";
     return;
   }
+  document.getElementById("settings-connect-prompt").style.display = "none";
+  document.getElementById("settings-content").style.display = "";
 
   document.getElementById("settings-wallet-addr").textContent = walletAddress.slice(0,10)+"…"+walletAddress.slice(-6);
   document.getElementById("settings-addr-display").textContent = walletAddress.slice(0,6)+"…"+walletAddress.slice(-4);
