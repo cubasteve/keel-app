@@ -156,6 +156,14 @@ body.embedded .topbar { padding: 10px 16px; }
 .layer-btn:disabled { opacity: 0.5; cursor: default; }
 .now-rel { font-family: var(--mono); font-size: 11px; color: var(--muted2); letter-spacing: 0; margin-left: 6px; text-transform: none; }
 .now-rel.future { color: var(--amber); }
+/* Conditions card tinted by tense: past, present, or future */
+#now-card { transition: border-color 0.3s, box-shadow 0.3s; }
+#now-card.tense-past   { border-color: rgba(96,144,176,0.55);  box-shadow: 0 0 0 1px rgba(96,144,176,0.18); }
+#now-card.tense-now    { border-color: rgba(74,179,255,0.6);   box-shadow: 0 0 0 1px rgba(74,179,255,0.2); }
+#now-card.tense-future { border-color: rgba(255,179,71,0.6);   box-shadow: 0 0 0 1px rgba(255,179,71,0.2); }
+#now-card.tense-past   #now-head { color: var(--muted2); }
+#now-card.tense-now    #now-head { color: var(--accent); }
+#now-card.tense-future #now-head { color: var(--amber); }
 .hud-controls { display: flex; gap: 8px; align-items: center; width: 100%; }
 .hud-spacer { flex: 1; }
 .layer-btn.ctl { padding: 6px 9px; font-size: 13px; line-height: 1; }
@@ -218,7 +226,7 @@ body.embedded .topbar { padding: 10px 16px; }
     </div>
   </div>
   <div class="panel">
-    <div class="card">
+    <div class="card tense-now" id="now-card">
       <h2 id="now-head">Right now</h2>
       <div class="now-grid" id="now-grid"><div class="loading">Waiting for a location…</div></div>
       <div id="verdict"></div>
@@ -996,6 +1004,12 @@ function showConditions(unixSec){
   document.getElementById("now-head").innerHTML = isNow ? "Right now"
     : clock + ' <span class="now-rel' + (mins > 0 ? " future" : "") + '">' +
       (mins > 0 ? "+" + mins + "m" : mins + "m") + "</span>";
+
+  // Tint the card by tense: past / now / future
+  const tense = isNow ? "now" : (mins > 0 ? "future" : "past");
+  const card = document.getElementById("now-card");
+  card.classList.remove("tense-past", "tense-now", "tense-future");
+  card.classList.add("tense-" + tense);
 
   const stats = [
     ["Wind", windKn != null ? windArrow(dir) + Math.round(windKn) + " <small>kn " + compass(dir) + "</small>" : "n/a"],
