@@ -287,7 +287,7 @@ function initMap(){
 // failures flip tmrDead and the loop falls back to the Open-Meteo canvas cast.
 const TMR_TILE_BASE = "https://keel-ics.keel-app.workers.dev/tile/";
 let tmrFrames = [], tmrCache = new Map(), tmrQueue = [], tmrInFlight = false;
-let tmrDead = false, tmrFails = 0;
+let tmrDead = false, tmrFails = 0, tmrAttempts = new Map();
 
 function initTomorrow(){
   tmrFrames = [1, 2, 3].map(hh => {
@@ -336,12 +336,23 @@ function tmrPump(){
   img.crossOrigin = "anonymous"; // worker sends CORS headers; lets us recolor pixels
   img.onload = () => { tmrCache.set(url, img); tmrInFlight = false; setTimeout(tmrPump, 450); };
   img.onerror = () => {
-    tmrCache.delete(url);
     tmrInFlight = false;
-    if(++tmrFails > 5 && !tmrDead){
+    // Retry each tile a few times with backoff (429 windows clear); after
+    // that mark just this tile failed. Loaded tiles are never discarded, so
+    // one bad frame can't drag the good ones down to the blob fallback.
+    const tries = (tmrAttempts.get(url) || 0) + 1;
+    tmrAttempts.set(url, tries);
+    if(tries < 3){
+      tmrCache.delete(url);
+      setTimeout(() => tmrFetch(url), 5000 * tries);
+    } else {
+      tmrCache.set(url, "fail");
+    }
+    if(++tmrFails > 24 && !tmrDead){ // only a sustained outage kills the path
       tmrDead = true; tmrQueue = [];
-      if(rainOn) startRain(); // rebuild playlist on the fallback
-    } else setTimeout(tmrPump, 900);
+      if(rainOn) startRain();
+    }
+    setTimeout(tmrPump, 900);
   };
   img.src = url;
 }
@@ -391,7 +402,7 @@ function drawTmrFrame(frame, w){
     const url = tmrUrl(frame.iso, t);
     const img = tmrCache.get(url);
     if(img === undefined) tmrFetch(url);
-    if(img){
+    if(img && img !== "fail"){
       const p0 = map.latLngToContainerPoint([tile2lat(t.y, t.z), tile2lon(t.x, t.z)]);
       const p1 = map.latLngToContainerPoint([tile2lat(t.y + 1, t.z), tile2lon(t.x + 1, t.z)]);
       castCtx.globalAlpha = 0.85 * w;
@@ -599,6 +610,14 @@ function buildRainPlaylist(){
   s.max = Math.max(0, rainPlaylist.length - 1);
   if(rainPosF >= rainPlaylist.length) rainPosF = 0;
 }
+function nearestCastStep(t){
+  let best = null, bd = Infinity;
+  for(const s of castSteps){
+    const d = Math.abs(s.time - t);
+    if(d < bd){ bd = d; best = s; }
+  }
+  return best;
+}
 function updateRainChip(i){
   const fr = rainPlaylist[i];
   const el = document.getElementById("radar-time");
@@ -621,7 +640,14 @@ function renderRainAt(p){
   const apply = (fr, w) => {
     if(w < 0.02) return;
     if(fr.kind === "tile") rainLayers[fr.idx].setOpacity(0.65 * w);
-    else if(fr.kind === "tmr") drawTmrFrame(fr.frame, w);
+    else if(fr.kind === "tmr"){
+      // Per-frame fallback: only a frame with no tiles at all shows the
+      // model blobs; loaded frames keep their forecast imagery.
+      if(!drawTmrFrame(fr.frame, w)){
+        const s = nearestCastStep(fr.time);
+        if(s) drawCastStep(s, w);
+      }
+    }
     else drawCastStep(fr.step, w);
   };
   if(j < rainPlaylist.length && f > 0.02){
