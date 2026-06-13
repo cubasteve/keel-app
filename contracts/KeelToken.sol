@@ -92,6 +92,14 @@ contract KeelToken is
         }));
     }
 
+    /// Record a tranche with a specific expiry (used for refunds to preserve original date).
+    function _pushTrancheAt(address member, uint256 amount, uint64 expiresAt) internal {
+        _tranches[member].push(Tranche({
+            amount:    uint128(amount),
+            expiresAt: expiresAt
+        }));
+    }
+
     /**
      * @dev Burn any tranches that have passed their expiry. Burn amount is
      *      capped at the live balance so legacy (untracked) tokens are safe.
@@ -115,13 +123,15 @@ contract KeelToken is
         }
     }
 
-    /// @dev Consume tranches FIFO to account for a spend. Any remainder beyond
-    ///      tracked tranches is legacy balance and needs no accounting.
-    function _consumeTranches(address member, uint256 amount) internal {
+    /// @dev Consume tranches FIFO to account for a spend. Returns the earliest
+    ///      expiry encountered (the head tranche's expiry), so callers can
+    ///      preserve the original timeline on refund. Returns 0 for legacy balances.
+    function _consumeTranches(address member, uint256 amount) internal returns (uint64 minExpiresAt) {
         Tranche[] storage ts = _tranches[member];
         uint256 h = _trancheHead[member];
         uint256 rem = amount;
         while (rem > 0 && h < ts.length) {
+            if (minExpiresAt == 0) minExpiresAt = ts[h].expiresAt; // capture head expiry once
             uint128 a = ts[h].amount;
             if (a <= rem) {
                 rem -= a;
@@ -237,22 +247,33 @@ contract KeelToken is
 
     // ── Ledger hooks ─────────────────────────────────────────────────────────
 
+    /// @notice Burns tokens for a trip. Returns the earliest tranche expiry consumed
+    ///         so the ledger can preserve it on a refund.
     function burnForUsage(address member, uint256 amount, bytes32 tripId)
-        external onlyRole(LEDGER_ROLE)
+        external onlyRole(LEDGER_ROLE) returns (uint64 minExpiresAt)
     {
         _sweepExpired(member);
         _burn(member, amount);
-        _consumeTranches(member, amount); // FIFO: oldest tokens are spent first
+        minExpiresAt = _consumeTranches(member, amount); // FIFO: oldest tokens are spent first
         emit TokensBurnedForUsage(member, amount, tripId);
     }
 
-    function refundCancellation(address member, uint256 amount, bytes32 tripId)
+    /// @notice Refunds tokens from a cancelled trip.
+    ///         If originalExpiresAt is in the future, the refunded tranche keeps
+    ///         the original expiry so the member doesn't gain extra time.
+    ///         Falls back to a fresh 90-day tranche for legacy trips (originalExpiresAt == 0).
+    function refundCancellation(address member, uint256 amount, bytes32 tripId, uint64 originalExpiresAt)
         external onlyRole(LEDGER_ROLE)
     {
         _sweepExpired(member);
         require(balanceOf(member) + amount <= walletCap, "KeelToken: refund would exceed wallet cap");
         _mint(member, amount);
-        _pushTranche(member, amount); // refunded tokens get a fresh 90-day life
+        if (originalExpiresAt > block.timestamp) {
+            _pushTrancheAt(member, amount, originalExpiresAt);
+        } else {
+            // Legacy trip (no stored expiry) or original already expired — fresh tranche
+            _pushTranche(member, amount);
+        }
         emit TokensRefunded(member, amount, tripId);
     }
 

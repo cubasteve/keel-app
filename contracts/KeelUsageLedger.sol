@@ -6,8 +6,8 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 interface IKeelToken {
-    function burnForUsage(address member, uint256 amount, bytes32 tripId) external;
-    function refundCancellation(address member, uint256 amount, bytes32 tripId) external;
+    function burnForUsage(address member, uint256 amount, bytes32 tripId) external returns (uint64 minExpiresAt);
+    function refundCancellation(address member, uint256 amount, bytes32 tripId, uint64 originalExpiresAt) external;
 }
 
 /**
@@ -36,6 +36,7 @@ contract KeelUsageLedger is Initializable, AccessControlUpgradeable, UUPSUpgrade
         uint16  boatId;
         uint256 burnHundredths;
         uint256 tokensBurned;
+        uint64  refundExpiresAt; // earliest tranche expiry at burn time; 0 for legacy trips
     }
 
     mapping(bytes32 => TripRecord) public trips;
@@ -124,16 +125,19 @@ contract KeelUsageLedger is Initializable, AccessControlUpgradeable, UUPSUpgrade
         tripId = keccak256(abi.encodePacked(member, boatId, startTs, endTs, block.timestamp));
         require(trips[tripId].member == address(0), "dup trip");
 
+        // Burn first — captures earliest tranche expiry for future refunds
+        uint64 refundExp = keelToken.burnForUsage(member, tokenAmount, tripId);
+
         trips[tripId] = TripRecord({
             member: member, startTs: startTs, endTs: endTs,
             totalTenths: totalTenths, competitive: competitive,
             cancelled: false, boatId: boatId,
-            burnHundredths: burnHundredths, tokensBurned: tokenAmount
+            burnHundredths: burnHundredths, tokensBurned: tokenAmount,
+            refundExpiresAt: refundExp
         });
         tripIds.push(tripId);
         boatTrips[boatId].push(tripId);
 
-        keelToken.burnForUsage(member, tokenAmount, tripId);
         emit TripSettled(tripId, member, boatId, tokenAmount, totalTenths, startTs, endTs);
     }
 
@@ -145,7 +149,7 @@ contract KeelUsageLedger is Initializable, AccessControlUpgradeable, UUPSUpgrade
         require(!t.cancelled, "already cancelled");
         t.cancelled = true;
         bool refunded = block.timestamp < t.startTs;
-        if (refunded) keelToken.refundCancellation(t.member, t.tokensBurned, tripId);
+        if (refunded) keelToken.refundCancellation(t.member, t.tokensBurned, tripId, t.refundExpiresAt);
         emit TripCancelled(tripId, t.member, t.boatId, refunded ? t.tokensBurned : 0, refunded);
     }
 
