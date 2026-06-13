@@ -871,6 +871,21 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 .btn-cancel-trip { font-size:12px; font-weight:600; padding:5px 14px; border-radius:8px; border:1px solid rgba(255,83,112,0.3); background:rgba(255,83,112,0.06); color:var(--danger); cursor:pointer; transition:all 0.2s; font-family:var(--sans); }
 .btn-cancel-trip:hover { background:rgba(255,83,112,0.15); border-color:var(--danger); }
 .btn-cancel-trip:disabled { opacity:0.4; cursor:default; }
+
+/* Wallet-approval banner (mobile WalletConnect: cue user to switch to MetaMask) */
+#wallet-prompt {
+  position:fixed; top:0; left:0; right:0; z-index:99999; display:none;
+  align-items:center; gap:12px; cursor:pointer; color:var(--foam); font-family:var(--sans);
+  padding:13px 18px; padding-top:calc(13px + env(safe-area-inset-top));
+  background:#14110a; border-bottom:2px solid var(--brass);
+  box-shadow:0 6px 24px rgba(0,0,0,0.5);
+}
+#wallet-prompt.show { display:flex; }
+.wp-icon { font-size:24px; flex-shrink:0; animation:wpNudge 1.4s ease-in-out infinite; }
+.wp-text { flex:1; font-size:13px; line-height:1.35; }
+.wp-text b { color:var(--brass); font-size:14px; }
+.wp-arrow { font-size:20px; color:var(--brass); flex-shrink:0; }
+@keyframes wpNudge { 0%,100%{ transform:translateX(0);} 50%{ transform:translateX(3px);} }
 .btn-add-cal { font-size:12px; font-weight:600; padding:5px 14px; border-radius:8px; border:1px solid rgba(74,179,255,0.3); background:rgba(74,179,255,0.06); color:var(--accent); cursor:pointer; transition:all 0.2s; font-family:var(--sans); text-decoration:none; display:inline-block; }
 .btn-add-cal:hover { background:rgba(74,179,255,0.15); border-color:var(--accent); }
 
@@ -891,6 +906,14 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 </style>
 </head>
 <body>
+
+<!-- Wallet-approval banner: on the mobile WalletConnect path, sending a tx does
+     not auto-foreground MetaMask (esp. iOS home-screen PWA), so cue the user. -->
+<div id="wallet-prompt" onclick="openWallet()" role="button" tabindex="0" aria-label="Open MetaMask to approve the transaction">
+  <span class="wp-icon" aria-hidden="true">🦊</span>
+  <span class="wp-text"><b>Waiting for MetaMask…</b><br>Tap here to open your wallet and approve</span>
+  <span class="wp-arrow" aria-hidden="true">→</span>
+</div>
 
 <!-- OCEAN WAVES -->
 <div class="wave-bg">
@@ -2323,7 +2346,10 @@ async function logTrip() {
       overrides.maxFeePerGas = ethers.utils.parseUnits("50","gwei");
     }
 
-    const tx = await ledger.logAndSettle(...args, overrides);
+    const txPromise = ledger.logAndSettle(...args, overrides); // initiates WC request
+    walletPromptShow();                                        // cue user to approve in MetaMask
+    let tx;
+    try { tx = await txPromise; } finally { walletPromptHide(); }
     showStatus("Transaction submitted — waiting for confirmation...","pending");
     const receipt = await tx.wait();
     if(receipt.status === 0){ throw new Error("Transaction reverted on-chain"); }
@@ -2623,6 +2649,22 @@ function dayStatus(dayKey){
 
 function showStatus(msg,type){const el=document.getElementById("settle-status-msg");if(el){el.textContent=msg;el.className="status-msg "+type;}}
 function clearStatus(){const el=document.getElementById("settle-status-msg");if(el){el.textContent="";el.className="status-msg";}}
+
+// ── Wallet-approval prompt (mobile WalletConnect) ──
+// Sending a tx over WalletConnect doesn't foreground the wallet on iOS
+// home-screen PWAs, so we show a tappable banner and best-effort deep-link.
+function openWallet(){ try { window.location.href = "metamask://"; } catch(_){} }
+function walletPromptShow(){
+  if(!window.__keelViaWalletConnect) return; // injected/desktop MetaMask pops itself
+  const el = document.getElementById("wallet-prompt");
+  if(el) el.classList.add("show");
+  // Best-effort auto-foreground; iOS may ignore it, the banner is the fallback.
+  setTimeout(openWallet, 350);
+}
+function walletPromptHide(){
+  const el = document.getElementById("wallet-prompt");
+  if(el) el.classList.remove("show");
+}
 
 // ── Drawer (slide-out) controls ──
 function isMobile(){ return window.matchMedia("(max-width:900px)").matches; }
@@ -3009,7 +3051,10 @@ async function cancelTrip(tripId, burnAmt) {
       overrides.maxFeePerGas = ethers.utils.parseUnits("50","gwei");
     }
 
-    const tx = await ledger.cancelTrip(tripId, overrides);
+    const txPromise = ledger.cancelTrip(tripId, overrides); // initiates WC request
+    walletPromptShow();                                     // cue user to approve in MetaMask
+    let tx;
+    try { tx = await txPromise; } finally { walletPromptHide(); }
     btn.textContent = "Confirming…";
     await tx.wait();
 
