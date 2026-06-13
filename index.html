@@ -2094,18 +2094,18 @@ async function connectViaAppKit(){
 }
 
 // Called whenever AppKit reports a connected EVM address. Wraps the provider in
-// ethers v5 and runs the shared post-connect population. Guarded so it only does
-// the heavy work once per address.
+// ethers v5 and runs the shared post-connect population. Guarded against
+// concurrent calls — AppKit can fire this subscription more than once.
 window.keelOnAppKitAccount = async function(addr){
   try {
     if(!addr) return;
     if(walletAddress && walletAddress.toLowerCase() === String(addr).toLowerCase()) return; // already done
-    const eip1193 = window.keelAppKit.getProvider();
-    if(!eip1193) return; // provider not ready yet; a later account/provider event will retry
+    if(window.__keelFinishConnecting) return; // guard concurrent calls
+    window.__keelFinishConnecting = true;
 
-    // Switch to Amoy NOW — wallet is connected so this actually works here.
-    // Doing it before wrapping the provider means finishConnect() / refreshBalance()
-    // always runs on the right chain, fixing both the overlay and the stale balance.
+    const eip1193 = window.keelAppKit.getProvider();
+    if(!eip1193) { window.__keelFinishConnecting = false; return; }
+
     try { await window.keelAppKit.switchToAmoy(); } catch(_) {}
 
     // Pin the network so ethers v5 doesn't throw "underlying network changed"
@@ -2113,17 +2113,26 @@ window.keelOnAppKitAccount = async function(addr){
     provider = new ethers.providers.Web3Provider(eip1193, {
       name: "polygon-amoy", chainId: AMOY_CHAIN_ID
     });
-    window.__keelViaWalletConnect = true; // let the wallet manage gas itself
-    try { captureWalletLink(eip1193); } catch(_){} // wallet name + deep link for the approval banner
+    window.__keelViaWalletConnect = true;
+    try { captureWalletLink(eip1193); } catch(_){}
     await finishConnect();
-    // Re-run balance after a short delay — the chain switch needs a moment to
-    // settle before contract reads on Amoy will succeed reliably.
+    // Re-run balance + display name after a delay — chain switch needs a moment
+    // to settle, and this also acts as a safety net if the first fetch failed.
     setTimeout(async () => {
       try { await refreshBalance(); } catch(_) {}
+      try {
+        const rp = getReadProvider();
+        const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, rp);
+        const profile = await ledger.memberProfiles(walletAddress);
+        walletDisplayName = profile?.displayName || "";
+        updateWalletPillName();
+      } catch(_) {}
     }, 1500);
     clearStatus();
   } catch(e){
     console.warn("AppKit account populate failed", e);
+  } finally {
+    window.__keelFinishConnecting = false;
   }
 };
 
@@ -2143,11 +2152,7 @@ async function finishConnect(){
         '<div class="wallet-menu-item danger" onclick="disconnectWallet(event)"><span class="mi-icon">⏻</span> Disconnect</div>' +
       '</div>' +
     '</div>';
-  // Run each populate step independently so one failure doesn't blank the others.
-  try { await refreshBalance(); }     catch(e){ console.warn("balance load failed", e); }
-  try { await loadMonthlyStats(); }   catch(e){ console.warn("monthly stats failed", e); }
-  try { await loadOnChainHistory(); } catch(e){ console.warn("history load failed", e); }
-  // Fetch display name from chain and update the pill
+  // Fetch display name first so the pill shows it as soon as possible.
   try {
     const rp = getReadProvider();
     const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, rp);
@@ -2155,13 +2160,20 @@ async function finishConnect(){
     walletDisplayName = profile?.displayName || "";
   } catch(_) { walletDisplayName = ""; }
   updateWalletPillName();
-  // If the user connected while already on another page, reload it now.
-  // Dismiss splash
+  // Load dashboard data independently so one failure doesn't block the others.
+  try { await refreshBalance(); }     catch(e){ console.warn("balance load failed", e); }
+  try { await loadMonthlyStats(); }   catch(e){ console.warn("monthly stats failed", e); }
+  try { await loadOnChainHistory(); } catch(e){ console.warn("history load failed", e); }
+  // Dismiss splash, then reload the active page after a brief delay so the
+  // provider has fully settled (especially important on the WalletConnect path
+  // where a chain switch just happened).
   document.getElementById("splash").classList.add("hidden");
-  if(currentPage === "trips")     try { await loadTripsPage(); }     catch(e){ console.warn("trips load failed", e); }
-  if(currentPage === "keeltoken") try { await loadKeelTokenPage(); } catch(e){ console.warn("keel token load failed", e); }
-  if(currentPage === "settings")  try { loadSettingsPage(); }         catch(e){ console.warn("settings load failed", e); }
-  if(currentPage === "admin")     try { await loadAdminPage(); }     catch(e){ console.warn("admin load failed", e); }
+  setTimeout(() => {
+    if(currentPage === "trips")     loadTripsPage().catch(e => console.warn("trips load failed", e));
+    if(currentPage === "keeltoken") loadKeelTokenPage().catch(e => console.warn("keel token load failed", e));
+    if(currentPage === "settings")  { try { loadSettingsPage(); } catch(e){ console.warn("settings load failed", e); } }
+    if(currentPage === "admin")     loadAdminPage().catch(e => console.warn("admin load failed", e));
+  }, 600);
 }
 
 // ── Wallet menu actions ──────────────────────────────────────────────────────
