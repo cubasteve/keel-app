@@ -2016,18 +2016,30 @@ async function loadExpiryStats(){
   if(bar) bar.style.width = Math.min((expiring/MAX_CAP)*100,100)+"%";
 }
 
-// Splash-specific connect: always opens the AppKit modal so the user gets
-// the full wallet picker (MetaMask, WalletConnect, Coinbase, etc.).
-// Falls back to direct MetaMask if AppKit hasn't loaded yet.
+// Splash connect: always opens the AppKit wallet picker.
+// If AppKit hasn't finished loading yet, waits for the keel-appkit-ready event
+// (up to 10 s) so the modal reliably opens on first tap.
 async function splashConnect() {
-  if(window.keelAppKit) {
-    try { await connectViaAppKit(); } catch(e){ showStatus("Connection failed: "+e.message,"error"); }
-  } else {
-    // AppKit still loading — try injected wallet; if neither, wait and retry once
-    if(window.ethereum) { await connectWallet(); return; }
-    showStatus("Wallet modal loading — please try again in a moment.","pending");
-    setTimeout(clearStatus, 3000);
+  if(!window.keelAppKit) {
+    showStatus("Opening wallet connection…","pending");
+    try {
+      await new Promise((resolve, reject) => {
+        if(window.keelAppKit){ resolve(); return; }
+        const t = setTimeout(() => reject(new Error("AppKit load timeout")), 10000);
+        window.addEventListener("keel-appkit-ready", () => { clearTimeout(t); resolve(); }, {once:true});
+      });
+    } catch(e) {
+      clearStatus();
+      // AppKit timed out — fall back to direct injected wallet if available
+      if(window.ethereum){ await connectWallet(); return; }
+      showStatus("Could not load wallet — please refresh and try again.","error");
+      setTimeout(clearStatus, 5000);
+      return;
+    }
+    clearStatus();
   }
+  try { await connectViaAppKit(); }
+  catch(e){ showStatus("Connection failed: "+e.message,"error"); }
 }
 
 async function connectWallet() {
