@@ -1072,7 +1072,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
     <div class="sp-sub">Boat Share Club</div>
     <div class="sp-rule"><span>⚓</span></div>
     <p class="sp-tagline">Burn tokens · Reserve voyages<br>Own the sea.</p>
-    <button class="sp-btn" onclick="connectWallet()">⬡ Connect Wallet</button>
+    <button class="sp-btn" id="sp-connect-btn" onclick="splashConnect()">⬡ Connect Wallet</button>
     <div class="sp-chain">Polygon Amoy · ERC-20 Usage Token</div>
   </div>
   <!-- Ocean waves -->
@@ -2014,6 +2014,20 @@ async function loadExpiryStats(){
   }
   const bar = document.getElementById("expiring-bar");
   if(bar) bar.style.width = Math.min((expiring/MAX_CAP)*100,100)+"%";
+}
+
+// Splash-specific connect: always opens the AppKit modal so the user gets
+// the full wallet picker (MetaMask, WalletConnect, Coinbase, etc.).
+// Falls back to direct MetaMask if AppKit hasn't loaded yet.
+async function splashConnect() {
+  if(window.keelAppKit) {
+    try { await connectViaAppKit(); } catch(e){ showStatus("Connection failed: "+e.message,"error"); }
+  } else {
+    // AppKit still loading — try injected wallet; if neither, wait and retry once
+    if(window.ethereum) { await connectWallet(); return; }
+    showStatus("Wallet modal loading — please try again in a moment.","pending");
+    setTimeout(clearStatus, 3000);
+  }
 }
 
 async function connectWallet() {
