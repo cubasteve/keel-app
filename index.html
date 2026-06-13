@@ -135,6 +135,7 @@ body {
   overflow-x: clip;
   position: relative;
 }
+body.splash-active { overflow: hidden; }
 body::before {
   content: '';
   position: fixed;
@@ -1049,7 +1050,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 
 </style>
 </head>
-<body>
+<body class="splash-active">
 
 <!-- ── SPLASH SCREEN ─────────────────────────────────────────────────────── -->
 <div id="splash">
@@ -2172,6 +2173,7 @@ async function finishConnect(){
   // provider has fully settled (especially important on the WalletConnect path
   // where a chain switch just happened).
   document.getElementById("splash").classList.add("hidden");
+  document.body.classList.remove("splash-active");
   setTimeout(() => {
     if(currentPage === "trips")     loadTripsPage().catch(e => console.warn("trips load failed", e));
     if(currentPage === "keeltoken") loadKeelTokenPage().catch(e => console.warn("keel token load failed", e));
@@ -2230,6 +2232,7 @@ async function disconnectWallet(e) {
   sp.classList.remove("hidden");
   sp.style.opacity = "";
   sp.style.pointerEvents = "";
+  document.body.classList.add("splash-active");
   // Reset all state and restore the Connect button
   provider = null; signer = null; walletAddress = null;
   keelBalance = 0; walletDisplayName = "";
