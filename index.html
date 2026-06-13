@@ -3225,19 +3225,24 @@ function renderKtTranches(tranches, balance, nowSec) {
   const expiresAts = tranches.expiresAts || tranches[1] || [];
   const LIFE = 90*24*3600;
 
-  // Group tranches by expiry date so same-date entries collapse into one row
-  const byExp = new Map();
+  // Group tranches by calendar date (day-level) so tranches issued on the same
+  // day collapse into one row even if their exact timestamps differ by seconds.
+  // Map key = "YYYY-MM-DD" (UTC); value = { amt, maxExp } where maxExp is the
+  // latest timestamp in the group (used for the progress bar / days-left calc).
+  const byDate = new Map();
   let trancheTotal = 0;
   for(let i = 0; i < amounts.length; i++){
     const amt = parseFloat(ethers.utils.formatUnits(amounts[i], 18));
     if(amt <= 0) continue;
     trancheTotal += amt;
     const exp = Number(expiresAts[i]);
-    byExp.set(exp, (byExp.get(exp) || 0) + amt);
+    const dateKey = new Date(exp*1000).toISOString().slice(0,10); // "YYYY-MM-DD"
+    const cur = byDate.get(dateKey) || { amt: 0, maxExp: 0 };
+    byDate.set(dateKey, { amt: cur.amt + amt, maxExp: Math.max(cur.maxExp, exp) });
   }
 
   const rows = [];
-  for(const [exp, amt] of [...byExp.entries()].sort((a,b) => a[0]-b[0])){
+  for(const [, {amt, maxExp: exp}] of [...byDate.entries()].sort((a,b) => a[1].maxExp - b[1].maxExp)){
     const secsLeft = exp - nowSec;
     const daysLeft = Math.max(0, Math.ceil(secsLeft / 86400));
     const pctLeft  = Math.max(0, Math.min(100, (secsLeft / LIFE) * 100));
