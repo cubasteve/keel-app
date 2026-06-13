@@ -3225,13 +3225,19 @@ function renderKtTranches(tranches, balance, nowSec) {
   const expiresAts = tranches.expiresAts || tranches[1] || [];
   const LIFE = 90*24*3600;
 
-  const rows = [];
+  // Group tranches by expiry date so same-date entries collapse into one row
+  const byExp = new Map();
   let trancheTotal = 0;
   for(let i = 0; i < amounts.length; i++){
     const amt = parseFloat(ethers.utils.formatUnits(amounts[i], 18));
     if(amt <= 0) continue;
     trancheTotal += amt;
-    const exp      = Number(expiresAts[i]);
+    const exp = Number(expiresAts[i]);
+    byExp.set(exp, (byExp.get(exp) || 0) + amt);
+  }
+
+  const rows = [];
+  for(const [exp, amt] of [...byExp.entries()].sort((a,b) => a[0]-b[0])){
     const secsLeft = exp - nowSec;
     const daysLeft = Math.max(0, Math.ceil(secsLeft / 86400));
     const pctLeft  = Math.max(0, Math.min(100, (secsLeft / LIFE) * 100));
