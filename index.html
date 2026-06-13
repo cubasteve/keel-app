@@ -967,21 +967,19 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   to{   opacity:1; transform:translateY(0); }
 }
 
-/* SVG sailboat */
-#sp-stars-layer { position:absolute; inset:0; pointer-events:none; will-change:transform; }
-#sp-boat-wrap {
-  position:relative; display:flex; justify-content:center;
-  transform-origin:50% 80%;
-  will-change:transform;
-  filter:drop-shadow(0 0 26px rgba(74,179,255,.42)) drop-shadow(0 0 10px rgba(0,200,160,.25));
+.sp-emblem {
+  font-size:clamp(72px,12vw,108px);
+  filter:drop-shadow(0 0 32px rgba(74,179,255,.65))
+         drop-shadow(0 0 14px rgba(0,200,160,.45))
+         drop-shadow(0 2px 8px rgba(0,0,0,.6));
+  animation:spBob 4.2s ease-in-out infinite;
+  display:block;
 }
-@keyframes spWake {
-  0%,100%{ opacity:.85; transform:scaleX(1); }
-  50%{ opacity:.28; transform:scaleX(1.07); }
+@keyframes spBob {
+  0%,100%{ transform:translateY(0px)   rotate(-2deg) scale(1); }
+  40%    { transform:translateY(-12px) rotate( 2deg) scale(1.04); }
+  70%    { transform:translateY(-5px)  rotate( 0deg) scale(1.01); }
 }
-.sp-wake1{ animation:spWake 3.4s ease-in-out infinite; transform-origin:center; }
-.sp-wake2{ animation:spWake 3.4s ease-in-out 1s infinite; transform-origin:center; }
-.sp-wake3{ animation:spWake 3.4s ease-in-out 2s infinite; transform-origin:center; }
 
 .sp-title {
   font-family:var(--display);
@@ -1055,155 +1053,13 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 
 <!-- ── SPLASH SCREEN ─────────────────────────────────────────────────────── -->
 <div id="splash">
-  <!-- Star parallax layer (counter-moves against heel) -->
-  <div id="sp-stars-layer"></div>
   <!-- Decorative background compass -->
   <div class="sp-compass" aria-hidden="true">✦</div>
   <!-- Horizon glow line -->
   <div class="sp-horizon"></div>
   <!-- Main content -->
   <div class="sp-body">
-    <div id="sp-boat-wrap" aria-hidden="true">
-      <svg id="sp-boat" viewBox="0 0 340 295" xmlns="http://www.w3.org/2000/svg"
-           style="overflow:visible;width:clamp(240px,46vw,330px)">
-        <defs>
-          <linearGradient id="sp-hl" x1="1" y1="0" x2="0" y2="0">
-            <stop offset="0%"   stop-color="rgba(18,48,76,0.96)"/>
-            <stop offset="100%" stop-color="rgba(18,48,76,0)"/>
-          </linearGradient>
-          <linearGradient id="sp-hr" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%"   stop-color="rgba(18,48,76,0.96)"/>
-            <stop offset="100%" stop-color="rgba(18,48,76,0)"/>
-          </linearGradient>
-          <linearGradient id="sp-hv" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stop-color="rgba(18,48,76,0.7)"/>
-            <stop offset="100%" stop-color="rgba(18,48,76,0)"/>
-          </linearGradient>
-          <linearGradient id="sp-water" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stop-color="rgba(0,26,52,0.94)"/>
-            <stop offset="100%" stop-color="rgba(1,5,14,0.98)"/>
-          </linearGradient>
-          <linearGradient id="sp-horiz" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%"   stop-color="rgba(0,200,160,0)"/>
-            <stop offset="25%"  stop-color="rgba(0,200,160,0.4)"/>
-            <stop offset="50%"  stop-color="rgba(74,179,255,0.62)"/>
-            <stop offset="75%"  stop-color="rgba(0,200,160,0.4)"/>
-            <stop offset="100%" stop-color="rgba(0,200,160,0)"/>
-          </linearGradient>
-          <!-- Mainsail: bright at luff/mast edge, fades toward leech (far edge) -->
-          <linearGradient id="sp-sail-main" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%"   stop-color="rgba(238,252,255,0.95)"/>
-            <stop offset="45%"  stop-color="rgba(195,235,252,0.75)"/>
-            <stop offset="100%" stop-color="rgba(100,172,225,0.30)"/>
-          </linearGradient>
-          <!-- Jib: same concept, bright on leading edge -->
-          <linearGradient id="sp-sail-jib" x1="1" y1="0" x2="0" y2="0">
-            <stop offset="0%"   stop-color="rgba(230,248,255,0.88)"/>
-            <stop offset="50%"  stop-color="rgba(188,228,250,0.65)"/>
-            <stop offset="100%" stop-color="rgba(100,172,225,0.25)"/>
-          </linearGradient>
-          <filter id="sp-glow" x="-60%" y="-60%" width="220%" height="220%">
-            <feGaussianBlur stdDeviation="4" result="b"/>
-            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-          <filter id="sp-sg" x="-30%" y="-30%" width="160%" height="160%">
-            <feGaussianBlur stdDeviation="2" result="b"/>
-            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-        </defs>
-
-        <!-- Water -->
-        <rect x="0" y="188" width="340" height="107" fill="url(#sp-water)"/>
-
-        <!-- Horizon glow -->
-        <rect x="0" y="182" width="340" height="16" fill="url(#sp-horiz)" filter="url(#sp-glow)"/>
-        <line x1="0" y1="190" x2="340" y2="190"
-              stroke="rgba(74,179,255,0.58)" stroke-width="1.2" filter="url(#sp-sg)"/>
-
-        <!-- Wake V-lines from transom -->
-        <path d="M 170,228 Q 108,240 35,262" fill="none" stroke="rgba(74,179,255,0.16)" stroke-width="1.2"/>
-        <path d="M 170,228 Q 232,240 305,262" fill="none" stroke="rgba(74,179,255,0.16)" stroke-width="1.2"/>
-        <path d="M 170,237 Q 96,252 16,278"  fill="none" stroke="rgba(74,179,255,0.08)" stroke-width="0.8"/>
-        <path d="M 170,237 Q 244,252 324,278" fill="none" stroke="rgba(74,179,255,0.08)" stroke-width="0.8"/>
-
-        <!-- Port hull (fades left) -->
-        <path d="M 170,218 C 146,212 114,204 78,196 C 50,190 24,186 2,183
-                 L 2,192 C 24,195 50,199 78,205 C 114,213 146,222 170,228 Z"
-              fill="url(#sp-hl)"/>
-        <!-- Starboard hull (fades right) -->
-        <path d="M 170,218 C 194,212 226,204 262,196 C 290,190 316,186 338,183
-                 L 338,192 C 316,195 290,199 262,205 C 226,213 194,222 170,228 Z"
-              fill="url(#sp-hr)"/>
-        <!-- Hull vertical fade -->
-        <path d="M 2,187 C 55,200 110,215 170,220 C 230,215 285,200 338,187
-                 L 338,198 C 285,211 230,226 170,231 C 110,226 55,211 2,198 Z"
-              fill="url(#sp-hv)" opacity="0.6"/>
-
-        <!-- Transom -->
-        <path d="M 154,205 C 160,203 166,202 170,202 C 174,202 180,203 186,205
-                 L 184,225 C 180,227 175,228 170,228 C 165,228 160,227 156,225 Z"
-              fill="#0e1c2e" stroke="rgba(74,179,255,0.52)" stroke-width="1.1"/>
-
-        <!-- Waterline glow + boot stripe -->
-        <path d="M 24,192 C 78,203 124,212 170,216 C 216,212 262,203 316,192"
-              fill="none" stroke="rgba(0,200,160,0.58)" stroke-width="1.7" filter="url(#sp-sg)"/>
-        <path d="M 38,190 C 88,200 130,207 170,210 C 210,207 252,200 302,190"
-              fill="none" stroke="rgba(212,168,75,0.44)" stroke-width="1.3"/>
-
-        <!-- Backstays -->
-        <line x1="170" y1="26" x2="56"  y2="214" stroke="rgba(100,162,200,0.22)" stroke-width="0.8"/>
-        <line x1="170" y1="26" x2="284" y2="214" stroke="rgba(100,162,200,0.22)" stroke-width="0.8"/>
-
-        <!-- Mast -->
-        <line x1="170" y1="212" x2="170" y2="22"
-              stroke="rgba(165,212,235,0.92)" stroke-width="2.6" stroke-linecap="round"/>
-
-        <!-- ── MAINSAIL — 3D horizontal plane sweeping to starboard ────────── -->
-        <!-- Boom: horizontal spar going right, perspective-foreshortened       -->
-        <!-- The sail group is CSS-rotated around the mast so the outer edge    -->
-        <!-- (leech / boom tip) recedes into distance — true 3D planar look     -->
-        <g style="transform-box:fill-box;transform-origin:0% 50%;transform:perspective(360px) rotateY(-32deg)">
-          <!-- Boom spar -->
-          <line x1="170" y1="220" x2="308" y2="220"
-                stroke="rgba(140,196,220,0.86)" stroke-width="2.2" stroke-linecap="round"/>
-          <!-- Mainsail face -->
-          <path d="M 170,24 C 242,82 292,158 308,220 L 170,212 Z"
-                fill="url(#sp-sail-main)" stroke="rgba(74,179,255,0.10)" stroke-width="0.5"/>
-          <!-- Luff highlight (bright strip at mast edge) -->
-          <path d="M 170,27 C 184,82 186,156 170,210 C 182,156 180,82 170,29 Z"
-                fill="rgba(255,255,255,0.15)" stroke="none"/>
-          <!-- Batten lines across sail face -->
-          <line x1="170" y1="80"  x2="282" y2="100" stroke="rgba(74,179,255,0.10)" stroke-width="0.5"/>
-          <line x1="170" y1="128" x2="294" y2="156" stroke="rgba(74,179,255,0.10)" stroke-width="0.5"/>
-          <line x1="170" y1="174" x2="300" y2="198" stroke="rgba(74,179,255,0.10)" stroke-width="0.5"/>
-          <!-- Leech shadow strip (far edge curves away) -->
-          <path d="M 282,105 C 295,145 306,182 308,220 L 170,212
-                   C 248,198 286,158 282,105 Z"
-                fill="rgba(5,18,40,0.28)" stroke="none"/>
-        </g>
-
-        <!-- ── JIB — smaller 3D plane sweeping to port ──────────────────────  -->
-        <g style="transform-box:fill-box;transform-origin:100% 50%;transform:perspective(360px) rotateY(28deg)">
-          <!-- Jib sail face -->
-          <path d="M 170,35 L 52,210 C 90,205 130,210 170,212 Z"
-                fill="url(#sp-sail-jib)" stroke="rgba(74,179,255,0.10)" stroke-width="0.5" opacity="0.88"/>
-          <!-- Jib leech highlight -->
-          <path d="M 52,210 C 85,207 122,210 152,212 L 170,212
-                   C 130,210 90,207 55,210 Z"
-                fill="rgba(255,255,255,0.10)" stroke="none"/>
-          <!-- Jib leech shadow (far outer edge) -->
-          <path d="M 170,35 L 52,210 L 72,208 C 90,175 120,95 170,38 Z"
-                fill="rgba(5,18,40,0.22)" stroke="none"/>
-        </g>
-
-        <!-- Masthead pennant -->
-        <path d="M 170,22 L 186,16 L 170,10 Z" fill="rgba(0,200,160,0.96)" stroke="none"/>
-
-        <!-- Mast reflection -->
-        <line x1="170" y1="230" x2="170" y2="272"
-              stroke="rgba(165,212,235,0.09)" stroke-width="1.5" stroke-dasharray="3,5"/>
-      </svg>
-    </div>
+    <div class="sp-emblem" aria-hidden="true">⛵</div>
     <div class="sp-title">KEEL</div>
     <div class="sp-sub">Boat Share Club</div>
     <div class="sp-rule"><span>⚓</span></div>
@@ -1221,10 +1077,9 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   </div>
 </div>
 <script>
-// Splash: star field + sailboat animation
+// Generate star field for splash
 (function(){
-  // ── Stars into parallax layer ──────────────────────────────────────────────
-  const starsLayer = document.getElementById('sp-stars-layer');
+  const sp = document.getElementById('splash');
   for(let i=0;i<130;i++){
     const s = document.createElement('div');
     s.className='sp-star';
@@ -1235,76 +1090,8 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
       +'--dl:'+(Math.random()*5).toFixed(1)+'s;'
       +'--lo:'+(Math.random()*.15+.04).toFixed(2)+';'
       +'--hi:'+(Math.random()*.5+.3).toFixed(2)+';';
-    starsLayer.appendChild(s);
+    sp.insertBefore(s,sp.firstChild);
   }
-
-  // ── Sailboat: accelerometer (mobile) + mouse parallax (desktop) ───────────
-  const wrap   = document.getElementById('sp-boat-wrap');
-  const splash = document.getElementById('splash');
-  if (!wrap) return;
-
-  let targetHeel=0, currentHeel=0, bobPhase=0, animActive=true;
-  const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-
-  function onOrientation(e) {
-    if (e.gamma == null) return;
-    targetHeel = Math.max(-32, Math.min(32, e.gamma * 0.75));
-  }
-  window.addEventListener('deviceorientation', onOrientation, true);
-
-  // iOS 13+: must call requestPermission() from a user gesture
-  let gyroRequested = false;
-  function requestGyro() {
-    if (gyroRequested) return;
-    gyroRequested = true;
-    if (typeof DeviceOrientationEvent !== 'undefined' &&
-        typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission()
-        .then(s => { if (s==='granted') window.addEventListener('deviceorientation', onOrientation, true); })
-        .catch(()=>{});
-    }
-  }
-  document.addEventListener('touchstart', requestGyro, { once:true, passive:true });
-  document.addEventListener('click',      requestGyro, { once:true });
-
-  // Desktop: mouse drives ±34° heel — very visible
-  if (!isMobile) {
-    document.addEventListener('mousemove', e => {
-      const cx = window.innerWidth / 2;
-      targetHeel = (e.clientX - cx) / cx * 34;
-    });
-  }
-
-  // ── rAF loop ───────────────────────────────────────────────────────────────
-  function animate() {
-    if (!animActive) return;
-    currentHeel += (targetHeel - currentHeel) * 0.07;
-    bobPhase += 0.009;
-    const bob  = Math.sin(bobPhase) * 5;
-    const roll = Math.sin(bobPhase * 0.58) * 1.2; // gentle lazy roll
-
-    // Stern view: rotateY turns the boat left/right (reveals hull sides),
-    // rotateX tilts slightly down so we look at the stern from just above.
-    // Mouse/gyro drive rotateY — far more intuitive from this angle.
-    const yaw = +(currentHeel * 0.55).toFixed(2);   // heel→yaw mapping
-    const heel = +(roll).toFixed(2);                  // small residual Z roll
-    wrap.style.transform =
-      `perspective(680px) rotateX(6deg) rotateY(${yaw}deg) ` +
-      `translateY(${+bob.toFixed(2)}px) rotateZ(${heel}deg)`;
-
-    // Stars counter-shift opposite yaw so the sky feels fixed
-    if (starsLayer) {
-      starsLayer.style.transform =
-        `translateX(${+(-currentHeel * 1.6).toFixed(2)}px)`;
-    }
-    requestAnimationFrame(animate);
-  }
-  requestAnimationFrame(animate);
-
-  new MutationObserver(() => {
-    animActive = !splash.classList.contains('hidden');
-    if (animActive) requestAnimationFrame(animate);
-  }).observe(splash, { attributes:true, attributeFilter:['class'] });
 })();
 </script>
 
