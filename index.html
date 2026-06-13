@@ -2209,8 +2209,11 @@ async function disconnectWallet(e) {
       await window.keelAppKit.disconnect();
     }
   } catch(_) {}
-  // Show splash
-  document.getElementById("splash").classList.remove("hidden");
+  // Restore splash (clear any inline opacity/pointer overrides set by splashConnect)
+  const sp = document.getElementById("splash");
+  sp.classList.remove("hidden");
+  sp.style.opacity = "";
+  sp.style.pointerEvents = "";
   // Reset all state and restore the Connect button
   provider = null; signer = null; walletAddress = null;
   keelBalance = 0; walletDisplayName = "";
