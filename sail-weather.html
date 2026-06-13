@@ -166,6 +166,12 @@ body.embedded .topbar { padding: 10px 16px; }
 .tide-stat .label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
 .tide-stat .value { font-family: var(--mono); font-size: 13px; color: var(--foam); }
 .tide-stat .sub { font-family: var(--mono); font-size: 10px; color: var(--muted2); margin-top: 2px; }
+.cur-readout { display: flex; align-items: center; gap: 10px; margin-top: 10px; background: rgba(0,200,160,0.06); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.cur-readout svg { flex-shrink: 0; }
+.cur-spd { font-family: var(--mono); font-size: 17px; font-weight: 700; color: var(--foam); }
+.cur-spd small { font-size: 11px; color: var(--muted2); font-weight: 400; }
+.cur-sub { font-family: var(--mono); font-size: 10px; color: var(--muted2); }
+.cur-slack .cur-spd { color: var(--muted2); }
 
 .now-rel { font-family: var(--mono); font-size: 11px; color: var(--muted2); letter-spacing: 0; margin-left: 6px; text-transform: none; }
 .now-rel.future { color: var(--amber); }
@@ -182,6 +188,7 @@ body.embedded .topbar { padding: 10px 16px; }
 .layer-btn.locate-pill { font-size: 17px; padding: 5px 12px; line-height: 1.1; font-weight: 700; }
 #wind-canvas { position: absolute; inset: 0; z-index: 450; pointer-events: none; }
 #cast-canvas { position: absolute; inset: 0; z-index: 440; pointer-events: none; }
+#current-canvas { position: absolute; inset: 0; z-index: 446; pointer-events: none; }
 
 /* ── Rain time scrubber ── */
 .scrub-row {
@@ -231,6 +238,7 @@ body.embedded .topbar { padding: 10px 16px; }
       <div class="hud-controls">
         <button id="btn-wind" class="layer-btn active" onclick="toggleWind()">≋ Wind</button>
         <button id="btn-rain" class="layer-btn active" onclick="toggleRain()">🌧 Rain</button>
+        <button id="btn-cur" class="layer-btn active" onclick="toggleCurrent()" style="display:none">≈ Current</button>
         <span class="hud-spacer"></span>
         <button class="layer-btn locate-pill" onclick="locateMe()" title="Use my location">⌖</button>
       </div>
@@ -247,6 +255,7 @@ body.embedded .topbar { padding: 10px 16px; }
       <div class="tide-head"><h2 id="tide-title">Tides</h2><span class="tide-state" id="tide-state"></span></div>
       <div class="tide-sub" id="tide-sub"></div>
       <div id="tide-body"><div class="loading">Waiting for a location…</div></div>
+      <div id="current-readout"></div>
     </div>
 
     <div class="card">
@@ -907,7 +916,8 @@ async function loadForecast(lat, lon){
   state.fc = fc; state.current = fc.current || {}; state.utcOffset = fc.utc_offset_seconds || 0;
   renderNow(fc, marine);
   renderDays(fc, marine);
-  loadTides(lat, lon); // tide station data uses state.utcOffset, now set above
+  loadTides(lat, lon);    // tide station data uses state.utcOffset, now set above
+  loadCurrents(lat, lon); // tidal-current station, if one is nearby
   document.getElementById("wave-note").textContent = marine
     ? "Wave data: Open-Meteo Marine (significant wave height)."
     : "No wave data for this point (inland or outside marine model coverage) — windows scored on wind alone.";
@@ -1054,6 +1064,7 @@ function showConditions(unixSec){
     calm: "Likely becalmed — not enough wind."
   })[score];
   document.getElementById("verdict").innerHTML = '<div class="verdict ' + score + '">' + msg + '</div>';
+  updateCurrents(unixSec); // tidal current readout tracks the same displayed time
 }
 
 // ── 7-day sailable windows strip ──
@@ -1270,6 +1281,162 @@ function renderTides(st, distNm, preds){
   state2.textContent = rising == null ? "" : (rising ? "rising" : "falling");
   state2.className = "tide-state " + (rising ? "rising" : "falling");
   document.getElementById("tide-sub").textContent = st.name + " · " + distNm + " nm";
+}
+
+// ── Tidal currents (NOAA CO-OPS) ─────────────────────────────────────────────
+// Nearest current-prediction station's slack/max-flood/max-ebb events, cosine-
+// interpolated to a set/drift at any displayed time. Drawn as flow arrows that
+// stream from the station along the current direction, scaled by speed, and a
+// readout in the tide card. Both track the timeline (scrubber / playback / now).
+let curStations = null, curReq = 0, curStation = null, curEvents = [], curVec = null, curOn = true;
+const CUR_MAX_NM = 25, CUR_KN_TO_PX_S = 24, CUR_LIFE_S = 1.5, CUR_RADIUS = 80;
+
+async function loadCurrents(lat, lon){
+  const reqId = ++curReq;
+  curStation = null; curEvents = []; curVec = null;
+  document.getElementById("current-readout").innerHTML = "";
+  document.getElementById("btn-cur").style.display = "none";
+  stopCurrentAnim();
+  try {
+    if(!curStations){
+      const r = await fetch("https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=currentpredictions");
+      if(!r.ok) throw new Error("cur stations " + r.status);
+      curStations = (await r.json()).stations || [];
+    }
+    if(reqId !== curReq) return;
+    let st = null, bd = Infinity;
+    for(const s of curStations){
+      const d = haversineNm(lat, lon, s.lat, s.lng);
+      if(d < bd){ bd = d; st = s; }
+    }
+    if(!st || bd > CUR_MAX_NM) return; // nothing close enough — no current layer
+    const begin = new Date(Date.now() - 12 * 3600e3);
+    const ymd = begin.getUTCFullYear() + String(begin.getUTCMonth() + 1).padStart(2, "0") + String(begin.getUTCDate()).padStart(2, "0");
+    const url = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=currents_predictions&units=english" +
+      "&time_zone=lst_ldt&format=json&begin_date=" + ymd + "&range=48&interval=MAX_SLACK&station=" + st.id;
+    const r2 = await fetch(url);
+    if(!r2.ok) throw new Error("cur preds " + r2.status);
+    const cp = (await r2.json()).current_predictions;
+    if(reqId !== curReq) return;
+    const rows = cp && cp.cp ? cp.cp : [];
+    curEvents = rows.map(e => ({
+      t: Date.parse(e.Time.replace(" ", "T") + "Z") / 1000 - state.utcOffset,
+      v: parseFloat(e.Velocity_Major),
+      fdir: parseFloat(e.meanFloodDir), edir: parseFloat(e.meanEbbDir)
+    })).filter(e => !isNaN(e.t) && !isNaN(e.v));
+    if(curEvents.length < 2) return;
+    curStation = { lat: st.lat, lng: st.lng, name: st.name, distNm: Math.round(bd * 10) / 10 };
+    document.getElementById("btn-cur").style.display = "";
+    document.getElementById("btn-cur").classList.toggle("active", curOn);
+    updateCurrents(Date.now() / 1000);
+    if(curOn) startCurrentAnim();
+  } catch(e){ /* leave the current layer off */ }
+}
+// Signed drift (kn) at time t: + = flood (toward meanFloodDir), − = ebb.
+function currentAt(t){
+  if(curEvents.length < 2) return null;
+  for(let i = 0; i < curEvents.length - 1; i++){
+    const a = curEvents[i], b = curEvents[i + 1];
+    if(t >= a.t && t <= b.t){
+      const mid = (a.v + b.v) / 2, amp = (b.v - a.v) / 2;
+      const v = mid - amp * Math.cos(Math.PI * (t - a.t) / (b.t - a.t));
+      return { speed: Math.abs(v), dir: v >= 0 ? a.fdir : a.edir, flood: v >= 0 };
+    }
+  }
+  return null;
+}
+function updateCurrents(t){
+  if(!curStation || !curEvents.length) return;
+  curVec = currentAt(t);
+  renderCurrentReadout(curVec);
+}
+function renderCurrentReadout(c){
+  const el = document.getElementById("current-readout");
+  if(!c){ el.innerHTML = ""; return; }
+  if(c.speed < 0.1){
+    el.innerHTML = '<div class="cur-readout cur-slack">' +
+      '<svg width="30" height="30" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="none" stroke="#6090b0" stroke-width="2"/></svg>' +
+      '<div><div class="cur-spd">slack <small>water</small></div><div class="cur-sub">' + curStation.name + ' · ' + curStation.distNm + ' nm</div></div></div>';
+    return;
+  }
+  const arrow = '<svg width="30" height="30" viewBox="0 0 24 24" style="transform:rotate(' + Math.round(c.dir) + 'deg)">' +
+    '<path d="M12,3 L12,21 M12,3 L7,9 M12,3 L17,9" stroke="#00c8a0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  el.innerHTML = '<div class="cur-readout">' + arrow +
+    '<div><div class="cur-spd">' + c.speed.toFixed(1) + ' <small>kn</small></div>' +
+    '<div class="cur-sub">' + (c.flood ? "flood" : "ebb") + " · set " + Math.round(c.dir) + "° " + compass(c.dir) + '</div></div></div>';
+}
+function toggleCurrent(){
+  curOn = !curOn;
+  document.getElementById("btn-cur").classList.toggle("active", curOn);
+  if(!curOn) stopCurrentAnim();
+  else if(curStation) startCurrentAnim();
+}
+
+// Flow-arrow animation: particles stream from the station along the current.
+let curCanvas, curCtx, curAnim = null, curParticles = [], lastCurTs = 0;
+function initCurCanvas(){
+  if(curCanvas) return;
+  curCanvas = document.createElement("canvas");
+  curCanvas.id = "current-canvas";
+  map.getContainer().appendChild(curCanvas);
+  curCtx = curCanvas.getContext("2d");
+  sizeCurCanvas();
+  map.on("resize", sizeCurCanvas);
+  map.on("movestart zoomstart", clearCur);
+  map.on("moveend zoomend", () => {
+    if(curOn && curStation){ const p = map.latLngToContainerPoint([curStation.lat, curStation.lng]); seedCurParticles(p.x, p.y); }
+  });
+}
+function sizeCurCanvas(){ const s = map.getSize(); curCanvas.width = s.x; curCanvas.height = s.y; }
+function clearCur(){ if(curCtx) curCtx.clearRect(0, 0, curCanvas.width, curCanvas.height); }
+function seedCurParticles(cx, cy){
+  curParticles = [];
+  for(let i = 0; i < 70; i++){
+    const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * CUR_RADIUS;
+    curParticles.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r, age: Math.random() * CUR_LIFE_S });
+  }
+}
+function startCurrentAnim(){
+  initCurCanvas();
+  const p = map.latLngToContainerPoint([curStation.lat, curStation.lng]);
+  seedCurParticles(p.x, p.y);
+  if(!curAnim) curAnim = requestAnimationFrame(currentLoop);
+}
+function stopCurrentAnim(){
+  if(curAnim){ cancelAnimationFrame(curAnim); curAnim = null; }
+  lastCurTs = 0; curParticles = [];
+  if(curCtx) clearCur();
+}
+function currentLoop(ts){
+  curAnim = requestAnimationFrame(currentLoop);
+  if(!curCanvas) return;
+  const w = curCanvas.width, h = curCanvas.height;
+  if(!curOn || !curStation || !curVec) return;
+  if(!ts) ts = performance.now();
+  let dt = (ts - lastCurTs) / 1000; lastCurTs = ts;
+  if(dt <= 0 || dt > 0.1) dt = 0.016;
+  curCtx.globalCompositeOperation = "destination-in";
+  curCtx.fillStyle = "rgba(0,0,0,0.86)";
+  curCtx.fillRect(0, 0, w, h);
+  curCtx.globalCompositeOperation = "source-over";
+  if(curVec.speed < 0.1) return; // slack: let trails fade out
+  const p = map.latLngToContainerPoint([curStation.lat, curStation.lng]);
+  const cx = p.x, cy = p.y;
+  const rad = curVec.dir * Math.PI / 180, ux = Math.sin(rad), uy = -Math.cos(rad);
+  const spd = curVec.speed * CUR_KN_TO_PX_S;
+  curCtx.strokeStyle = "rgba(0,200,160,0.8)";
+  curCtx.lineWidth = 1.6;
+  for(const part of curParticles){
+    const nx = part.x + ux * spd * dt, ny = part.y + uy * spd * dt;
+    part.age += dt;
+    if(part.age > CUR_LIFE_S || Math.hypot(nx - cx, ny - cy) > CUR_RADIUS){
+      const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * CUR_RADIUS;
+      part.x = cx + Math.cos(a) * r; part.y = cy + Math.sin(a) * r; part.age = 0;
+      continue;
+    }
+    curCtx.beginPath(); curCtx.moveTo(part.x, part.y); curCtx.lineTo(nx, ny); curCtx.stroke();
+    part.x = nx; part.y = ny;
+  }
 }
 
 if(window.self !== window.top) document.body.classList.add("embedded");
