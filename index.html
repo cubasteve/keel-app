@@ -913,10 +913,6 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 .trips-stat-label { font-size:11px; color:var(--muted2); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:6px; }
 .trips-stat-val { font-family:var(--mono); font-size:22px; font-weight:700; }
 
-.trips-connect-prompt { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; gap:14px; text-align:center; }
-.trips-connect-prompt .empty-anchor { font-size:48px; opacity:0.3; }
-.trips-connect-prompt h3 { font-family:var(--display); font-size:18px; color:var(--foam); }
-.trips-connect-prompt p { font-size:13px; color:var(--muted2); max-width:280px; line-height:1.6; }
 
 @media(max-width:900px){
   .trips-summary { grid-template-columns:1fr 1fr; }
@@ -1047,14 +1043,6 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 }
 @keyframes spCompassSpin { to{ transform:rotate(360deg); } }
 
-/* Settings connect prompt */
-#settings-connect-prompt {
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  padding:80px 20px; gap:14px; text-align:center;
-}
-#settings-connect-prompt .empty-anchor { font-size:48px; opacity:.3; }
-#settings-connect-prompt h3 { font-family:var(--display); font-size:18px; color:var(--foam); }
-#settings-connect-prompt p { font-size:13px; color:var(--muted2); max-width:280px; line-height:1.6; }
 </style>
 </head>
 <body>
@@ -1342,14 +1330,6 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
     <!-- TRIPS PAGE -->
     <div class="page center-panel" id="page-trips">
 
-      <!-- Connect prompt (shown when no wallet) -->
-      <div id="trips-connect-prompt" class="trips-connect-prompt" style="display:none">
-        <div class="empty-anchor">⛵</div>
-        <h3>Connect your wallet to view trips</h3>
-        <p>Your upcoming and past voyages will appear here once your wallet is connected.</p>
-      </div>
-
-      <!-- Trips content (shown when wallet connected) -->
       <div id="trips-content" style="display:none">
 
         <!-- Summary stats -->
@@ -1398,14 +1378,6 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
     <!-- KEEL TOKEN PAGE -->
     <div class="page center-panel" id="page-keeltoken">
 
-      <!-- Connect prompt -->
-      <div id="kt-connect-prompt" class="trips-connect-prompt">
-        <div class="empty-anchor">◈</div>
-        <h3>Connect your wallet to view your KEEL</h3>
-        <p>Your token balance, expiration schedule, and usage history will appear here.</p>
-      </div>
-
-      <!-- Content -->
       <div id="kt-content" style="display:none">
 
         <!-- Summary stats -->
@@ -1504,11 +1476,6 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 
     <!-- SETTINGS PAGE -->
     <div class="page center-panel" id="page-settings">
-      <div id="settings-connect-prompt" style="display:none">
-        <div class="empty-anchor">⚓</div>
-        <h3>Connect Your Wallet</h3>
-        <p>Connect your wallet to view and save your member profile.</p>
-      </div>
       <div id="settings-content">
       <div class="settings-grid">
 
@@ -2248,24 +2215,18 @@ async function disconnectWallet(e) {
   provider = null; signer = null; walletAddress = null;
   keelBalance = 0; walletDisplayName = "";
   const expRow = document.getElementById("ms-expiring-row"); if(expRow) expRow.style.display = "none";
-  // Reset Keel Token page
-  document.getElementById("kt-connect-prompt").style.display = "";
+  // Reset page content — splash is the connect gate
   document.getElementById("kt-content").style.display = "none";
   monthlyUsed = 0; monthlyIssued = 0; monthlyCap = MAX_CAP;
-  // Reset settings page to connect prompt
-  document.getElementById("settings-connect-prompt").style.display = "";
-  document.getElementById("settings-content").style.display = "none";
   document.getElementById("settings-display-name").value = "";
   document.getElementById("settings-experience").value   = "";
   document.getElementById("settings-avatar").textContent = "⚓";
   document.getElementById("settings-name-display").textContent = "—";
-  document.getElementById("settings-addr-display").textContent = "Connect wallet to save profile";
+  document.getElementById("settings-addr-display").textContent = "—";
   const spr = document.getElementById("settings-profile-result");
   if(spr){ spr.className = "settings-result"; spr.textContent = ""; }
-  // Reset trips + admin page state
   tripsData = []; tripsLoaded = false;
   resetAdminPage();
-  document.getElementById("trips-connect-prompt").style.display = "";
   document.getElementById("trips-content").style.display = "none";
   // Reset settle panel to blank state
   currentCalc = {};
@@ -3188,12 +3149,7 @@ function switchTripsTab(tab) {
 }
 
 async function loadTripsPage() {
-  if(!walletAddress) {
-    document.getElementById("trips-connect-prompt").style.display = "";
-    document.getElementById("trips-content").style.display = "none";
-    return;
-  }
-  document.getElementById("trips-connect-prompt").style.display = "none";
+  if(!walletAddress) return;
   document.getElementById("trips-content").style.display = "";
 
   // Show loading state
@@ -3395,12 +3351,8 @@ async function cancelTrip(tripId, burnAmt) {
 }
 // ── KEEL TOKEN PAGE ──────────────────────────────────────────────────────────
 async function loadKeelTokenPage() {
-  const prompt  = document.getElementById("kt-connect-prompt");
-  const content = document.getElementById("kt-content");
-  if(!walletAddress) {
-    prompt.style.display = ""; content.style.display = "none"; return;
-  }
-  prompt.style.display = "none"; content.style.display = "";
+  if(!walletAddress) return;
+  document.getElementById("kt-content").style.display = "";
 
   const rp     = getReadProvider();
   const token  = new ethers.Contract(KEEL_TOKEN_ADDRESS, TOKEN_ABI, rp);
@@ -3571,12 +3523,7 @@ async function loadSettingsPage() {
   document.getElementById("settings-ledger-addr").textContent = KEEL_LEDGER_ADDRESS.slice(0,10)+"…"+KEEL_LEDGER_ADDRESS.slice(-6);
   document.getElementById("settings-balance").textContent = keelBalance > 0 ? keelBalance.toFixed(2)+" KEEL" : "—";
 
-  if(!walletAddress) {
-    document.getElementById("settings-connect-prompt").style.display = "";
-    document.getElementById("settings-content").style.display = "none";
-    return;
-  }
-  document.getElementById("settings-connect-prompt").style.display = "none";
+  if(!walletAddress) return;
   document.getElementById("settings-content").style.display = "";
 
   document.getElementById("settings-wallet-addr").textContent = walletAddress.slice(0,10)+"…"+walletAddress.slice(-6);
