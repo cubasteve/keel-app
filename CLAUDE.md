@@ -52,6 +52,24 @@ A working end-to-end usage + reservation system:
 - Views: `expiringWithin(member, window)`, `pendingExpiry(member)`, `nextExpiryAt(member)`.
 - Dashboard "This Month" card shows an **Expiring Soon** row (30-day window) when nonzero.
 
+## Tokenomics — per-member ownership share (built)
+
+The token uses **per-member, ownership-share allocation** (upgraded 2025-06-14, supersedes the old flat 100/month + 300 cap):
+- `memberAllocation[m]` = the member's **ownership share** = their **monthly allocation**. Wallet cap = **share × 3** (three months' worth). E.g. a 20-KEEL member gets up to 20/month, cap 60.
+- Members with no share set (legacy) **fall back to the global** `monthlyAllocation` (100) / `walletCap` (300) — fully backward compatible.
+- Contract fns: `onboardMember(member, allocation, year, month)` (sets share + mints it), `setMemberAllocation(member, allocation)` (admin), views `allocationOf(m)` / `capOf(m)`. `issueMonthlyAllocation` + `mintMonthlyAllocation` enforce per-member limits.
+- **Admin UI:** onboarding wizard has an "Initial KEEL (ownership share)" field → `onboardMember`. Batch mint is a per-member grid (Load Members → edit amounts → Mint All via `mintMonthlyAllocation`). Member Balances list has a per-row **Share input + Set** (calls `setMemberAllocation`) to move legacy members onto the share model.
+
+## Gasless relayer (built, live)
+
+Members transact **without POL** — they sign an EIP-712 message and a Cloudflare Worker pays the gas:
+- Worker at **https://keel-relayer.keel-app.workers.dev** (`relayer/worker.js`, ethers v6) verifies the member's signature then submits `logAndSettle` / `cancelTrip` / `setMemberProfile`. Secret `RELAYER_KEY` set via `wrangler secret put` (never in repo). Deploy: `cd relayer && npm install && npx wrangler deploy`.
+- **Relayer wallet `0x1c13DB2d82da0220594BdBb96D30eF6a4Ba304Ff`** holds `OPERATOR_ROLE` (granted via `scripts/grant-operator-role.js`) and is funded with POL for gas — **keep it topped up**.
+- Frontend toggle: `KEEL_RELAYER_ENDPOINT` in `keel-core.js` (set = gasless on, `""` = members pay their own gas). `relaySigned()` in index.html; `RELAY_DOMAIN`/`RELAY_TYPES` must stay byte-identical to the worker.
+- No contract change was needed (operator-on-behalf already existed; `member` is an explicit param so reads attribute to the member, not the relayer).
+
+**Gas split:** member actions → relayer wallet (`0x1c13…04Ff`). Admin actions (onboarding, batch mint, set-share, upgrades) → deployer/admin `0xa953cF5c65EA74c66d874186D3832E398d388660`. Keep POL in both.
+
 ## Current state
 
 - Contract v5 is **deployed and live** at the address above, and **LEDGER_ROLE has been granted** to it (confirmed: `✓ LEDGER_ROLE granted.`).

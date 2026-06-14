@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-14m";
+    const APP_VERSION = "2025-06-14n";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-14m"></script>
+<script src="keel-core.js?v=2025-06-14n"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -3972,6 +3972,36 @@ function renderAdminTrips() {
 // Load every member into the batch grid with their monthly allocation (share)
 // pre-filled (clamped to remaining cap space, 0 if already issued this month).
 let _batchRows = [];
+let _memberRows = [];
+
+// Set/override a member's ownership share (monthly allocation; cap becomes 3x).
+// Lets existing members move off the default 100/300 onto the share model.
+async function adminSetShare(i){
+  const r = _memberRows[i]; if(!r) return;
+  if(!signer){ showStatus("Connect your admin wallet first.","error"); setTimeout(clearStatus,4000); return; }
+  const val = parseFloat(document.getElementById("mshare-"+i)?.value);
+  if(!(val >= 0)){ showStatus("Enter a share amount (KEEL).","error"); setTimeout(clearStatus,4000); return; }
+  try {
+    const token = new ethers.Contract(KEEL_TOKEN_ADDRESS, TOKEN_ABI, signer);
+    const AMOY_MIN_TIP = ethers.utils.parseUnits("30","gwei");
+    const fee = await provider.getFeeData().catch(()=>({}));
+    const prio   = (fee.maxPriorityFeePerGas?.gt(AMOY_MIN_TIP)) ? fee.maxPriorityFeePerGas : AMOY_MIN_TIP;
+    const maxFee = (fee.maxFeePerGas?.gt(prio)) ? fee.maxFeePerGas : prio.add(ethers.utils.parseUnits("20","gwei"));
+    const who = r.displayName || (r.addr.slice(0,6)+"…"+r.addr.slice(-4));
+    showStatus("Approve in wallet — setting "+who+"'s share…","pending");
+    walletPromptShow();
+    let tx; try {
+      tx = await token.setMemberAllocation(r.addr, ethers.utils.parseUnits(String(val),18),
+        { maxPriorityFeePerGas: prio, maxFeePerGas: maxFee });
+    } finally { walletPromptHide(); }
+    showStatus("Confirming…","pending");
+    await tx.wait();
+    showStatus("✓ "+who+" share set to "+val.toFixed(0)+" (cap "+(val*3).toFixed(0)+").","success");
+    setTimeout(clearStatus,4000);
+    await adminLoadMemberBalances();
+  } catch(e){ showStatus("Set share failed: "+(e.reason||e.message),"error"); setTimeout(clearStatus,5000); }
+}
+
 async function adminLoadBatchGrid() {
   const grid = document.getElementById("admin-batch-grid");
   const loadBtn = document.getElementById("admin-batch-load");
@@ -4111,8 +4141,8 @@ async function adminLoadMemberBalances() {
       addrs.push(...got);
     }
 
-    // Fetch profiles + balances + monthly minted in parallel
-    const [profiles, balances, mintedArr] = await Promise.all([
+    // Fetch profiles + balances + monthly minted + per-member share/cap in parallel
+    const [profiles, balances, mintedArr, rawShares, caps] = await Promise.all([
       Promise.all(addrs.map(a => ledger.memberProfiles(a).catch(()=>null))),
       Promise.all(addrs.map(a => token.balanceOf(a).catch(()=>ethers.BigNumber.from(0)))),
       Promise.all(addrs.map(a => {
@@ -4120,23 +4150,28 @@ async function adminLoadMemberBalances() {
           ["address","uint256","uint256"], [a, now.getFullYear(), now.getMonth()+1]
         );
         return token.monthlyMinted(key).catch(()=>ethers.BigNumber.from(0));
-      }))
+      })),
+      Promise.all(addrs.map(a => token.memberAllocation(a).catch(()=>ethers.BigNumber.from(0)))),
+      Promise.all(addrs.map(a => token.capOf(a).catch(()=>ethers.BigNumber.from(0))))
     ]);
 
-    const rows = addrs.map((addr, i) => ({
+    _memberRows = addrs.map((addr, i) => ({
       addr,
       displayName:     profiles[i]?.displayName     || "",
       experienceLevel: profiles[i]?.experienceLevel || "",
       memberSince:     Number(profiles[i]?.memberSince || 0),
       balance:         parseFloat(ethers.utils.formatUnits(balances[i], 18)),
       monthlyMinted:   parseFloat(ethers.utils.formatUnits(mintedArr[i], 18)),
+      shareRaw:        parseFloat(ethers.utils.formatUnits(rawShares[i], 18)),
+      cap:             parseFloat(ethers.utils.formatUnits(caps[i], 18)),
+      isCustom:        rawShares[i].gt(0),
     })).sort((a, b) => b.balance - a.balance);
 
     el.innerHTML = `<table class="admin-trips-table">
       <thead><tr>
-        <th>Member</th><th>Experience</th><th>Balance</th><th>Issued This Month</th><th>Member Since</th>
+        <th>Member</th><th>Balance / Cap</th><th>Issued</th><th>Share (monthly)</th><th>Since</th>
       </tr></thead>
-      <tbody>${rows.map(r => {
+      <tbody>${_memberRows.map((r, i) => {
         const short = r.addr.slice(0,6)+"…"+r.addr.slice(-4);
         const nameDisplay = r.displayName
           ? `<span style="color:var(--foam);font-weight:600">${r.displayName}</span><br><span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${short}</span>`
@@ -4145,14 +4180,20 @@ async function adminLoadMemberBalances() {
           ? new Date(r.memberSince*1000).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})
           : "—";
         return `<tr>
-          <td>${nameDisplay}</td>
-          <td>${r.experienceLevel || '<span style="color:var(--muted)">—</span>'}</td>
-          <td style="font-family:var(--mono);color:var(--teal);font-weight:700">${r.balance.toFixed(2)}</td>
-          <td style="font-family:var(--mono);color:var(--accent)">${r.monthlyMinted.toFixed(0)} KEEL</td>
-          <td style="font-size:12px;color:var(--muted2)">${since}</td>
+          <td data-label="Member">${nameDisplay}</td>
+          <td data-label="Balance / Cap" style="font-family:var(--mono);font-weight:700"><span style="color:var(--teal)">${r.balance.toFixed(2)}</span><span style="color:var(--muted)"> / ${r.cap.toFixed(0)}</span></td>
+          <td data-label="Issued" style="font-family:var(--mono);color:var(--accent)">${r.monthlyMinted.toFixed(0)}</td>
+          <td data-label="Share (monthly)">
+            <span style="display:inline-flex;align-items:center;gap:6px;justify-content:flex-end">
+              <input class="inp" id="mshare-${i}" type="number" min="0" step="1" value="${r.isCustom ? r.shareRaw.toFixed(0) : ''}" placeholder="${r.isCustom ? '' : '100*'}" style="width:60px;text-align:right;font-family:var(--mono);font-size:12px;padding:6px 8px">
+              <button class="btn-admin btn-admin-primary" style="width:auto;padding:6px 11px;font-size:11px;margin-top:0" onclick="adminSetShare(${i})">Set</button>
+            </span>
+          </td>
+          <td data-label="Since" style="font-size:12px;color:var(--muted2)">${since}</td>
         </tr>`;
       }).join("")}</tbody>
-    </table>`;
+    </table>
+    <p style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5">Share = monthly allocation (their ownership share); wallet cap = 3×. <strong>100*</strong> = no custom share set (using the default). Set a share to switch a member to the ownership model.</p>`;
   } catch(e) {
     console.error("member balances failed", e);
     el.innerHTML = '<div class="empty-state" style="padding:20px 0"><div class="empty-anchor">⚓</div><div class="empty-title">Failed to load</div></div>';
