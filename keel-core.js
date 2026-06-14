@@ -31,7 +31,7 @@ const MONTHLY_ISSUED = 100; // KEEL issued per member per month (matches token c
 // ── Gasless relayer (members sign, the relayer pays gas) ──────────────────────
 // Empty = disabled (app uses normal member-paid transactions). Set this to the
 // deployed keel-relayer Worker URL to turn on gasless member actions.
-const KEEL_RELAYER_ENDPOINT = "";
+const KEEL_RELAYER_ENDPOINT = "https://keel-relayer.keel-app.workers.dev";
 // EIP-712 domain + types — MUST stay byte-for-byte identical to relayer/worker.js.
 const RELAY_DOMAIN = { name: "KeelUsageLedger", version: "1", chainId: AMOY_CHAIN_ID, verifyingContract: KEEL_LEDGER_ADDRESS };
 const RELAY_TYPES = {
