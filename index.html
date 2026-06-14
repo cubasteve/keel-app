@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-14h";
+    const APP_VERSION = "2025-06-14i";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-14h"></script>
+<script src="keel-core.js?v=2025-06-14i"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -916,6 +916,11 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 .onb-scanner-title { font-family:var(--display); font-size:16px; color:var(--foam); margin-bottom:14px; }
 #onb-video { width:100%; border-radius:12px; background:#000; aspect-ratio:1/1; object-fit:cover; }
 .onb-scanner-hint { font-size:12px; color:var(--muted2); margin:12px 0 16px; line-height:1.5; }
+.settings-manual-box { background:var(--surface3); border:1px solid var(--border); border-radius:12px; padding:14px 16px; margin-bottom:14px; }
+.settings-manual-title { font-size:12px; font-weight:700; color:var(--foam); margin-bottom:10px; }
+.settings-manual-steps { margin:0; padding-left:18px; display:flex; flex-direction:column; gap:7px; }
+.settings-manual-steps li { font-size:12px; color:var(--muted2); line-height:1.5; }
+.settings-manual-steps strong { color:var(--text); }
 /* ── TRIPS PAGE ─────────────────────────────────────────────────────────── */
 .page { display:none; }
 .page.active { display:block; }
@@ -1634,13 +1639,24 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
         <div class="settings-card" style="grid-column:1/-1">
           <div class="settings-card-title">⬡ See KEEL in Your Wallet</div>
           <p style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6">
-            Your balance always shows here in the app. To also see it in your wallet app, add the Polygon Amoy network and the KEEL token. One-tap works when this page is open inside your wallet's built-in browser; otherwise add them manually using the details below.
+            Your balance always shows here in the app. Adding KEEL to your wallet app is optional. <strong>One-tap add works on desktop MetaMask</strong>; <strong>MetaMask mobile usually blocks auto-adding testnet tokens</strong>, so on a phone use the quick manual steps below — it takes about 20 seconds.
           </p>
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
             <button class="btn-continue" style="flex:1;min-width:160px;padding:11px;font-size:12px" onclick="settingsAddNetwork(this)">➕ Add Polygon Amoy</button>
             <button class="btn-continue" style="flex:1;min-width:160px;padding:11px;font-size:12px" onclick="settingsAddToken(this)">➕ Add KEEL Token</button>
           </div>
           <div class="admin-result" id="settings-wallet-add-result" style="margin-bottom:14px"></div>
+
+          <div class="settings-manual-box">
+            <div class="settings-manual-title">📲 Add manually (works on any wallet)</div>
+            <ol class="settings-manual-steps">
+              <li>In your wallet, switch the network to <strong>Polygon Amoy</strong>.</li>
+              <li>Open <strong>Import tokens → Custom token</strong>.</li>
+              <li>Paste the <strong>token contract address</strong> below (symbol &amp; decimals auto-fill).</li>
+              <li>Confirm — KEEL now shows in your wallet.</li>
+            </ol>
+          </div>
+
           <div class="settings-info-row"><span class="settings-info-label">Network</span><span class="settings-info-val">Polygon Amoy</span></div>
           <div class="settings-info-row"><span class="settings-info-label">Chain ID</span><span class="settings-info-val">80002</span></div>
           <div class="settings-info-row"><span class="settings-info-label">Symbol</span><span class="settings-info-val">KEEL</span></div>
