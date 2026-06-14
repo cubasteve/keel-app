@@ -8,7 +8,6 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>KEEL Token — Boat Share</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
   // ── EDIT THIS: your Reown project ID from dashboard.reown.com ──
   // Also add your deployed domain to the project's allowed origins, or mobile
@@ -137,51 +136,6 @@ body {
   position: relative;
 }
 body.splash-active { overflow: hidden; }
-body.setup-active  { overflow: hidden; }
-/* ── Wallet Setup Screen (onboarding ?setup=1) ─────────────────────────── */
-#setup-screen {
-  position:fixed; inset:0; z-index:99999; display:none;
-  background:radial-gradient(120% 100% at 50% 0%, #0e2247 0%, #081530 55%, #050d1f 100%);
-  overflow-y:auto; -webkit-overflow-scrolling:touch;
-}
-#setup-screen.show { display:block; }
-.setup-wrap { max-width:420px; margin:0 auto; padding:32px 22px 48px; min-height:100%; box-sizing:border-box; display:flex; flex-direction:column; }
-.setup-logo { text-align:center; font-size:44px; margin-bottom:6px; }
-.setup-title { text-align:center; font-family:var(--display); font-size:24px; font-weight:800; color:var(--foam); letter-spacing:1px; margin-bottom:4px; }
-.setup-sub { text-align:center; font-size:13px; color:var(--muted2); margin-bottom:26px; line-height:1.6; }
-.setup-card { background:rgba(13,28,54,0.7); border:1px solid var(--border); border-radius:18px; padding:22px; margin-bottom:16px; }
-.setup-card-title { font-family:var(--display); font-size:15px; font-weight:700; color:var(--foam); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
-.setup-card-text { font-size:13px; color:var(--muted2); line-height:1.6; margin-bottom:16px; }
-.setup-steps { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:12px; }
-.setup-step { display:flex; align-items:center; gap:12px; font-size:14px; color:var(--text); transition:opacity 0.3s; }
-.setup-step .sicon { width:30px; height:30px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; background:var(--surface3); color:var(--muted2); transition:all 0.3s; }
-.setup-step.active  .sicon { background:linear-gradient(135deg,var(--brass2),var(--brass)); color:#fff; box-shadow:0 0 14px rgba(212,168,64,0.45); }
-.setup-step.done    .sicon { background:var(--teal); color:#fff; }
-.setup-step.failed  .sicon { background:var(--danger); color:#fff; }
-.setup-step .stext small { display:block; font-size:11px; color:var(--muted2); margin-top:1px; }
-.setup-btn { font-family:var(--sans); font-weight:700; font-size:15px; padding:15px 20px; border-radius:12px; border:none; cursor:pointer; width:100%; transition:all 0.2s; }
-.setup-btn-primary { background:linear-gradient(135deg,#0a4090,var(--accent)); color:#fff; box-shadow:0 6px 20px rgba(74,179,255,0.3); }
-.setup-btn-primary:active { transform:translateY(1px); }
-.setup-btn-primary:disabled { opacity:0.5; }
-.setup-btn-ghost { background:transparent; color:var(--muted2); border:1px solid var(--border); margin-top:10px; font-weight:600; font-size:13px; padding:12px; }
-.setup-wallet-btns { display:flex; flex-direction:column; gap:10px; margin-bottom:6px; }
-.setup-wallet-btn { display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:12px; background:var(--surface3); border:1px solid var(--border); color:var(--text); font-size:14px; font-weight:600; text-decoration:none; transition:all 0.2s; }
-.setup-wallet-btn:active { transform:translateY(1px); background:rgba(74,179,255,0.08); }
-.setup-wallet-btn .wemoji { font-size:22px; }
-.setup-wallet-btn .warrow { margin-left:auto; color:var(--muted2); }
-.setup-url-row { display:flex; gap:8px; margin-top:14px; }
-.setup-url-row input { flex:1; background:var(--surface3); border:1px solid var(--border); border-radius:10px; padding:11px 12px; color:var(--text); font-family:var(--mono); font-size:12px; }
-.setup-url-row button { background:var(--surface3); border:1px solid var(--border); border-radius:10px; padding:0 16px; color:var(--brass); font-weight:700; font-size:13px; cursor:pointer; }
-.setup-result { margin-top:14px; padding:12px 14px; border-radius:10px; font-size:13px; display:none; line-height:1.5; }
-.setup-result.success { background:rgba(0,200,160,0.1); border:1px solid rgba(0,200,160,0.3); color:var(--teal); display:block; }
-.setup-result.error   { background:rgba(255,83,112,0.1); border:1px solid rgba(255,83,112,0.3); color:var(--danger); display:block; }
-.setup-result.info    { background:rgba(74,179,255,0.08); border:1px solid rgba(74,179,255,0.2); color:var(--accent); display:block; }
-.setup-field-label { font-size:11px; font-weight:600; color:var(--muted2); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:6px; }
-.setup-meta { margin-top:14px; }
-.setup-meta-row { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:13px; }
-.setup-meta-row:last-child { border-bottom:none; }
-.setup-meta-row span { color:var(--muted2); }
-.setup-meta-row b { color:var(--text); font-family:var(--mono); }
 body::before {
   content: '';
   position: fixed;
@@ -883,36 +837,6 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 .admin-badge.cancelled { background:rgba(255,83,112,0.08); color:var(--danger); }
 .admin-badge.active-now{ background:rgba(212,168,64,0.12); color:var(--brass); }
 @media(max-width:900px){ .admin-grid { grid-template-columns:1fr; } .admin-row { grid-template-columns:1fr; } }
-/* ── Member Onboarding Wizard ──────────────────────────────────────────── */
-.onboard-steps { display:flex; align-items:center; margin-bottom:24px; }
-.onboard-step  { display:flex; align-items:center; }
-.onboard-step-dot { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; transition:all 0.3s; }
-.onboard-step-dot.pending { background:var(--surface3); color:var(--muted2); }
-.onboard-step-dot.active  { background:linear-gradient(135deg,var(--brass2),var(--brass)); color:#fff; box-shadow:0 0 12px rgba(212,168,64,0.4); }
-.onboard-step-dot.done    { background:var(--teal); color:#fff; }
-.onboard-step-label { font-size:11px; color:var(--muted2); margin-left:7px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; }
-.onboard-step-label.active { color:var(--brass); }
-.onboard-step-label.done   { color:var(--teal); }
-.onboard-connector { flex:1; height:2px; background:var(--surface3); margin:0 10px; border-radius:2px; min-width:12px; }
-.onboard-connector.done { background:var(--teal); }
-.onboard-panel { display:none; }
-.onboard-panel.active { display:block; }
-.onboard-qr-wrap { display:flex; justify-content:center; margin:18px 0; }
-.onboard-qr-box  { padding:14px; background:#fff; border-radius:14px; box-shadow:0 4px 28px rgba(0,0,0,0.35); display:inline-block; line-height:0; }
-.onboard-instructions { list-style:none; padding:0; margin:0 0 20px; display:flex; flex-direction:column; gap:9px; }
-.onboard-instructions li { display:flex; align-items:flex-start; gap:10px; font-size:13px; color:var(--text); line-height:1.5; }
-.onboard-instructions li .num { width:20px; height:20px; border-radius:50%; background:var(--surface3); color:var(--brass); font-weight:700; font-size:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
-.onboard-addr-row { display:flex; gap:8px; }
-.onboard-addr-row .inp { flex:1; }
-.onboard-preview { background:var(--surface3); border-radius:12px; padding:12px 16px; margin-bottom:16px; }
-.onboard-preview-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:13px; }
-.onboard-preview-row:last-child { border-bottom:none; }
-.onboard-preview-label { color:var(--muted2); }
-.onboard-preview-val   { font-weight:700; color:var(--text); font-family:var(--mono); }
-.onboard-success { text-align:center; padding:20px 0 10px; }
-.onboard-success-icon  { font-size:44px; margin-bottom:12px; }
-.onboard-success-title { font-family:var(--display); font-size:20px; color:var(--teal); margin-bottom:8px; }
-.onboard-success-sub   { font-size:13px; color:var(--muted2); margin-bottom:20px; line-height:1.6; }
 /* ── TRIPS PAGE ─────────────────────────────────────────────────────────── */
 .page { display:none; }
 .page.active { display:block; }
@@ -1153,63 +1077,6 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
     </svg>
   </div>
 </div>
-<!-- ── WALLET SETUP SCREEN (onboarding, shown when URL has ?setup=1) ──────── -->
-<div id="setup-screen">
-  <div class="setup-wrap">
-    <div class="setup-logo">⛵</div>
-    <div class="setup-title">Welcome Aboard</div>
-    <div class="setup-sub">Let's add the <strong style="color:var(--brass)">KEEL token</strong> to your wallet so you can see your balance.</div>
-
-    <!-- Path A: injected provider present — run config directly -->
-    <div class="setup-card" id="setup-injected" style="display:none">
-      <div class="setup-card-title">🔗 One tap to set up</div>
-      <div class="setup-card-text">Tap below and approve the two prompts in your wallet — first to add the <strong>Polygon Amoy</strong> network, then to add the <strong>KEEL</strong> token.</div>
-      <ul class="setup-steps" id="setup-steps">
-        <li class="setup-step" id="setup-step-net"><span class="sicon">1</span><span class="stext">Add Polygon Amoy network<small>The test network KEEL runs on</small></span></li>
-        <li class="setup-step" id="setup-step-tok"><span class="sicon">2</span><span class="stext">Add KEEL token<small>So your balance shows in your wallet</small></span></li>
-      </ul>
-      <div class="setup-result" id="setup-result"></div>
-      <button class="setup-btn setup-btn-primary" id="setup-run-btn" onclick="setupRunConfig()" style="margin-top:18px">Add to my wallet</button>
-      <button class="setup-btn setup-btn-ghost" onclick="setupContinue()">Skip — continue to app</button>
-    </div>
-
-    <!-- Path B: no injected provider — guide to open in wallet's browser -->
-    <div class="setup-card" id="setup-noinjected" style="display:none">
-      <div class="setup-card-title">📲 Open in your wallet's browser</div>
-      <div class="setup-card-text">To add the network and token, this page needs to run <strong>inside your wallet app</strong>. Tap your wallet below — it'll reopen this page there and finish setup automatically.</div>
-      <div class="setup-wallet-btns">
-        <a class="setup-wallet-btn" id="setup-link-mm" target="_blank" rel="noopener"><span class="wemoji">🦊</span> MetaMask <span class="warrow">→</span></a>
-        <a class="setup-wallet-btn" id="setup-link-cb" target="_blank" rel="noopener"><span class="wemoji">🔵</span> Coinbase Wallet <span class="warrow">→</span></a>
-        <a class="setup-wallet-btn" id="setup-link-tw" target="_blank" rel="noopener"><span class="wemoji">🛡️</span> Trust Wallet <span class="warrow">→</span></a>
-      </div>
-      <div class="setup-card-text" style="margin:16px 0 0">Using a different wallet? Copy this link and open it in your wallet app's built-in browser:</div>
-      <div class="setup-url-row">
-        <input id="setup-url-input" readonly>
-        <button onclick="setupCopyUrl(this)">Copy</button>
-      </div>
-    </div>
-
-    <!-- Manual import — always works in any wallet -->
-    <div class="setup-card">
-      <div class="setup-card-title">✍️ Or add KEEL manually</div>
-      <div class="setup-card-text">Works in any wallet. In your wallet, switch to <strong>Polygon Amoy</strong>, open <em>Import / Add custom token</em>, and paste this contract address:</div>
-      <div class="setup-field-label">KEEL Token Contract</div>
-      <div class="setup-url-row">
-        <input id="setup-contract-input" readonly>
-        <button onclick="setupCopyContract(this)">Copy</button>
-      </div>
-      <div class="setup-meta">
-        <div class="setup-meta-row"><span>Network</span><b>Polygon Amoy</b></div>
-        <div class="setup-meta-row"><span>Chain ID</span><b>80002</b></div>
-        <div class="setup-meta-row"><span>Symbol</span><b>KEEL</b></div>
-        <div class="setup-meta-row"><span>Decimals</span><b>18</b></div>
-      </div>
-      <button class="setup-btn setup-btn-ghost" onclick="setupContinue()" style="margin-top:16px">Continue to app →</button>
-    </div>
-
-  </div>
-</div>
-
 <script>
 // Generate star field for splash
 (function(){
@@ -1691,124 +1558,6 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 
       <!-- Admin content -->
       <div id="admin-content" style="display:none">
-
-        <!-- Member Onboarding Wizard -->
-        <div class="admin-card" id="admin-onboard-card" style="margin-bottom:20px">
-          <div class="admin-card-title">🧭 Member Onboarding</div>
-
-          <!-- Step indicator -->
-          <div class="onboard-steps">
-            <div class="onboard-step">
-              <div class="onboard-step-dot active" id="onboard-dot-1">1</div>
-              <span class="onboard-step-label active" id="onboard-lbl-1">Wallet Setup</span>
-            </div>
-            <div class="onboard-connector" id="onboard-con-1"></div>
-            <div class="onboard-step">
-              <div class="onboard-step-dot pending" id="onboard-dot-2">2</div>
-              <span class="onboard-step-label" id="onboard-lbl-2">Address</span>
-            </div>
-            <div class="onboard-connector" id="onboard-con-2"></div>
-            <div class="onboard-step">
-              <div class="onboard-step-dot pending" id="onboard-dot-3">3</div>
-              <span class="onboard-step-label" id="onboard-lbl-3">Profile</span>
-            </div>
-            <div class="onboard-connector" id="onboard-con-3"></div>
-            <div class="onboard-step">
-              <div class="onboard-step-dot pending" id="onboard-dot-4">✓</div>
-              <span class="onboard-step-label" id="onboard-lbl-4">Done</span>
-            </div>
-          </div>
-
-          <!-- Step 1: QR for member to scan -->
-          <div class="onboard-panel active" id="onboard-panel-1">
-            <p style="font-size:13px;color:var(--muted2);margin-bottom:16px;line-height:1.6">
-              Have the new member scan this QR with their phone camera. It opens the KEEL app and automatically prompts them to add the <strong style="color:var(--accent)">Polygon Amoy</strong> network and the <strong style="color:var(--brass)">KEEL token</strong> to their wallet — so they can see their balance right away.
-            </p>
-            <div class="onboard-qr-wrap">
-              <div class="onboard-qr-box" id="onboard-qr-canvas"></div>
-            </div>
-            <ul class="onboard-instructions">
-              <li><span class="num">1</span>Member opens their phone camera and scans the QR code above</li>
-              <li><span class="num">2</span>The KEEL app opens in their browser</li>
-              <li><span class="num">3</span>They tap <em>Connect Wallet</em> and approve in MetaMask or their wallet app</li>
-              <li><span class="num">4</span>App prompts to add <strong>Polygon Amoy</strong> network — they approve</li>
-              <li><span class="num">5</span>App prompts to add <strong>KEEL</strong> as a custom token — they approve</li>
-              <li><span class="num">6</span>They can now see their KEEL balance in their wallet</li>
-            </ul>
-            <button class="btn-admin btn-admin-primary" onclick="onboardGoTo(2)">Member's wallet is ready →</button>
-          </div>
-
-          <!-- Step 2: Enter member's wallet address -->
-          <div class="onboard-panel" id="onboard-panel-2">
-            <p style="font-size:13px;color:var(--muted2);margin-bottom:16px;line-height:1.6">
-              Enter the member's wallet address. They can find it in their wallet app — tap their account name to copy it.
-            </p>
-            <div style="margin-bottom:14px">
-              <label style="font-size:11px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:6px">Member Wallet Address</label>
-              <input class="inp" id="onboard-addr" placeholder="0x…" autocomplete="off" oninput="onboardAddrInput()" style="width:100%;box-sizing:border-box">
-            </div>
-            <div class="admin-result" id="onboard-addr-result" style="margin-bottom:12px"></div>
-            <div style="display:flex;gap:10px">
-              <button class="btn-admin btn-admin-primary" style="flex:1" onclick="onboardGoTo(1)">← Back</button>
-              <button class="btn-admin btn-admin-gold" style="flex:2" id="onboard-addr-next" onclick="onboardGoTo(3)" disabled>Next →</button>
-            </div>
-          </div>
-
-          <!-- Step 3: Profile + Review -->
-          <div class="onboard-panel" id="onboard-panel-3">
-            <div style="margin-bottom:14px">
-              <label style="font-size:11px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:6px">Display Name</label>
-              <input class="inp" id="onboard-name" placeholder="e.g. Steve C." autocomplete="off" oninput="onboardUpdatePreview()" style="width:100%;box-sizing:border-box">
-            </div>
-            <div style="margin-bottom:16px">
-              <label style="font-size:11px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:6px">Experience Level</label>
-              <select class="inp" id="onboard-exp" onchange="onboardUpdatePreview()" style="width:100%">
-                <option value="Novice">Novice</option>
-                <option value="Intermediate">Intermediate</option>
-                <option value="Advanced">Advanced</option>
-                <option value="Captain">Captain</option>
-              </select>
-            </div>
-            <div class="onboard-preview">
-              <div class="onboard-preview-row">
-                <span class="onboard-preview-label">Wallet</span>
-                <span class="onboard-preview-val" id="onboard-prev-addr">—</span>
-              </div>
-              <div class="onboard-preview-row">
-                <span class="onboard-preview-label">Display Name</span>
-                <span class="onboard-preview-val" id="onboard-prev-name">—</span>
-              </div>
-              <div class="onboard-preview-row">
-                <span class="onboard-preview-label">Experience</span>
-                <span class="onboard-preview-val" id="onboard-prev-exp">Novice</span>
-              </div>
-              <div class="onboard-preview-row">
-                <span class="onboard-preview-label">Initial Mint</span>
-                <span class="onboard-preview-val" style="color:var(--teal)">100 KEEL</span>
-              </div>
-              <div class="onboard-preview-row">
-                <span class="onboard-preview-label">Transactions</span>
-                <span class="onboard-preview-val" style="color:var(--muted2)">2 — approve both in wallet</span>
-              </div>
-            </div>
-            <div class="admin-result" id="onboard-exec-result" style="margin-bottom:12px"></div>
-            <div style="display:flex;gap:10px">
-              <button class="btn-admin btn-admin-primary" style="flex:1" onclick="onboardGoTo(2)">← Back</button>
-              <button class="btn-admin btn-admin-gold" style="flex:2" id="onboard-exec-btn" onclick="onboardExecute()">⚡ Create Profile & Mint</button>
-            </div>
-          </div>
-
-          <!-- Step 4: Success -->
-          <div class="onboard-panel" id="onboard-panel-4">
-            <div class="onboard-success">
-              <div class="onboard-success-icon">⚓</div>
-              <div class="onboard-success-title">Member Onboarded!</div>
-              <div class="onboard-success-sub" id="onboard-success-text">Profile created and initial KEEL issued.</div>
-            </div>
-            <button class="btn-admin btn-admin-primary" onclick="onboardReset()">Onboard Another Member</button>
-          </div>
-
-        </div><!-- /onboarding card -->
 
         <!-- Row 1: Batch Mint + Member Balances -->
         <div class="admin-grid">
@@ -2372,8 +2121,6 @@ window.keelOnAppKitAccount = async function(addr){
     window.__keelViaWalletConnect = true;
     try { captureWalletLink(eip1193); } catch(_){}
     await finishConnect();
-    // Close the Reown modal — on mobile it stays open after the wallet returns to the browser
-    try { if(window.keelAppKit?.isOpen?.()) window.keelAppKit.close(); } catch(_) {}
     // Re-run balance + display name after a delay — chain switch needs a moment
     // to settle, and this also acts as a safety net if the first fetch failed.
     setTimeout(async () => {
@@ -3255,7 +3002,6 @@ window.addEventListener("resize", ()=>{
 });
 
 window.addEventListener("load",()=>{
-  setupInit(); // onboarding ?setup=1 — show wallet-setup screen if present
   const today = todayKey(); // ET YYYY-MM-DD
   document.getElementById("trip-date").value = today;
   document.getElementById("cal-trigger-text").textContent =
@@ -3903,7 +3649,6 @@ async function loadAdminPage() {
   }
 
   denied.style.display = "none"; content.style.display = "";
-  onboardInitQR();
 
   // Default mint month to current month
   const now = new Date();
@@ -4300,263 +4045,6 @@ function addToCalendar(startTs, endTs, typeLabel, burnAmt) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
-// ── Wallet Setup Screen (member onboarding via ?setup=1) ─────────────────────
-// A web page can only add a network/token to a wallet that injects a provider
-// (i.e. when opened inside the wallet's in-app browser). On a plain mobile
-// browser there is no such API, so we route the member into their wallet's
-// browser via deeplinks. This screen is fully decoupled from the Reown/
-// WalletConnect connect flow, so it can never hang on that modal.
-
-function setupInit() {
-  if(new URLSearchParams(location.search).get("setup") !== "1") return;
-
-  const screen = document.getElementById("setup-screen");
-  screen.classList.add("show");
-  document.body.classList.add("setup-active");
-
-  const injected = document.getElementById("setup-injected");
-  const noinj    = document.getElementById("setup-noinjected");
-
-  // Manual-import contract address is always shown — wallet-agnostic fallback.
-  document.getElementById("setup-contract-input").value = KEEL_TOKEN_ADDRESS;
-
-  if(window.ethereum) {
-    // Inside a wallet's in-app browser (or desktop extension) — config will work.
-    injected.style.display = "";
-    noinj.style.display    = "none";
-  } else {
-    // Plain mobile browser — guide them into their wallet's browser.
-    injected.style.display = "none";
-    noinj.style.display    = "";
-    const full      = location.href;                                  // includes ?setup=1
-    const noScheme  = location.host + location.pathname + location.search; // for MetaMask
-    document.getElementById("setup-link-mm").href =
-      "https://metamask.app.link/dapp/" + noScheme;
-    document.getElementById("setup-link-cb").href =
-      "https://go.cb-w.com/dapp?cb_url=" + encodeURIComponent(full);
-    document.getElementById("setup-link-tw").href =
-      "https://link.trustwallet.com/open_url?url=" + encodeURIComponent(full);
-    document.getElementById("setup-url-input").value = full;
-  }
-}
-
-function _setupStep(id, state) {
-  const el = document.getElementById(id);
-  if(!el) return;
-  el.className = "setup-step" + (state ? " " + state : "");
-  const icon = el.querySelector(".sicon");
-  if(icon && state === "done")   icon.textContent = "✓";
-  if(icon && state === "failed") icon.textContent = "✕";
-}
-
-function _setupResult(type, msg) {
-  const r = document.getElementById("setup-result");
-  r.className = "setup-result " + type;
-  r.innerHTML = msg;
-}
-
-async function setupRunConfig() {
-  const eth = window.ethereum;
-  const btn = document.getElementById("setup-run-btn");
-  if(!eth) { _setupResult("error","No wallet detected in this browser."); return; }
-
-  btn.disabled = true; btn.textContent = "Check your wallet…";
-
-  // Wake/permission the provider first (some wallets require this before config).
-  try { await eth.request({ method:"eth_requestAccounts" }); } catch(_) {}
-
-  // Step 1 — add Polygon Amoy
-  _setupStep("setup-step-net","active");
-  let netOk = false;
-  try {
-    await eth.request({ method:"wallet_addEthereumChain", params:[{
-      chainId:"0x13882", chainName:"Polygon Amoy",
-      nativeCurrency:{ name:"POL", symbol:"POL", decimals:18 },
-      rpcUrls:["https://rpc-amoy.polygon.technology"],
-      blockExplorerUrls:["https://amoy.polygonscan.com"]
-    }]});
-    netOk = true; _setupStep("setup-step-net","done");
-  } catch(e) {
-    // 4001 = user rejected; anything else (incl. "already added") we treat as non-fatal
-    if(e && e.code === 4001) { _setupStep("setup-step-net","failed"); }
-    else { netOk = true; _setupStep("setup-step-net","done"); }
-  }
-
-  // Step 2 — add KEEL token
-  _setupStep("setup-step-tok","active");
-  let tokOk = false;
-  try {
-    const res = await eth.request({ method:"wallet_watchAsset", params:{
-      type:"ERC20",
-      options:{ address:KEEL_TOKEN_ADDRESS, symbol:"KEEL", decimals:18 }
-    }});
-    tokOk = (res !== false); _setupStep("setup-step-tok", tokOk ? "done" : "failed");
-  } catch(e) {
-    _setupStep("setup-step-tok","failed");
-  }
-
-  if(tokOk) {
-    _setupResult("success","✓ All set! Your KEEL balance will now show in your wallet. Tap below to continue to the app.");
-    btn.textContent = "Continue to app →";
-    btn.disabled = false;
-    btn.setAttribute("onclick","setupContinue()");
-  } else {
-    _setupResult(netOk ? "info" : "error",
-      "Couldn't add the KEEL token automatically — your wallet may not support it. You can still use the app; add KEEL manually later using the contract address in Settings.");
-    btn.textContent = "Try again";
-    btn.disabled = false;
-  }
-}
-
-function setupContinue() {
-  document.getElementById("setup-screen").classList.remove("show");
-  document.body.classList.remove("setup-active");
-  // Strip ?setup=1 so a refresh doesn't re-trigger the setup screen.
-  try { history.replaceState({}, "", location.pathname); } catch(_) {}
-}
-
-function _setupCopyFrom(inputId, btn) {
-  const inp = document.getElementById(inputId);
-  if(!inp) return;
-  const flip = () => { const t = btn.dataset.label || btn.textContent; btn.dataset.label = t; btn.textContent = "Copied!"; setTimeout(()=>btn.textContent = t, 1500); };
-  // Synchronous execCommand first — works on the selected input even when the
-  // async Clipboard API is blocked (not focused, permissions, older mobile WebkViews).
-  try { inp.removeAttribute("readonly"); inp.focus(); inp.select(); inp.setSelectionRange(0, 99999);
-        const ok = document.execCommand("copy"); inp.setAttribute("readonly","");
-        if(ok) { flip(); } } catch(_) {}
-  // Best-effort async copy too (harmless if execCommand already worked).
-  if(navigator.clipboard) navigator.clipboard.writeText(inp.value).then(flip).catch(()=>{});
-}
-function setupCopyUrl(btn)      { _setupCopyFrom("setup-url-input", btn); }
-function setupCopyContract(btn) { _setupCopyFrom("setup-contract-input", btn); }
-
-// ── Member Onboarding Wizard ─────────────────────────────────────────────────
-
-let _onboardStep = 1;
-
-function onboardInitQR() {
-  const el = document.getElementById("onboard-qr-canvas");
-  if(!el || el.dataset.generated) return;
-  el.dataset.generated = "1";
-  if(typeof QRCode === "undefined") { el.innerHTML = '<span style="color:#999;font-size:12px">QR library unavailable</span>'; return; }
-  new QRCode(el, {
-    text: "https://cubasteve.github.io/keel-app/?setup=1",
-    width: 180, height: 180,
-    colorDark: "#000000", colorLight: "#ffffff",
-    correctLevel: QRCode.CorrectLevel.M
-  });
-}
-
-function onboardGoTo(step) {
-  if(step === 3) {
-    const addr = (document.getElementById("onboard-addr").value||"").trim();
-    if(!ethers.utils.isAddress(addr)) {
-      const r = document.getElementById("onboard-addr-result");
-      r.className = "admin-result error"; r.textContent = "⚠ Enter a valid Ethereum address first."; r.style.display = "block";
-      return;
-    }
-    document.getElementById("onboard-prev-addr").textContent = addr.slice(0,8)+"…"+addr.slice(-6);
-    onboardUpdatePreview();
-  }
-  _onboardStep = step;
-  for(let i = 1; i <= 4; i++) {
-    document.getElementById("onboard-panel-"+i).classList.toggle("active", i === step);
-    const dot = document.getElementById("onboard-dot-"+i);
-    const lbl = document.getElementById("onboard-lbl-"+i);
-    dot.className = "onboard-step-dot "+(i < step ? "done" : i === step ? "active" : "pending");
-    lbl.className = "onboard-step-label "+(i < step ? "done" : i === step ? "active" : "");
-    if(i < 4) {
-      const con = document.getElementById("onboard-con-"+i);
-      if(con) con.className = "onboard-connector"+(i < step ? " done" : "");
-    }
-  }
-}
-
-function onboardAddrInput() {
-  const val = (document.getElementById("onboard-addr").value||"").trim();
-  const ok  = ethers.utils.isAddress(val);
-  document.getElementById("onboard-addr-next").disabled = !ok;
-  if(val.length > 10) {
-    const r = document.getElementById("onboard-addr-result");
-    r.className = "admin-result "+(ok ? "success" : "error");
-    r.textContent = ok ? "✓ Valid address" : "⚠ Not a valid Ethereum address";
-    r.style.display = "block";
-  }
-}
-
-function onboardUpdatePreview() {
-  const name = (document.getElementById("onboard-name")?.value||"").trim();
-  const exp  = document.getElementById("onboard-exp")?.value || "Novice";
-  document.getElementById("onboard-prev-name").textContent = name || "(no name set)";
-  document.getElementById("onboard-prev-exp").textContent  = exp;
-}
-
-async function onboardExecute() {
-  const addr = (document.getElementById("onboard-addr").value||"").trim();
-  const name = (document.getElementById("onboard-name").value||"").trim();
-  const exp  = document.getElementById("onboard-exp").value;
-  const btn  = document.getElementById("onboard-exec-btn");
-
-  if(!ethers.utils.isAddress(addr)) return;
-  if(!signer) { showAdminResult("onboard-exec-result","error","Wallet not connected."); return; }
-
-  btn.disabled = true; btn.textContent = "Working…";
-
-  try {
-    const AMOY_MIN_TIP = ethers.utils.parseUnits("30","gwei");
-    const fee    = await provider.getFeeData().catch(()=>({}));
-    const prio   = (fee.maxPriorityFeePerGas?.gt(AMOY_MIN_TIP)) ? fee.maxPriorityFeePerGas : AMOY_MIN_TIP;
-    const maxFee = (fee.maxFeePerGas?.gt(prio)) ? fee.maxFeePerGas : prio.add(ethers.utils.parseUnits("20","gwei"));
-    const gasOpts = { maxPriorityFeePerGas: prio, maxFeePerGas: maxFee };
-
-    // Tx 1: setMemberProfile
-    showAdminResult("onboard-exec-result","info","Step 1 of 2 — Setting member profile…");
-    const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, signer);
-    showStatus("Approve in wallet — creating member profile…","pending");
-    walletPromptShow();
-    let tx1;
-    try { tx1 = await ledger.setMemberProfile(addr, name, exp, gasOpts); }
-    finally { walletPromptHide(); clearStatus(); }
-    showAdminResult("onboard-exec-result","info","Step 1 of 2 — Profile tx submitted, confirming…");
-    await tx1.wait();
-
-    // Tx 2: issueMonthlyAllocation
-    showAdminResult("onboard-exec-result","info","Step 2 of 2 — Minting initial 100 KEEL…");
-    const token = new ethers.Contract(KEEL_TOKEN_ADDRESS, TOKEN_ABI, signer);
-    const now   = new Date();
-    showStatus("Approve in wallet — minting KEEL…","pending");
-    walletPromptShow();
-    let tx2;
-    try { tx2 = await token.issueMonthlyAllocation(addr, now.getFullYear(), now.getMonth()+1, gasOpts); }
-    finally { walletPromptHide(); clearStatus(); }
-    showAdminResult("onboard-exec-result","info","Step 2 of 2 — Mint tx submitted, confirming…");
-    await tx2.wait();
-
-    const shortAddr = addr.slice(0,8)+"…"+addr.slice(-6);
-    document.getElementById("onboard-success-text").textContent =
-      `${name || shortAddr} is now a member. Profile created and 100 KEEL minted to ${shortAddr}.`;
-    onboardGoTo(4);
-    await Promise.all([adminLoadStats(), adminLoadMemberBalances()]).catch(()=>{});
-
-  } catch(e) {
-    console.error("onboard failed", e);
-    showAdminResult("onboard-exec-result","error","Failed: "+(e.reason||e.message||"Transaction rejected"));
-    btn.disabled = false; btn.textContent = "⚡ Create Profile & Mint";
-  }
-}
-
-function onboardReset() {
-  document.getElementById("onboard-addr").value = "";
-  document.getElementById("onboard-name").value = "";
-  document.getElementById("onboard-exp").selectedIndex = 0;
-  document.getElementById("onboard-addr-next").disabled = true;
-  ["onboard-addr-result","onboard-exec-result"].forEach(id => {
-    const el = document.getElementById(id);
-    if(el){ el.className = "admin-result"; el.style.display = "none"; }
-  });
-  onboardGoTo(1);
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 </script>
 </body>
