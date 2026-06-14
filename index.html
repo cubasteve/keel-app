@@ -7,6 +7,30 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <title>KEEL Token — Boat Share</title>
+<script>
+  // ── Auto-update guard ──────────────────────────────────────────────────
+  // GitHub Pages serves index.html with a ~10-min cache, so normal mobile
+  // browsers can keep running a stale copy after a deploy (incognito, with an
+  // empty cache, gets the latest — the classic symptom). This compares the
+  // version baked into THIS html against a never-cached version.txt; if the
+  // deployed version is newer, it reloads once with a cache-busting query so
+  // the browser fetches fresh html. The ?v= guard prevents a reload loop.
+  // ON EVERY DEPLOY: bump APP_VERSION here AND the matching value in version.txt.
+  (function(){
+    const APP_VERSION = "2025-06-13a";
+    window.__APP_VERSION = APP_VERSION;
+    fetch("version.txt", { cache: "no-store" })
+      .then(r => r.ok ? r.text() : null)
+      .then(t => {
+        if(!t) return;
+        const latest = t.trim();
+        if(latest && latest !== APP_VERSION && !location.search.includes("v=" + latest)){
+          location.replace(location.pathname + "?v=" + encodeURIComponent(latest));
+        }
+      })
+      .catch(()=>{});
+  })();
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <script>
   // ── EDIT THIS: your Reown project ID from dashboard.reown.com ──
