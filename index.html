@@ -15,15 +15,11 @@
   // version baked into THIS html against a never-cached version.txt; if the
   // deployed version is newer, it reloads once with a cache-busting query so
   // the browser fetches fresh html. The ?v= guard prevents a reload loop.
-  // ON EVERY DEPLOY: bump APP_VERSION here AND the matching value in version.txt.
+  // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
+  // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-14b";
+    const APP_VERSION = "2025-06-14c";
     window.__APP_VERSION = APP_VERSION;
-    // Load the shared core synchronously, cache-busted to APP_VERSION so it
-    // refreshes together with the html (subresources aren't covered by the
-    // html's ?v= reload). document.write keeps it blocking + in document order
-    // so its globals exist before the app shell's inline script runs.
-    document.write('<scr' + 'ipt src="keel-core.js?v=' + APP_VERSION + '"><\/scr' + 'ipt>');
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
       .then(t => {
@@ -36,6 +32,12 @@
       .catch(()=>{});
   })();
 </script>
+<!-- Shared core: must load (and finish) before the app shell's inline script,
+     which references core globals (MAX_CAP, ABIs, …) at top level. A static
+     tag — NOT document.write — so Chrome's slow-network intervention can't
+     silently drop it (that would undefine the whole app and dead-click the UI).
+     Bump ?v= together with APP_VERSION + version.txt. -->
+<script src="keel-core.js?v=2025-06-14c"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <script>
   // ── EDIT THIS: your Reown project ID from dashboard.reown.com ──
