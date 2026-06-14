@@ -2270,6 +2270,8 @@ window.keelOnAppKitAccount = async function(addr){
     window.__keelViaWalletConnect = true;
     try { captureWalletLink(eip1193); } catch(_){}
     await finishConnect();
+    // Close the Reown modal — on mobile it stays open after the wallet returns to the browser
+    try { if(window.keelAppKit?.isOpen?.()) window.keelAppKit.close(); } catch(_) {}
     // Re-run balance + display name after a delay — chain switch needs a moment
     // to settle, and this also acts as a safety net if the first fetch failed.
     setTimeout(async () => {
