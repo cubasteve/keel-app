@@ -2277,12 +2277,8 @@ async function disconnectWallet(e) {
       await window.keelAppKit.disconnect();
     }
   } catch(_) {}
-  // Restore splash (clear any inline opacity/pointer overrides set by splashConnect)
-  const sp = document.getElementById("splash");
-  sp.classList.remove("hidden");
-  sp.style.opacity = "";
-  sp.style.pointerEvents = "";
-  document.body.classList.add("splash-active");
+  // Restore splash (clears any inline opacity/pointer overrides from splashConnect)
+  showConnectGate();
   // Reset all state and restore the Connect button
   provider = null; signer = null; walletAddress = null;
   keelBalance = 0; walletDisplayName = "";
@@ -3166,7 +3162,19 @@ function renderPricingTable(){
 // ── PAGE NAVIGATION ──────────────────────────────────────────────────────────
 let currentPage = "dashboard";
 
+// Show the connect gate (splash overlay). Used on disconnect and whenever a
+// disconnected user tries to navigate — the splash is the sole connect gate.
+function showConnectGate() {
+  const sp = document.getElementById("splash");
+  sp.classList.remove("hidden");
+  sp.style.opacity = "";
+  sp.style.pointerEvents = "";
+  document.body.classList.add("splash-active");
+}
+
 function showPage(page) {
+  // Gate: with no wallet, every nav action returns to the connect gate.
+  if(!walletAddress) { showConnectGate(); return; }
   currentPage = page;
 
   // Toggle page panels
