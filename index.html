@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-14i";
+    const APP_VERSION = "2025-06-14j";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-14i"></script>
+<script src="keel-core.js?v=2025-06-14j"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -314,7 +314,7 @@ body.nav-collapsed .sidebar { transform: translateX(-100%); }
 
 
 /* MAIN */
-.main-wrap { margin-left: 230px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; position: relative; z-index: 1; transition: margin-left 0.3s ease; }
+.main-wrap { margin-left: 230px; flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 100vh; position: relative; z-index: 1; transition: margin-left 0.3s ease; }
 body.nav-collapsed .main-wrap { margin-left: 0; }
 /* Left-edge textured lines hinting a pull-out sidebar exists (when it's not docked) */
 .main-wrap::before {
@@ -406,7 +406,7 @@ body.drawer-open .drawer-backdrop { opacity: 1; pointer-events: auto; }
 .wallet-menu-item .mi-icon { font-size:15px; width:20px; text-align:center; }
 
 /* CONTENT */
-.content { display:flex; gap:0; flex:1; overflow-x:clip; }
+.content { display:flex; gap:0; flex:1; min-width:0; overflow-x:clip; }
 .center-panel { flex:1; padding:24px 28px; min-width:0; }
 
 /* HERO — nautical chart style */
@@ -882,6 +882,19 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 .admin-badge.cancelled { background:rgba(255,83,112,0.08); color:var(--danger); }
 .admin-badge.active-now{ background:rgba(212,168,64,0.12); color:var(--brass); }
 @media(max-width:900px){ .admin-grid { grid-template-columns:1fr; } .admin-row { grid-template-columns:1fr; } }
+/* Portrait/phone: stack the admin tables as cards (label : value rows) so the
+   admin panel reads top-to-bottom instead of needing a wide landscape table. */
+@media(max-width:700px){
+  .admin-card { padding:18px 16px; }
+  .admin-trips-table, .admin-trips-table tbody, .admin-trips-table tr, .admin-trips-table td { display:block; width:100%; }
+  .admin-trips-table thead { display:none; }
+  .admin-trips-table tr { background:var(--surface3); border:1px solid var(--border); border-radius:12px; padding:6px 12px; margin-bottom:10px; }
+  .admin-trips-table td { border:none !important; padding:7px 0; display:flex; justify-content:space-between; align-items:center; gap:14px; text-align:right; }
+  .admin-trips-table td::before { content:attr(data-label); color:var(--muted2); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; text-align:left; flex-shrink:0; }
+  .admin-trips-table td br { display:none; }
+  .onb-lbl { display:none; }            /* keep step dots, drop labels to save width */
+  .onb-bar { margin:0 6px; }
+}
 /* ── Member Onboarding wizard ─────────────────────────────────────────── */
 .onb-steps { display:flex; align-items:center; margin-bottom:20px; }
 .onb-step { display:flex; align-items:center; gap:7px; }
@@ -3871,12 +3884,12 @@ function renderAdminTrips() {
       const label = (t.competitive?"Racing ":"")+"Voyage";
       const statusLabel = {upcoming:"Upcoming","active-now":"Underway",past:"Completed",cancelled:"Cancelled"}[t.status];
       return `<tr>
-        <td>${memberDisplay}</td>
-        <td>${date}</td>
-        <td>${t.hrs}h</td>
-        <td>${label}</td>
-        <td style="font-family:var(--mono);color:var(--danger)">−${t.burn.toFixed(2)}</td>
-        <td><span class="admin-badge ${t.status}">${statusLabel}</span></td>
+        <td data-label="Member">${memberDisplay}</td>
+        <td data-label="Date">${date}</td>
+        <td data-label="Duration">${t.hrs}h</td>
+        <td data-label="Type">${label}</td>
+        <td data-label="KEEL Burned" style="font-family:var(--mono);color:var(--danger)">−${t.burn.toFixed(2)}</td>
+        <td data-label="Status"><span class="admin-badge ${t.status}">${statusLabel}</span></td>
       </tr>`;
     }).join("")}</tbody>
   </table>`;
