@@ -17,7 +17,7 @@
   // the browser fetches fresh html. The ?v= guard prevents a reload loop.
   // ON EVERY DEPLOY: bump APP_VERSION here AND the matching value in version.txt.
   (function(){
-    const APP_VERSION = "2025-06-14a";
+    const APP_VERSION = "2025-06-14b";
     window.__APP_VERSION = APP_VERSION;
     // Load the shared core synchronously, cache-busted to APP_VERSION so it
     // refreshes together with the html (subresources aren't covered by the
@@ -1066,6 +1066,14 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   margin-top:10px; font-size:10px; letter-spacing:.35em;
   text-transform:uppercase; color:var(--muted); opacity:.5;
 }
+.sp-reset {
+  margin-top:18px; background:none; border:none; cursor:pointer;
+  font-family:var(--sans,inherit); font-size:12px; color:var(--muted);
+  opacity:.55; text-decoration:underline; text-underline-offset:3px;
+  transition:opacity .2s;
+}
+.sp-reset:hover { opacity:.9; color:var(--accent); }
+.sp-reset:disabled { opacity:.4; cursor:default; text-decoration:none; }
 
 /* Decorative compass rose (background) */
 .sp-compass {
@@ -1096,6 +1104,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
     <p class="sp-tagline">Burn tokens · Reserve voyages<br>Own the sea.</p>
     <button class="sp-btn" id="sp-connect-btn" onclick="splashConnect()">⬡ Connect Wallet</button>
     <div class="sp-chain">Polygon Amoy · ERC-20 Usage Token</div>
+    <button class="sp-reset" id="sp-reset-btn" onclick="resetConnection()">Trouble connecting? Reset</button>
   </div>
   <!-- Ocean waves -->
   <div class="sp-ocean">
@@ -1865,6 +1874,44 @@ async function loadExpiryStats(){
   }
   const bar = document.getElementById("expiring-bar");
   if(bar) bar.style.width = Math.min((expiring/MAX_CAP)*100,100)+"%";
+}
+
+// Recovery escape hatch: clears stale WalletConnect/Reown session state and
+// force-reloads to the latest version. Use when the modal won't open in a
+// normal (non-incognito) browser — the tell-tale symptom of stale cache or a
+// corrupt persisted WC session left over from prior connects.
+async function resetConnection() {
+  const btn = document.getElementById("sp-reset-btn");
+  if(btn){ btn.disabled = true; btn.textContent = "Resetting…"; }
+
+  // 1. Cleanly disconnect any live AppKit session first (best-effort).
+  try { if(window.keelAppKit && window.keelAppKit.disconnect) await window.keelAppKit.disconnect(); } catch(_){}
+
+  // 2. Remove WalletConnect / Reown / wagmi keys from localStorage.
+  try {
+    const kill = [];
+    for(let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if(k && /(^wc@|walletconnect|wagmi|w3m|reown|appkit|wcm_)/i.test(k)) kill.push(k);
+    }
+    kill.forEach(k => { try { localStorage.removeItem(k); } catch(_){} });
+  } catch(_){}
+
+  // 3. Delete WalletConnect's IndexedDB stores (and idb-keyval used by wagmi).
+  try {
+    if(indexedDB && indexedDB.databases){
+      const dbs = await indexedDB.databases();
+      await Promise.all((dbs || [])
+        .filter(d => d && d.name && /(wallet|walletconnect|wc|reown|w3m|appkit|keyval)/i.test(d.name))
+        .map(d => new Promise(res => { const r = indexedDB.deleteDatabase(d.name); r.onsuccess = r.onerror = r.onblocked = () => res(); })));
+    } else {
+      try { indexedDB.deleteDatabase("WALLET_CONNECT_V2_INDEXED_DB"); } catch(_){}
+    }
+  } catch(_){}
+
+  // 4. Force a fresh load that bypasses the HTTP cache.
+  const v = (window.__APP_VERSION || "reset") + "-reset" + Date.now();
+  location.replace(location.pathname + "?v=" + encodeURIComponent(v));
 }
 
 // Splash connect: opens the AppKit wallet picker.
