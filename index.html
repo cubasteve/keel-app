@@ -2323,18 +2323,27 @@ async function finishConnect(){
   // where a chain switch just happened).
   document.getElementById("splash").classList.add("hidden");
   document.body.classList.remove("splash-active");
-  // If opened via onboarding QR (?setup=1), prompt wallet to add Amoy + KEEL token
-  if(new URLSearchParams(location.search).get("setup") === "1" && provider) {
-    try { await provider.send("wallet_addEthereumChain",[{
-      chainId:"0x13882", chainName:"Polygon Amoy",
-      nativeCurrency:{name:"MATIC",symbol:"MATIC",decimals:18},
-      rpcUrls:["https://rpc-amoy.polygon.technology"],
-      blockExplorerUrls:["https://amoy.polygonscan.com"]
-    }]); } catch(_) {}
-    try { await provider.send("wallet_watchAsset",{
-      type:"ERC20",
-      options:{address:KEEL_TOKEN_ADDRESS, symbol:"KEEL", decimals:18, image:""}
-    }); } catch(_) {}
+  // If opened via onboarding QR (?setup=1), prompt wallet to add Amoy + KEEL token.
+  // Run non-blocking after page settles so this never freezes the connect flow.
+  if(new URLSearchParams(location.search).get("setup") === "1") {
+    setTimeout(async () => {
+      const eth = window.ethereum;
+      if(!eth) return;
+      try {
+        await eth.request({ method:"wallet_addEthereumChain", params:[{
+          chainId:"0x13882", chainName:"Polygon Amoy",
+          nativeCurrency:{name:"MATIC",symbol:"MATIC",decimals:18},
+          rpcUrls:["https://rpc-amoy.polygon.technology"],
+          blockExplorerUrls:["https://amoy.polygonscan.com"]
+        }]});
+      } catch(e){ console.warn("addEthereumChain:", e); }
+      try {
+        await eth.request({ method:"wallet_watchAsset", params:{
+          type:"ERC20",
+          options:{address:KEEL_TOKEN_ADDRESS, symbol:"KEEL", decimals:18}
+        }});
+      } catch(e){ console.warn("watchAsset:", e); }
+    }, 1200);
   }
   setTimeout(() => {
     if(currentPage === "trips")     loadTripsPage().catch(e => console.warn("trips load failed", e));
