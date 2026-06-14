@@ -15,9 +15,9 @@ const hre = require("hardhat");
 
 async function main() {
   const LEDGER          = "0x5c27f0399C3737a68e0933183609b8a273A98eC0"; // active v5 ledger proxy
-  const RELAYER_ADDRESS = "0xREPLACE_WITH_YOUR_RELAYER_WALLET_ADDRESS";
+  const RELAYER_ADDRESS = "0x1c13DB2d82da0220594BdBb96D30eF6a4Ba304Ff";
 
-  if (!hre.ethers.utils.isAddress(RELAYER_ADDRESS) || RELAYER_ADDRESS.includes("REPLACE")) {
+  if (!hre.ethers.isAddress(RELAYER_ADDRESS) || RELAYER_ADDRESS.includes("REPLACE")) {
     throw new Error("Set RELAYER_ADDRESS to your relayer wallet address first.");
   }
 
