@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-14f";
+    const APP_VERSION = "2025-06-14g";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-14f"></script>
+<script src="keel-core.js?v=2025-06-14g"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -4224,6 +4224,27 @@ async function settingsAddToken(btn){
   if(!eth){ showAdminResult("settings-wallet-add-result","info","Open this page inside your wallet's browser to add automatically, or import the token manually using the contract address below."); return; }
   const t = btn.textContent; btn.disabled = true; btn.textContent = "Check wallet…";
   try {
+    // wallet_watchAsset adds the token to the ACTIVE network — so we must be on
+    // Polygon Amoy first, otherwise MetaMask says "token not supported on this
+    // network" (the contract only exists on Amoy).
+    try {
+      await eth.request({ method:"wallet_switchEthereumChain", params:[{ chainId:"0x13882" }] });
+    } catch(switchErr){
+      if(switchErr && switchErr.code === 4902){
+        // Amoy not added yet — add it, which also switches to it.
+        await eth.request({ method:"wallet_addEthereumChain", params:[{
+          chainId:"0x13882", chainName:"Polygon Amoy",
+          nativeCurrency:{ name:"POL", symbol:"POL", decimals:18 },
+          rpcUrls:["https://rpc-amoy.polygon.technology"],
+          blockExplorerUrls:["https://amoy.polygonscan.com"]
+        }]});
+        try { await eth.request({ method:"wallet_switchEthereumChain", params:[{ chainId:"0x13882" }] }); } catch(_){}
+      } else if(switchErr && switchErr.code === 4001){
+        showAdminResult("settings-wallet-add-result","info","Switch to Polygon Amoy first, then tap Add KEEL Token.");
+        btn.disabled = false; btn.textContent = t; return;
+      }
+      // any other switch error: fall through and try to add the token anyway
+    }
     const ok = await eth.request({ method:"wallet_watchAsset", params:{
       type:"ERC20", options:{ address:KEEL_TOKEN_ADDRESS, symbol:"KEEL", decimals:18 }
     }});
