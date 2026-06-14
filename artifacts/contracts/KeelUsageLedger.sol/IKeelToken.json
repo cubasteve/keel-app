@@ -22,7 +22,13 @@
         }
       ],
       "name": "burnForUsage",
-      "outputs": [],
+      "outputs": [
+        {
+          "internalType": "uint64",
+          "name": "minExpiresAt",
+          "type": "uint64"
+        }
+      ],
       "stateMutability": "nonpayable",
       "type": "function"
     },
@@ -42,6 +48,11 @@
           "internalType": "bytes32",
           "name": "tripId",
           "type": "bytes32"
+        },
+        {
+          "internalType": "uint64",
+          "name": "originalExpiresAt",
+          "type": "uint64"
         }
       ],
       "name": "refundCancellation",

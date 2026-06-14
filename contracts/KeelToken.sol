@@ -53,6 +53,12 @@ contract KeelToken is
     mapping(address => uint256)  private _trancheHead;   // index of oldest live tranche
     uint256 public expiryDuration;                        // 0 = use default (90 days)
 
+    // Slot (appended — never reorder): per-member ownership share.
+    // memberAllocation[m] = member's MONTHLY allocation (their ownership share).
+    // Wallet cap for m = memberAllocation[m] * 3 (three months' worth).
+    // Zero = legacy member → fall back to the global monthlyAllocation / walletCap.
+    mapping(address => uint256) public memberAllocation;
+
     // ── Events ───────────────────────────────────────────────────────────────
     event TokensMinted(address indexed to, uint256 amount, uint256 year, uint256 month);
     event TokensBurnedForUsage(address indexed member, uint256 amount, bytes32 tripId);
@@ -61,6 +67,7 @@ contract KeelToken is
     event WalletCapUpdated(uint256 newCap);
     event MonthlyAllocationUpdated(uint256 newAmount);
     event ExpiryDurationUpdated(uint256 newDuration);
+    event MemberAllocationUpdated(address indexed member, uint256 allocation);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
@@ -196,9 +203,53 @@ contract KeelToken is
 
     // ── Core monthly issuance ────────────────────────────────────────────────
 
+    // ── Per-member share-based limits ─────────────────────────────────────────
+    // A member's monthly allocation is their ownership share; their wallet cap is
+    // 3x that (three months' worth). Members with no share set fall back to the
+    // global monthlyAllocation / walletCap so legacy balances are unaffected.
+
+    /// @notice Member's monthly allocation (their share), or the global default.
+    function allocationOf(address member) public view returns (uint256) {
+        uint256 a = memberAllocation[member];
+        return a > 0 ? a : monthlyAllocation;
+    }
+
+    /// @notice Member's wallet cap = share x 3, or the global default.
+    function capOf(address member) public view returns (uint256) {
+        uint256 a = memberAllocation[member];
+        return a > 0 ? a * 3 : walletCap;
+    }
+
+    /// @notice Admin sets a member's ownership share (their monthly allocation;
+    ///         wallet cap becomes share x 3). Does not mint.
+    function setMemberAllocation(address member, uint256 allocation)
+        public onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        memberAllocation[member] = allocation;
+        emit MemberAllocationUpdated(member, allocation);
+    }
+
+    /// @notice Onboard a member: set their share AND mint their first allocation.
+    function onboardMember(address member, uint256 allocation, uint256 year, uint256 month)
+        external onlyRole(MINTER_ROLE) returns (uint256 issued)
+    {
+        require(allocation > 0, "KeelToken: zero allocation");
+        memberAllocation[member] = allocation;
+        emit MemberAllocationUpdated(member, allocation);
+
+        _sweepExpired(member);
+        require(balanceOf(member) + allocation <= allocation * 3, "KeelToken: exceeds wallet cap");
+        bytes32 key = keccak256(abi.encodePacked(member, year, month));
+        monthlyMinted[key] += allocation;
+        _mint(member, allocation);
+        _pushTranche(member, allocation);
+        emit TokensMinted(member, allocation, year, month);
+        return allocation;
+    }
+
     /**
      * @notice Issue the standard monthly allocation to a member. Sweeps any
-     *         expired tokens first, then mints min(monthlyAllocation, cap space).
+     *         expired tokens first, then mints min(allocationOf, cap space).
      *         Idempotent per member per month.
      */
     function issueMonthlyAllocation(
@@ -212,11 +263,13 @@ contract KeelToken is
 
         _sweepExpired(member); // expired tokens free up cap space before the drip
 
+        uint256 cap = capOf(member);
         uint256 balance = balanceOf(member);
-        if (balance >= walletCap) return 0; // already at cap
+        if (balance >= cap) return 0; // already at cap
 
-        uint256 space = walletCap - balance;
-        issued = monthlyAllocation < space ? monthlyAllocation : space;
+        uint256 space = cap - balance;
+        uint256 alloc = allocationOf(member);
+        issued = alloc < space ? alloc : space;
         if (issued == 0) return 0;
 
         monthlyMinted[key] = issued;
@@ -226,8 +279,8 @@ contract KeelToken is
     }
 
     /**
-     * @notice Manual mint override — for admin corrections.
-     *         Still enforces the wallet cap; minted tokens get a normal tranche.
+     * @notice Manual mint override — for admin corrections / custom batch amounts.
+     *         Enforces the member's wallet cap (share x 3) and monthly allocation.
      */
     function mintMonthlyAllocation(
         address member,
@@ -236,9 +289,9 @@ contract KeelToken is
         uint256 month
     ) external onlyRole(MINTER_ROLE) {
         _sweepExpired(member);
-        require(balanceOf(member) + amount <= walletCap, "KeelToken: exceeds wallet cap");
+        require(balanceOf(member) + amount <= capOf(member), "KeelToken: exceeds wallet cap");
         bytes32 key = keccak256(abi.encodePacked(member, year, month));
-        require(monthlyMinted[key] + amount <= monthlyAllocation, "KeelToken: exceeds monthly allocation");
+        require(monthlyMinted[key] + amount <= allocationOf(member), "KeelToken: exceeds monthly allocation");
         monthlyMinted[key] += amount;
         _mint(member, amount);
         _pushTranche(member, amount);
