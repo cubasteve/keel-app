@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-14c";
+    const APP_VERSION = "2025-06-14d";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-14c"></script>
+<script src="keel-core.js?v=2025-06-14d"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <script>
   // ── EDIT THIS: your Reown project ID from dashboard.reown.com ──
@@ -89,13 +89,17 @@
       featuredWalletIds: [
         "0e4915107da5b3408b38e248f7a710f4529d54cd30e9d12ff0eb886d45c18e92" // Arculus Wallet
       ],
-      features: { analytics: false, email: false, socials: [] }
+      features: { analytics: false, email: false, socials: [] },
+      // Render the modal ABOVE the connect gate (#splash, z-index 99998) so it
+      // floats on top natively — no more hiding the gate to reveal the modal.
+      themeVariables: { "--w3m-z-index": 2147483000 }
     });
 
     window.keelAppKit = {
       _modal: modal,
       _amoy: amoy,
       open: () => modal.open(),
+      close: () => { try { return modal.close && modal.close(); } catch(_) {} },
       isOpen: () => modal.isOpen && modal.isOpen(),
       getProvider: () => { try { return modal.getProvider && modal.getProvider("eip155"); } catch(_) { try { return modal.getWalletProvider && modal.getWalletProvider(); } catch(__) { return null; } } },
       subscribeProviders: (cb) => modal.subscribeProviders(cb),
@@ -166,7 +170,15 @@ body {
   overflow-x: clip;
   position: relative;
 }
-body.splash-active { overflow: hidden; }
+/* Connect gate as its own page: while gated, ONLY #splash exists — the app
+   shell is removed from layout so nothing underneath can intercept touches or
+   fight the modal for stacking. The Reown modal renders above the gate via
+   --w3m-z-index, so the gate is never hidden to reveal it. */
+body.gated { overflow: hidden; }
+body.gated .sidebar,
+body.gated .main-wrap,
+body.gated .wave-bg { display: none !important; }
+body:not(.gated) #splash { display: none !important; }
 body::before {
   content: '';
   position: fixed;
@@ -1089,7 +1101,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 
 </style>
 </head>
-<body class="splash-active">
+<body class="gated">
 
 <!-- ── SPLASH SCREEN ─────────────────────────────────────────────────────── -->
 <div id="splash">
@@ -1916,10 +1928,10 @@ async function resetConnection() {
   location.replace(location.pathname + "?v=" + encodeURIComponent(v));
 }
 
-// Splash connect: opens the AppKit wallet picker.
-// The splash is at z-index 99998; the AppKit modal web-component uses a much
-// lower z-index, so we hide the splash before opening the modal and restore it
-// if the user cancels without connecting.
+// Gate connect: opens the AppKit wallet picker. The modal is configured with a
+// z-index above the gate (--w3m-z-index), so it floats on top natively — the
+// gate stays put and we never hide/restore it. Connection is handled by the
+// AppKit account subscription → finishConnect().
 async function splashConnect() {
   // 1. Wait for AppKit to finish loading if needed. The Reown bundle loads from
   // esm.sh and on mobile can take a while; rather than rely on a one-shot ready
@@ -1951,45 +1963,15 @@ async function splashConnect() {
     clearStatus();
   }
 
-  // 2. Hide splash so AppKit modal (lower z-index) is visible
-  const sp = document.getElementById("splash");
-  sp.style.opacity = "0";
-  sp.style.pointerEvents = "none";
-
+  // Open the modal — it renders above the gate via --w3m-z-index, so there is
+  // nothing to hide or restore. finishConnect() (via the account subscription)
+  // takes over on a successful connection.
   try {
     await window.keelAppKit.open();
   } catch(e) {
-    sp.style.opacity = "";
-    sp.style.pointerEvents = "";
     showStatus("Connection failed: "+e.message,"error");
-    return;
+    setTimeout(clearStatus, 5000);
   }
-
-  // 3. Poll until connected or modal dismissed without connecting.
-  // modal.open() resolves BEFORE the modal web-component finishes mounting, so
-  // isOpen() can briefly read false right after opening. Only treat a closed
-  // modal as a user-cancel once we've actually seen it open — otherwise the
-  // first tick restores the splash on top of the still-mounting modal and it
-  // looks like the modal never opened (the inconsistency).
-  let sawOpen = false;
-  const restoreSplash = () => { sp.style.opacity = ""; sp.style.pointerEvents = ""; };
-  const poll = setInterval(() => {
-    if(walletAddress) {
-      clearInterval(poll); // finishConnect() already hid splash permanently
-      return;
-    }
-    if(window.keelAppKit.isOpen()) {
-      sawOpen = true;
-    } else if(sawOpen) {
-      clearInterval(poll);
-      restoreSplash();     // it opened, now it's closed → user cancelled
-    }
-  }, 300);
-  // Safety net: if the modal never reports open within 5s and no wallet
-  // connected, stop polling and restore the splash so the user can retry.
-  setTimeout(() => {
-    if(!sawOpen && !walletAddress) { clearInterval(poll); restoreSplash(); }
-  }, 5000);
 }
 
 async function connectWallet() {
@@ -2123,11 +2105,12 @@ async function finishConnect(){
   try { await refreshBalance(); }     catch(e){ console.warn("balance load failed", e); }
   try { await loadMonthlyStats(); }   catch(e){ console.warn("monthly stats failed", e); }
   try { await loadOnChainHistory(); } catch(e){ console.warn("history load failed", e); }
-  // Dismiss splash, then reload the active page after a brief delay so the
-  // provider has fully settled (especially important on the WalletConnect path
-  // where a chain switch just happened).
-  document.getElementById("splash").classList.add("hidden");
-  document.body.classList.remove("splash-active");
+  // Leave the gate — reveals the app shell (the gate is display:none when
+  // not gated). Also close the modal if it's still up. Then reload the active
+  // page after a brief delay so the provider has fully settled (especially on
+  // the WalletConnect path where a chain switch just happened).
+  try { if(window.keelAppKit?.isOpen?.()) window.keelAppKit.close(); } catch(_) {}
+  document.body.classList.remove("gated");
   setTimeout(() => {
     if(currentPage === "trips")     loadTripsPage().catch(e => console.warn("trips load failed", e));
     if(currentPage === "keeltoken") loadKeelTokenPage().catch(e => console.warn("keel token load failed", e));
@@ -3066,14 +3049,17 @@ function renderPricingTable(){
 // ── PAGE NAVIGATION ──────────────────────────────────────────────────────────
 let currentPage = "dashboard";
 
-// Show the connect gate (splash overlay). Used on disconnect and whenever a
-// disconnected user tries to navigate — the splash is the sole connect gate.
+// Show the connect gate as its own page. Used on disconnect and whenever a
+// disconnected user tries to navigate — the gate is the sole connect surface.
+// body.gated reveals #splash and removes the app shell from layout.
 function showConnectGate() {
   const sp = document.getElementById("splash");
-  sp.classList.remove("hidden");
+  sp.classList.remove("hidden");      // legacy class no longer used, cleared defensively
   sp.style.opacity = "";
   sp.style.pointerEvents = "";
-  document.body.classList.add("splash-active");
+  document.body.classList.add("gated");
+  // Close the wallet modal if it happens to be open (e.g. disconnect mid-flow).
+  try { if(window.keelAppKit?.isOpen?.()) window.keelAppKit.close(); } catch(_) {}
 }
 
 function showPage(page) {
