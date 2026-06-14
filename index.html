@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-14j";
+    const APP_VERSION = "2025-06-14k";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-14j"></script>
+<script src="keel-core.js?v=2025-06-14k"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -2668,14 +2668,55 @@ function backToCalc() {
   clearStatus(); setStep(1);
 }
 
+// Gasless relayer is on only when KEEL_RELAYER_ENDPOINT is configured.
+function relayerEnabled(){ return typeof KEEL_RELAYER_ENDPOINT === "string" && KEEL_RELAYER_ENDPOINT.length > 0; }
+
+// Member signs an EIP-712 message (free — no gas, no POL); the relayer submits
+// the matching ledger call and pays the gas. Waits for the relayed tx to
+// confirm via the read RPC so callers can refresh state afterward.
+async function relaySigned(primaryType, message){
+  if(!signer) throw new Error("Connect your wallet first.");
+  const signature = await signer._signTypedData(RELAY_DOMAIN, { [primaryType]: RELAY_TYPES[primaryType] }, message);
+  const resp = await fetch(KEEL_RELAYER_ENDPOINT, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ primaryType, message, signature })
+  });
+  let data = {}; try { data = await resp.json(); } catch(_){}
+  if(!resp.ok || !data.txHash) throw new Error(data.error || ("Relayer error ("+resp.status+")"));
+  try { await getReadProvider().waitForTransaction(data.txHash, 1, 90000); } catch(_){}
+  return data;
+}
+
 async function logTrip() {
   if(!signer){showStatus("Connect your wallet first.","error");return;}
   try {
-    showStatus("Waiting for wallet confirmation…","pending"); setStep(3);
     const c=currentCalc;
+    const BOAT_ID = 0; // single boat for now; fleet-ready
+
+    // Gasless path: member signs, relayer burns + records. No POL needed.
+    if(relayerEnabled()){
+      showStatus("Approve the signature in your wallet…","pending"); setStep(3);
+      const message = {
+        member: walletAddress, boatId: BOAT_ID,
+        startTs: c.startTs, endTs: c.endTs,
+        hours: bucketArray(c.tenths), competitive: c.isCompete,
+        deadline: Math.floor(Date.now()/1000) + 3600
+      };
+      walletPromptShow();
+      try { await relaySigned("Reserve", message); } finally { walletPromptHide(); }
+      setStep(4);
+      showStatus("Voyage confirmed! "+c.keelBurn.toFixed(2)+" KEEL burned.","success");
+      keelBalance=c.remaining; updateBalanceUI();
+      await refreshBalance();
+      await loadOnChainHistory();
+      await loadReservedRanges();
+      setTimeout(()=>{backToCalc();setStep(1);clearStatus();},4000);
+      return;
+    }
+
+    showStatus("Waiting for wallet confirmation…","pending"); setStep(3);
     const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, signer);
 
-    const BOAT_ID = 0; // single boat for now; fleet-ready
     const args = [
       walletAddress, BOAT_ID, c.startTs, c.endTs,
       bucketArray(c.tenths),
@@ -3453,6 +3494,21 @@ async function cancelTrip(tripId, burnAmt) {
   btn.disabled = true;
   showStatus("Waiting for wallet confirmation…","pending");
   try {
+    // Gasless path: member signs, relayer cancels + refunds. No POL needed.
+    if(relayerEnabled()){
+      showStatus("Approve the signature in your wallet…","pending");
+      const message = { member: walletAddress, tripId, deadline: Math.floor(Date.now()/1000)+3600 };
+      walletPromptShow();
+      try { await relaySigned("Cancel", message); } finally { walletPromptHide(); }
+      showStatus("Reservation cancelled. "+burnAmt.toFixed(2)+" KEEL refunded.","success");
+      setTimeout(clearStatus, 4000);
+      const trip0 = tripsData.find(t => t.id === tripId);
+      if(trip0) { trip0.cancelled = true; trip0.status = "cancelled"; }
+      renderTripsPage();
+      await Promise.all([ refreshBalance(), loadReservedRanges(), loadOnChainHistory() ]);
+      return;
+    }
+
     const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, signer);
     const overrides = {};
     try {
@@ -3707,18 +3763,26 @@ async function saveProfile() {
 
   // Save public fields on-chain
   try {
-    const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, signer);
-    const AMOY_MIN_TIP = ethers.utils.parseUnits("30","gwei");
-    const fee    = await provider.getFeeData().catch(()=>({}));
-    const prio   = (fee.maxPriorityFeePerGas?.gt(AMOY_MIN_TIP)) ? fee.maxPriorityFeePerGas : AMOY_MIN_TIP;
-    const maxFee = (fee.maxFeePerGas?.gt(prio)) ? fee.maxFeePerGas : prio.add(ethers.utils.parseUnits("20","gwei"));
-    const txPromise = ledger.setMemberProfile(walletAddress, displayName, experienceLevel,
-      { maxPriorityFeePerGas: prio, maxFeePerGas: maxFee });
-    walletPromptShow();
-    let tx;
-    try { tx = await txPromise; } finally { walletPromptHide(); }
-    showStatus("Transaction submitted — waiting for confirmation…","pending");
-    await tx.wait();
+    if(relayerEnabled()){
+      // Gasless path: member signs, relayer writes the profile. No POL needed.
+      showStatus("Approve the signature in your wallet…","pending");
+      const message = { member: walletAddress, displayName, experienceLevel, deadline: Math.floor(Date.now()/1000)+3600 };
+      walletPromptShow();
+      try { await relaySigned("Profile", message); } finally { walletPromptHide(); }
+    } else {
+      const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, signer);
+      const AMOY_MIN_TIP = ethers.utils.parseUnits("30","gwei");
+      const fee    = await provider.getFeeData().catch(()=>({}));
+      const prio   = (fee.maxPriorityFeePerGas?.gt(AMOY_MIN_TIP)) ? fee.maxPriorityFeePerGas : AMOY_MIN_TIP;
+      const maxFee = (fee.maxFeePerGas?.gt(prio)) ? fee.maxFeePerGas : prio.add(ethers.utils.parseUnits("20","gwei"));
+      const txPromise = ledger.setMemberProfile(walletAddress, displayName, experienceLevel,
+        { maxPriorityFeePerGas: prio, maxFeePerGas: maxFee });
+      walletPromptShow();
+      let tx;
+      try { tx = await txPromise; } finally { walletPromptHide(); }
+      showStatus("Transaction submitted — waiting for confirmation…","pending");
+      await tx.wait();
+    }
     showStatus("Profile saved on-chain.","success");
     setTimeout(clearStatus, 4000);
     walletDisplayName = displayName; // keep cache in sync

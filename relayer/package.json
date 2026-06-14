@@ -1,0 +1,9 @@
+{
+  "name": "keel-relayer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Gasless relayer for the KEEL dApp — members sign, this pays gas.",
+  "dependencies": {
+    "ethers": "^6.13.0"
+  }
+}

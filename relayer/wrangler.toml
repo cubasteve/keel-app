@@ -1,0 +1,13 @@
+name = "keel-relayer"
+main = "worker.js"
+compatibility_date = "2026-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Deploy:
+#   cd relayer
+#   npm install
+#   npx wrangler secret put RELAYER_KEY      # paste the relayer wallet private key
+#   npx wrangler deploy
+#
+# The relayer wallet must hold OPERATOR_ROLE (run scripts/grant-operator-role.js)
+# and be funded with POL for gas.

@@ -27,6 +27,35 @@ const READ_RPC_URL = "https://polygon-amoy.g.alchemy.com/v2/tocmMJjVYA0syE3coEuG
 // project's allowed origins at dashboard.reown.com.
 const MAX_CAP = 300;
 const MONTHLY_ISSUED = 100; // KEEL issued per member per month (matches token cap)
+
+// ── Gasless relayer (members sign, the relayer pays gas) ──────────────────────
+// Empty = disabled (app uses normal member-paid transactions). Set this to the
+// deployed keel-relayer Worker URL to turn on gasless member actions.
+const KEEL_RELAYER_ENDPOINT = "";
+// EIP-712 domain + types — MUST stay byte-for-byte identical to relayer/worker.js.
+const RELAY_DOMAIN = { name: "KeelUsageLedger", version: "1", chainId: AMOY_CHAIN_ID, verifyingContract: KEEL_LEDGER_ADDRESS };
+const RELAY_TYPES = {
+  Reserve: [
+    { name: "member",      type: "address"   },
+    { name: "boatId",      type: "uint16"    },
+    { name: "startTs",     type: "uint64"    },
+    { name: "endTs",       type: "uint64"    },
+    { name: "hours",       type: "uint32[8]" },
+    { name: "competitive", type: "bool"      },
+    { name: "deadline",    type: "uint256"   }
+  ],
+  Cancel: [
+    { name: "member",   type: "address" },
+    { name: "tripId",   type: "bytes32" },
+    { name: "deadline", type: "uint256" }
+  ],
+  Profile: [
+    { name: "member",          type: "address" },
+    { name: "displayName",     type: "string"  },
+    { name: "experienceLevel", type: "string"  },
+    { name: "deadline",        type: "uint256" }
+  ]
+};
 const TOKEN_ABI  = [
   "function balanceOf(address) view returns (uint256)",
   "function decimals() view returns (uint8)",
