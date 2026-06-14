@@ -8,6 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>KEEL Token — Boat Share</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
   // ── EDIT THIS: your Reown project ID from dashboard.reown.com ──
   // Also add your deployed domain to the project's allowed origins, or mobile
@@ -837,6 +838,36 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 .admin-badge.cancelled { background:rgba(255,83,112,0.08); color:var(--danger); }
 .admin-badge.active-now{ background:rgba(212,168,64,0.12); color:var(--brass); }
 @media(max-width:900px){ .admin-grid { grid-template-columns:1fr; } .admin-row { grid-template-columns:1fr; } }
+/* ── Member Onboarding Wizard ──────────────────────────────────────────── */
+.onboard-steps { display:flex; align-items:center; margin-bottom:24px; }
+.onboard-step  { display:flex; align-items:center; }
+.onboard-step-dot { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; transition:all 0.3s; }
+.onboard-step-dot.pending { background:var(--surface3); color:var(--muted2); }
+.onboard-step-dot.active  { background:linear-gradient(135deg,var(--brass2),var(--brass)); color:#fff; box-shadow:0 0 12px rgba(212,168,64,0.4); }
+.onboard-step-dot.done    { background:var(--teal); color:#fff; }
+.onboard-step-label { font-size:11px; color:var(--muted2); margin-left:7px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; }
+.onboard-step-label.active { color:var(--brass); }
+.onboard-step-label.done   { color:var(--teal); }
+.onboard-connector { flex:1; height:2px; background:var(--surface3); margin:0 10px; border-radius:2px; min-width:12px; }
+.onboard-connector.done { background:var(--teal); }
+.onboard-panel { display:none; }
+.onboard-panel.active { display:block; }
+.onboard-qr-wrap { display:flex; justify-content:center; margin:18px 0; }
+.onboard-qr-box  { padding:14px; background:#fff; border-radius:14px; box-shadow:0 4px 28px rgba(0,0,0,0.35); display:inline-block; line-height:0; }
+.onboard-instructions { list-style:none; padding:0; margin:0 0 20px; display:flex; flex-direction:column; gap:9px; }
+.onboard-instructions li { display:flex; align-items:flex-start; gap:10px; font-size:13px; color:var(--text); line-height:1.5; }
+.onboard-instructions li .num { width:20px; height:20px; border-radius:50%; background:var(--surface3); color:var(--brass); font-weight:700; font-size:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+.onboard-addr-row { display:flex; gap:8px; }
+.onboard-addr-row .inp { flex:1; }
+.onboard-preview { background:var(--surface3); border-radius:12px; padding:12px 16px; margin-bottom:16px; }
+.onboard-preview-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:13px; }
+.onboard-preview-row:last-child { border-bottom:none; }
+.onboard-preview-label { color:var(--muted2); }
+.onboard-preview-val   { font-weight:700; color:var(--text); font-family:var(--mono); }
+.onboard-success { text-align:center; padding:20px 0 10px; }
+.onboard-success-icon  { font-size:44px; margin-bottom:12px; }
+.onboard-success-title { font-family:var(--display); font-size:20px; color:var(--teal); margin-bottom:8px; }
+.onboard-success-sub   { font-size:13px; color:var(--muted2); margin-bottom:20px; line-height:1.6; }
 /* ── TRIPS PAGE ─────────────────────────────────────────────────────────── */
 .page { display:none; }
 .page.active { display:block; }
@@ -1559,6 +1590,124 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
       <!-- Admin content -->
       <div id="admin-content" style="display:none">
 
+        <!-- Member Onboarding Wizard -->
+        <div class="admin-card" id="admin-onboard-card" style="margin-bottom:20px">
+          <div class="admin-card-title">🧭 Member Onboarding</div>
+
+          <!-- Step indicator -->
+          <div class="onboard-steps">
+            <div class="onboard-step">
+              <div class="onboard-step-dot active" id="onboard-dot-1">1</div>
+              <span class="onboard-step-label active" id="onboard-lbl-1">Wallet Setup</span>
+            </div>
+            <div class="onboard-connector" id="onboard-con-1"></div>
+            <div class="onboard-step">
+              <div class="onboard-step-dot pending" id="onboard-dot-2">2</div>
+              <span class="onboard-step-label" id="onboard-lbl-2">Address</span>
+            </div>
+            <div class="onboard-connector" id="onboard-con-2"></div>
+            <div class="onboard-step">
+              <div class="onboard-step-dot pending" id="onboard-dot-3">3</div>
+              <span class="onboard-step-label" id="onboard-lbl-3">Profile</span>
+            </div>
+            <div class="onboard-connector" id="onboard-con-3"></div>
+            <div class="onboard-step">
+              <div class="onboard-step-dot pending" id="onboard-dot-4">✓</div>
+              <span class="onboard-step-label" id="onboard-lbl-4">Done</span>
+            </div>
+          </div>
+
+          <!-- Step 1: QR for member to scan -->
+          <div class="onboard-panel active" id="onboard-panel-1">
+            <p style="font-size:13px;color:var(--muted2);margin-bottom:16px;line-height:1.6">
+              Have the new member scan this QR with their phone camera. It opens the KEEL app and automatically prompts them to add the <strong style="color:var(--accent)">Polygon Amoy</strong> network and the <strong style="color:var(--brass)">KEEL token</strong> to their wallet — so they can see their balance right away.
+            </p>
+            <div class="onboard-qr-wrap">
+              <div class="onboard-qr-box" id="onboard-qr-canvas"></div>
+            </div>
+            <ul class="onboard-instructions">
+              <li><span class="num">1</span>Member opens their phone camera and scans the QR code above</li>
+              <li><span class="num">2</span>The KEEL app opens in their browser</li>
+              <li><span class="num">3</span>They tap <em>Connect Wallet</em> and approve in MetaMask or their wallet app</li>
+              <li><span class="num">4</span>App prompts to add <strong>Polygon Amoy</strong> network — they approve</li>
+              <li><span class="num">5</span>App prompts to add <strong>KEEL</strong> as a custom token — they approve</li>
+              <li><span class="num">6</span>They can now see their KEEL balance in their wallet</li>
+            </ul>
+            <button class="btn-admin btn-admin-primary" onclick="onboardGoTo(2)">Member's wallet is ready →</button>
+          </div>
+
+          <!-- Step 2: Enter member's wallet address -->
+          <div class="onboard-panel" id="onboard-panel-2">
+            <p style="font-size:13px;color:var(--muted2);margin-bottom:16px;line-height:1.6">
+              Enter the member's wallet address. They can find it in their wallet app — tap their account name to copy it.
+            </p>
+            <div style="margin-bottom:14px">
+              <label style="font-size:11px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:6px">Member Wallet Address</label>
+              <input class="inp" id="onboard-addr" placeholder="0x…" autocomplete="off" oninput="onboardAddrInput()" style="width:100%;box-sizing:border-box">
+            </div>
+            <div class="admin-result" id="onboard-addr-result" style="margin-bottom:12px"></div>
+            <div style="display:flex;gap:10px">
+              <button class="btn-admin btn-admin-primary" style="flex:1" onclick="onboardGoTo(1)">← Back</button>
+              <button class="btn-admin btn-admin-gold" style="flex:2" id="onboard-addr-next" onclick="onboardGoTo(3)" disabled>Next →</button>
+            </div>
+          </div>
+
+          <!-- Step 3: Profile + Review -->
+          <div class="onboard-panel" id="onboard-panel-3">
+            <div style="margin-bottom:14px">
+              <label style="font-size:11px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:6px">Display Name</label>
+              <input class="inp" id="onboard-name" placeholder="e.g. Steve C." autocomplete="off" oninput="onboardUpdatePreview()" style="width:100%;box-sizing:border-box">
+            </div>
+            <div style="margin-bottom:16px">
+              <label style="font-size:11px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:6px">Experience Level</label>
+              <select class="inp" id="onboard-exp" onchange="onboardUpdatePreview()" style="width:100%">
+                <option value="Novice">Novice</option>
+                <option value="Intermediate">Intermediate</option>
+                <option value="Advanced">Advanced</option>
+                <option value="Captain">Captain</option>
+              </select>
+            </div>
+            <div class="onboard-preview">
+              <div class="onboard-preview-row">
+                <span class="onboard-preview-label">Wallet</span>
+                <span class="onboard-preview-val" id="onboard-prev-addr">—</span>
+              </div>
+              <div class="onboard-preview-row">
+                <span class="onboard-preview-label">Display Name</span>
+                <span class="onboard-preview-val" id="onboard-prev-name">—</span>
+              </div>
+              <div class="onboard-preview-row">
+                <span class="onboard-preview-label">Experience</span>
+                <span class="onboard-preview-val" id="onboard-prev-exp">Novice</span>
+              </div>
+              <div class="onboard-preview-row">
+                <span class="onboard-preview-label">Initial Mint</span>
+                <span class="onboard-preview-val" style="color:var(--teal)">100 KEEL</span>
+              </div>
+              <div class="onboard-preview-row">
+                <span class="onboard-preview-label">Transactions</span>
+                <span class="onboard-preview-val" style="color:var(--muted2)">2 — approve both in wallet</span>
+              </div>
+            </div>
+            <div class="admin-result" id="onboard-exec-result" style="margin-bottom:12px"></div>
+            <div style="display:flex;gap:10px">
+              <button class="btn-admin btn-admin-primary" style="flex:1" onclick="onboardGoTo(2)">← Back</button>
+              <button class="btn-admin btn-admin-gold" style="flex:2" id="onboard-exec-btn" onclick="onboardExecute()">⚡ Create Profile & Mint</button>
+            </div>
+          </div>
+
+          <!-- Step 4: Success -->
+          <div class="onboard-panel" id="onboard-panel-4">
+            <div class="onboard-success">
+              <div class="onboard-success-icon">⚓</div>
+              <div class="onboard-success-title">Member Onboarded!</div>
+              <div class="onboard-success-sub" id="onboard-success-text">Profile created and initial KEEL issued.</div>
+            </div>
+            <button class="btn-admin btn-admin-primary" onclick="onboardReset()">Onboard Another Member</button>
+          </div>
+
+        </div><!-- /onboarding card -->
+
         <!-- Row 1: Batch Mint + Member Balances -->
         <div class="admin-grid">
 
@@ -2174,6 +2323,19 @@ async function finishConnect(){
   // where a chain switch just happened).
   document.getElementById("splash").classList.add("hidden");
   document.body.classList.remove("splash-active");
+  // If opened via onboarding QR (?setup=1), prompt wallet to add Amoy + KEEL token
+  if(new URLSearchParams(location.search).get("setup") === "1" && provider) {
+    try { await provider.send("wallet_addEthereumChain",[{
+      chainId:"0x13882", chainName:"Polygon Amoy",
+      nativeCurrency:{name:"MATIC",symbol:"MATIC",decimals:18},
+      rpcUrls:["https://rpc-amoy.polygon.technology"],
+      blockExplorerUrls:["https://amoy.polygonscan.com"]
+    }]); } catch(_) {}
+    try { await provider.send("wallet_watchAsset",{
+      type:"ERC20",
+      options:{address:KEEL_TOKEN_ADDRESS, symbol:"KEEL", decimals:18, image:""}
+    }); } catch(_) {}
+  }
   setTimeout(() => {
     if(currentPage === "trips")     loadTripsPage().catch(e => console.warn("trips load failed", e));
     if(currentPage === "keeltoken") loadKeelTokenPage().catch(e => console.warn("keel token load failed", e));
@@ -3649,6 +3811,7 @@ async function loadAdminPage() {
   }
 
   denied.style.display = "none"; content.style.display = "";
+  onboardInitQR();
 
   // Default mint month to current month
   const now = new Date();
@@ -4045,6 +4208,133 @@ function addToCalendar(startTs, endTs, typeLabel, burnAmt) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+// ── Member Onboarding Wizard ─────────────────────────────────────────────────
+
+let _onboardStep = 1;
+
+function onboardInitQR() {
+  const el = document.getElementById("onboard-qr-canvas");
+  if(!el || el.dataset.generated) return;
+  el.dataset.generated = "1";
+  if(typeof QRCode === "undefined") { el.innerHTML = '<span style="color:#999;font-size:12px">QR library unavailable</span>'; return; }
+  new QRCode(el, {
+    text: "https://cubasteve.github.io?setup=1",
+    width: 180, height: 180,
+    colorDark: "#000000", colorLight: "#ffffff",
+    correctLevel: QRCode.CorrectLevel.M
+  });
+}
+
+function onboardGoTo(step) {
+  if(step === 3) {
+    const addr = (document.getElementById("onboard-addr").value||"").trim();
+    if(!ethers.utils.isAddress(addr)) {
+      const r = document.getElementById("onboard-addr-result");
+      r.className = "admin-result error"; r.textContent = "⚠ Enter a valid Ethereum address first."; r.style.display = "block";
+      return;
+    }
+    document.getElementById("onboard-prev-addr").textContent = addr.slice(0,8)+"…"+addr.slice(-6);
+    onboardUpdatePreview();
+  }
+  _onboardStep = step;
+  for(let i = 1; i <= 4; i++) {
+    document.getElementById("onboard-panel-"+i).classList.toggle("active", i === step);
+    const dot = document.getElementById("onboard-dot-"+i);
+    const lbl = document.getElementById("onboard-lbl-"+i);
+    dot.className = "onboard-step-dot "+(i < step ? "done" : i === step ? "active" : "pending");
+    lbl.className = "onboard-step-label "+(i < step ? "done" : i === step ? "active" : "");
+    if(i < 4) {
+      const con = document.getElementById("onboard-con-"+i);
+      if(con) con.className = "onboard-connector"+(i < step ? " done" : "");
+    }
+  }
+}
+
+function onboardAddrInput() {
+  const val = (document.getElementById("onboard-addr").value||"").trim();
+  const ok  = ethers.utils.isAddress(val);
+  document.getElementById("onboard-addr-next").disabled = !ok;
+  if(val.length > 10) {
+    const r = document.getElementById("onboard-addr-result");
+    r.className = "admin-result "+(ok ? "success" : "error");
+    r.textContent = ok ? "✓ Valid address" : "⚠ Not a valid Ethereum address";
+    r.style.display = "block";
+  }
+}
+
+function onboardUpdatePreview() {
+  const name = (document.getElementById("onboard-name")?.value||"").trim();
+  const exp  = document.getElementById("onboard-exp")?.value || "Novice";
+  document.getElementById("onboard-prev-name").textContent = name || "(no name set)";
+  document.getElementById("onboard-prev-exp").textContent  = exp;
+}
+
+async function onboardExecute() {
+  const addr = (document.getElementById("onboard-addr").value||"").trim();
+  const name = (document.getElementById("onboard-name").value||"").trim();
+  const exp  = document.getElementById("onboard-exp").value;
+  const btn  = document.getElementById("onboard-exec-btn");
+
+  if(!ethers.utils.isAddress(addr)) return;
+  if(!signer) { showAdminResult("onboard-exec-result","error","Wallet not connected."); return; }
+
+  btn.disabled = true; btn.textContent = "Working…";
+
+  try {
+    const AMOY_MIN_TIP = ethers.utils.parseUnits("30","gwei");
+    const fee    = await provider.getFeeData().catch(()=>({}));
+    const prio   = (fee.maxPriorityFeePerGas?.gt(AMOY_MIN_TIP)) ? fee.maxPriorityFeePerGas : AMOY_MIN_TIP;
+    const maxFee = (fee.maxFeePerGas?.gt(prio)) ? fee.maxFeePerGas : prio.add(ethers.utils.parseUnits("20","gwei"));
+    const gasOpts = { maxPriorityFeePerGas: prio, maxFeePerGas: maxFee };
+
+    // Tx 1: setMemberProfile
+    showAdminResult("onboard-exec-result","info","Step 1 of 2 — Setting member profile…");
+    const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, signer);
+    showStatus("Approve in wallet — creating member profile…","pending");
+    walletPromptShow();
+    let tx1;
+    try { tx1 = await ledger.setMemberProfile(addr, name, exp, gasOpts); }
+    finally { walletPromptHide(); clearStatus(); }
+    showAdminResult("onboard-exec-result","info","Step 1 of 2 — Profile tx submitted, confirming…");
+    await tx1.wait();
+
+    // Tx 2: issueMonthlyAllocation
+    showAdminResult("onboard-exec-result","info","Step 2 of 2 — Minting initial 100 KEEL…");
+    const token = new ethers.Contract(KEEL_TOKEN_ADDRESS, TOKEN_ABI, signer);
+    const now   = new Date();
+    showStatus("Approve in wallet — minting KEEL…","pending");
+    walletPromptShow();
+    let tx2;
+    try { tx2 = await token.issueMonthlyAllocation(addr, now.getFullYear(), now.getMonth()+1, gasOpts); }
+    finally { walletPromptHide(); clearStatus(); }
+    showAdminResult("onboard-exec-result","info","Step 2 of 2 — Mint tx submitted, confirming…");
+    await tx2.wait();
+
+    const shortAddr = addr.slice(0,8)+"…"+addr.slice(-6);
+    document.getElementById("onboard-success-text").textContent =
+      `${name || shortAddr} is now a member. Profile created and 100 KEEL minted to ${shortAddr}.`;
+    onboardGoTo(4);
+    await Promise.all([adminLoadStats(), adminLoadMemberBalances()]).catch(()=>{});
+
+  } catch(e) {
+    console.error("onboard failed", e);
+    showAdminResult("onboard-exec-result","error","Failed: "+(e.reason||e.message||"Transaction rejected"));
+    btn.disabled = false; btn.textContent = "⚡ Create Profile & Mint";
+  }
+}
+
+function onboardReset() {
+  document.getElementById("onboard-addr").value = "";
+  document.getElementById("onboard-name").value = "";
+  document.getElementById("onboard-exp").selectedIndex = 0;
+  document.getElementById("onboard-addr-next").disabled = true;
+  ["onboard-addr-result","onboard-exec-result"].forEach(id => {
+    const el = document.getElementById(id);
+    if(el){ el.className = "admin-result"; el.style.display = "none"; }
+  });
+  onboardGoTo(1);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 </script>
 </body>
