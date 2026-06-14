@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-14e";
+    const APP_VERSION = "2025-06-14f";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-14e"></script>
+<script src="keel-core.js?v=2025-06-14f"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -2075,6 +2075,12 @@ async function resetConnection() {
 // gate stays put and we never hide/restore it. Connection is handled by the
 // AppKit account subscription → finishConnect().
 async function splashConnect() {
+  // Inside a wallet's in-app browser (MetaMask, Coinbase, etc.) or a desktop
+  // extension, an injected provider is present — connect to it directly.
+  // WalletConnect cannot pair a wallet to ITSELF over the relay, so opening the
+  // WC modal here returns "connection declined". Always prefer injected.
+  if(window.ethereum){ return connectWallet(); }
+
   // 1. Wait for AppKit to finish loading if needed. The Reown bundle loads from
   // esm.sh and on mobile can take a while; rather than rely on a one-shot ready
   // event (which can be missed in a race), poll for window.keelAppKit and also
