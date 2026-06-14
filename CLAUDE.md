@@ -4,7 +4,8 @@ A web3 dApp for **KEEL Token**, an ERC-20 usage/utility token on the **Polygon A
 
 - **Local project:** `C:\dev\keel-token` (Hardhat, Windows)
 - **Live app:** https://cubasteve.github.io (GitHub Pages)
-- **Single-file frontend:** `keel-app.html` (~2,177 lines, no build step — plain HTML/CSS/JS + ethers v5.7.2 from cdnjs, Reown AppKit via esm.sh)
+- **Frontend:** `index.html` (the app shell + connect gate, no build step — plain HTML/CSS/JS + ethers v5.7.2 from cdnjs, Reown AppKit via esm.sh) plus `keel-core.js` (shared pure/stateless core: contract addresses, network constants, `TOKEN_ABI`/`LEDGER_ABI`, federal-holiday date math). `keel-core.js` is loaded synchronously from `index.html`'s head via `document.write`, cache-busted to `APP_VERSION`. (Older docs/scripts may still say `keel-app.html` — the live file is `index.html`.)
+- **Connect gate:** `index.html`'s `#splash` overlay is the sole connect gate. `showConnectGate()` shows it; `showPage()` is guarded so any nav action while disconnected returns to the gate instead of switching pages.
 - **Contract:** `KeelUsageLedger.sol` (v5, ~186 lines)
 
 ---
