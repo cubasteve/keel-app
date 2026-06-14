@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-14d";
+    const APP_VERSION = "2025-06-14e";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,8 +37,10 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-14d"></script>
+<script src="keel-core.js?v=2025-06-14e"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+<!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
   // ── EDIT THIS: your Reown project ID from dashboard.reown.com ──
   // Also add your deployed domain to the project's allowed origins, or mobile
@@ -880,6 +882,40 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 .admin-badge.cancelled { background:rgba(255,83,112,0.08); color:var(--danger); }
 .admin-badge.active-now{ background:rgba(212,168,64,0.12); color:var(--brass); }
 @media(max-width:900px){ .admin-grid { grid-template-columns:1fr; } .admin-row { grid-template-columns:1fr; } }
+/* ── Member Onboarding wizard ─────────────────────────────────────────── */
+.onb-steps { display:flex; align-items:center; margin-bottom:20px; }
+.onb-step { display:flex; align-items:center; gap:7px; }
+.onb-num { width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; background:var(--surface3); color:var(--muted2); flex-shrink:0; transition:all .25s; }
+.onb-step.active .onb-num { background:linear-gradient(135deg,var(--brass2),var(--brass)); color:#fff; box-shadow:0 0 12px rgba(212,168,64,.4); }
+.onb-step.done .onb-num { background:var(--teal); color:#fff; }
+.onb-lbl { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--muted2); white-space:nowrap; }
+.onb-step.active .onb-lbl { color:var(--brass); }
+.onb-step.done .onb-lbl { color:var(--teal); }
+.onb-bar { flex:1; height:2px; background:var(--surface3); margin:0 8px; border-radius:2px; min-width:8px; }
+.onb-panel { display:none; }
+.onb-panel.active { display:block; }
+.onb-help { font-size:12px; color:var(--muted2); line-height:1.6; margin-bottom:14px; }
+.onb-addr-row { display:flex; gap:8px; }
+.onb-addr-row .inp { flex:1; }
+.onb-scan-btn { width:auto !important; padding:0 16px !important; margin-top:0 !important; white-space:nowrap; }
+.onb-btn-row { display:flex; gap:10px; }
+.onb-btn-row .btn-admin { flex:1; }
+.onb-btn-row .btn-admin-gold { flex:2; }
+.onb-review { background:var(--surface3); border-radius:12px; padding:12px 16px; margin-bottom:14px; }
+.onb-review-row { display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid rgba(255,255,255,.05); font-size:13px; }
+.onb-review-row:last-child { border-bottom:none; }
+.onb-review-row span { color:var(--muted2); }
+.onb-review-row b { color:var(--text); font-family:var(--mono); font-weight:700; }
+.onb-done { text-align:center; padding:18px 0 8px; }
+.onb-done-icon { font-size:42px; margin-bottom:10px; }
+.onb-done-title { font-family:var(--display); font-size:20px; color:var(--teal); margin-bottom:6px; }
+.onb-done-sub { font-size:13px; color:var(--muted2); line-height:1.6; margin-bottom:18px; }
+.onb-scanner { display:none; position:fixed; inset:0; z-index:100000; background:rgba(2,9,18,.92); align-items:center; justify-content:center; }
+.onb-scanner.show { display:flex; }
+.onb-scanner-inner { width:min(92vw,420px); background:var(--surface2); border:1px solid var(--border); border-radius:18px; padding:20px; text-align:center; }
+.onb-scanner-title { font-family:var(--display); font-size:16px; color:var(--foam); margin-bottom:14px; }
+#onb-video { width:100%; border-radius:12px; background:#000; aspect-ratio:1/1; object-fit:cover; }
+.onb-scanner-hint { font-size:12px; color:var(--muted2); margin:12px 0 16px; line-height:1.5; }
 /* ── TRIPS PAGE ─────────────────────────────────────────────────────────── */
 .page { display:none; }
 .page.active { display:block; }
@@ -1594,6 +1630,25 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
           </div>
         </div>
 
+        <!-- Add KEEL to your wallet -->
+        <div class="settings-card" style="grid-column:1/-1">
+          <div class="settings-card-title">⬡ See KEEL in Your Wallet</div>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6">
+            Your balance always shows here in the app. To also see it in your wallet app, add the Polygon Amoy network and the KEEL token. One-tap works when this page is open inside your wallet's built-in browser; otherwise add them manually using the details below.
+          </p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+            <button class="btn-continue" style="flex:1;min-width:160px;padding:11px;font-size:12px" onclick="settingsAddNetwork(this)">➕ Add Polygon Amoy</button>
+            <button class="btn-continue" style="flex:1;min-width:160px;padding:11px;font-size:12px" onclick="settingsAddToken(this)">➕ Add KEEL Token</button>
+          </div>
+          <div class="admin-result" id="settings-wallet-add-result" style="margin-bottom:14px"></div>
+          <div class="settings-info-row"><span class="settings-info-label">Network</span><span class="settings-info-val">Polygon Amoy</span></div>
+          <div class="settings-info-row"><span class="settings-info-label">Chain ID</span><span class="settings-info-val">80002</span></div>
+          <div class="settings-info-row"><span class="settings-info-label">Symbol</span><span class="settings-info-val">KEEL</span></div>
+          <div class="settings-info-row"><span class="settings-info-label">Decimals</span><span class="settings-info-val">18</span></div>
+          <div class="settings-info-row"><span class="settings-info-label">Token Contract</span><span class="settings-info-val" style="font-size:10px" id="settings-add-token-addr">—</span></div>
+          <button class="btn-continue" style="width:100%;padding:10px;font-size:12px;margin-top:12px" onclick="settingsCopyTokenContract(this)">⧉ Copy Token Contract Address</button>
+        </div>
+
       </div>
       </div><!-- /settings-content -->
     </div><!-- /page-settings -->
@@ -1610,6 +1665,93 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 
       <!-- Admin content -->
       <div id="admin-content" style="display:none">
+
+        <!-- Member Onboarding wizard -->
+        <div class="admin-card" id="onb-card" style="margin-bottom:20px">
+          <div class="admin-card-title">🧭 Member Onboarding</div>
+
+          <div class="onb-steps">
+            <div class="onb-step active" id="onb-dot-1"><span class="onb-num">1</span><span class="onb-lbl">Address</span></div>
+            <div class="onb-bar"></div>
+            <div class="onb-step" id="onb-dot-2"><span class="onb-num">2</span><span class="onb-lbl">Profile</span></div>
+            <div class="onb-bar"></div>
+            <div class="onb-step" id="onb-dot-3"><span class="onb-num">3</span><span class="onb-lbl">Mint</span></div>
+            <div class="onb-bar"></div>
+            <div class="onb-step" id="onb-dot-4"><span class="onb-num">✓</span><span class="onb-lbl">Done</span></div>
+          </div>
+
+          <!-- Step 1: Address -->
+          <div class="onb-panel active" id="onb-panel-1">
+            <p class="onb-help">Enter the member's wallet address, or scan their wallet's receive/address QR in person. They don't need Polygon or any tokens set up first — a wallet address is the same on every network.</p>
+            <div class="admin-field">
+              <label>Member Wallet Address</label>
+              <div class="onb-addr-row">
+                <input class="inp" id="onb-addr" placeholder="0x…" autocomplete="off" oninput="onbAddrInput()">
+                <button class="btn-admin btn-admin-primary onb-scan-btn" onclick="onbStartScan()">📷 Scan</button>
+              </div>
+            </div>
+            <div class="admin-result" id="onb-addr-result"></div>
+            <button class="btn-admin btn-admin-gold" id="onb-to-2" onclick="onbGoTo(2)" disabled>Next →</button>
+          </div>
+
+          <!-- Step 2: Profile -->
+          <div class="onb-panel" id="onb-panel-2">
+            <div class="admin-field">
+              <label>Display Name</label>
+              <input class="inp" id="onb-name" placeholder="e.g. CubaSteve" maxlength="32" autocomplete="off" oninput="onbReview()">
+            </div>
+            <div class="admin-field">
+              <label>Experience Level</label>
+              <select class="inp" id="onb-exp" onchange="onbReview()">
+                <option value="Novice">Novice</option>
+                <option value="Intermediate">Intermediate</option>
+                <option value="Advanced">Advanced</option>
+                <option value="Captain">Captain</option>
+              </select>
+            </div>
+            <div class="onb-btn-row">
+              <button class="btn-admin btn-admin-primary" onclick="onbGoTo(1)">← Back</button>
+              <button class="btn-admin btn-admin-gold" onclick="onbGoTo(3)">Next →</button>
+            </div>
+          </div>
+
+          <!-- Step 3: Review & Mint -->
+          <div class="onb-panel" id="onb-panel-3">
+            <div class="onb-review">
+              <div class="onb-review-row"><span>Wallet</span><b id="onb-rv-addr">—</b></div>
+              <div class="onb-review-row"><span>Display Name</span><b id="onb-rv-name">—</b></div>
+              <div class="onb-review-row"><span>Experience</span><b id="onb-rv-exp">—</b></div>
+              <div class="onb-review-row"><span>Initial Mint</span><b style="color:var(--teal)">100 KEEL</b></div>
+              <div class="onb-review-row"><span>You'll approve</span><b style="color:var(--muted2)">2 transactions</b></div>
+            </div>
+            <p class="onb-help">This sets the member's on-chain profile (you as operator) and mints their initial KEEL — they don't sign anything.</p>
+            <div class="admin-result" id="onb-mint-result"></div>
+            <div class="onb-btn-row">
+              <button class="btn-admin btn-admin-primary" onclick="onbGoTo(2)">← Back</button>
+              <button class="btn-admin btn-admin-gold" id="onb-mint-btn" onclick="onbExecute()">⚡ Create &amp; Mint</button>
+            </div>
+          </div>
+
+          <!-- Step 4: Done -->
+          <div class="onb-panel" id="onb-panel-4">
+            <div class="onb-done">
+              <div class="onb-done-icon">⚓</div>
+              <div class="onb-done-title">Member Onboarded!</div>
+              <div class="onb-done-sub" id="onb-done-sub">Profile created and 100 KEEL minted.</div>
+            </div>
+            <button class="btn-admin btn-admin-primary" onclick="onbReset()">Onboard Another Member</button>
+          </div>
+        </div>
+
+        <!-- Camera scanner overlay -->
+        <div id="onb-scanner" class="onb-scanner">
+          <div class="onb-scanner-inner">
+            <div class="onb-scanner-title">Scan member's wallet QR</div>
+            <video id="onb-video" playsinline muted></video>
+            <div class="onb-scanner-hint" id="onb-scan-hint">Point the camera at the member's wallet address QR…</div>
+            <button class="btn-admin btn-admin-primary" onclick="onbStopScan()">Cancel</button>
+          </div>
+        </div>
 
         <!-- Row 1: Batch Mint + Member Balances -->
         <div class="admin-grid">
@@ -3491,6 +3633,8 @@ function getProfileSync(addr) {
 async function loadSettingsPage() {
   document.getElementById("settings-token-addr").textContent  = KEEL_TOKEN_ADDRESS.slice(0,10)+"…"+KEEL_TOKEN_ADDRESS.slice(-6);
   document.getElementById("settings-ledger-addr").textContent = KEEL_LEDGER_ADDRESS.slice(0,10)+"…"+KEEL_LEDGER_ADDRESS.slice(-6);
+  const addTok = document.getElementById("settings-add-token-addr");
+  if(addTok) addTok.textContent = KEEL_TOKEN_ADDRESS.slice(0,10)+"…"+KEEL_TOKEN_ADDRESS.slice(-6);
   document.getElementById("settings-balance").textContent = keelBalance > 0 ? keelBalance.toFixed(2)+" KEEL" : "—";
 
   if(!walletAddress) return;
@@ -3907,6 +4051,194 @@ function resetAdminPage() {
   document.getElementById("admin-access-denied").style.display = "";
   document.getElementById("admin-content").style.display = "none";
   document.getElementById("admin-denied-msg").textContent = "Connect your wallet to access the admin panel";
+  try { onbStopScan(); } catch(_){}
+  try { onbReset(); } catch(_){}
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── MEMBER ONBOARDING WIZARD (admin) ─────────────────────────────────────────
+function onbGoTo(step){
+  if(step === 3) onbReview();
+  for(let i=1;i<=4;i++){
+    document.getElementById("onb-panel-"+i).classList.toggle("active", i===step);
+    const dot = document.getElementById("onb-dot-"+i);
+    dot.classList.toggle("active", i===step);
+    dot.classList.toggle("done", i<step);
+  }
+}
+
+function onbAddrInput(){
+  const v = (document.getElementById("onb-addr").value||"").trim();
+  const ok = ethers.utils.isAddress(v);
+  document.getElementById("onb-to-2").disabled = !ok;
+  const r = document.getElementById("onb-addr-result");
+  if(!v){ r.className="admin-result"; r.textContent=""; return; }
+  r.className = "admin-result "+(ok?"success":"error");
+  r.textContent = ok ? "✓ Valid wallet address" : "⚠ Not a valid wallet address";
+}
+
+function onbReview(){
+  const addr = (document.getElementById("onb-addr").value||"").trim();
+  document.getElementById("onb-rv-addr").textContent = addr ? addr.slice(0,8)+"…"+addr.slice(-6) : "—";
+  document.getElementById("onb-rv-name").textContent = (document.getElementById("onb-name").value||"").trim() || "(none)";
+  document.getElementById("onb-rv-exp").textContent  = document.getElementById("onb-exp").value || "Novice";
+}
+
+async function onbExecute(){
+  const addr = (document.getElementById("onb-addr").value||"").trim();
+  const name = (document.getElementById("onb-name").value||"").trim();
+  const exp  = document.getElementById("onb-exp").value;
+  const btn  = document.getElementById("onb-mint-btn");
+  if(!ethers.utils.isAddress(addr)){ showAdminResult("onb-mint-result","error","Invalid wallet address."); return; }
+  if(!signer){ showAdminResult("onb-mint-result","error","Connect your admin wallet first."); return; }
+
+  btn.disabled = true; btn.textContent = "Working…";
+  try {
+    const AMOY_MIN_TIP = ethers.utils.parseUnits("30","gwei");
+    const fee    = await provider.getFeeData().catch(()=>({}));
+    const prio   = (fee.maxPriorityFeePerGas?.gt(AMOY_MIN_TIP)) ? fee.maxPriorityFeePerGas : AMOY_MIN_TIP;
+    const maxFee = (fee.maxFeePerGas?.gt(prio)) ? fee.maxFeePerGas : prio.add(ethers.utils.parseUnits("20","gwei"));
+    const gas = { maxPriorityFeePerGas: prio, maxFeePerGas: maxFee };
+
+    // Tx 1 — set member profile (admin acts as operator)
+    showAdminResult("onb-mint-result","info","Step 1 of 2 — setting member profile…");
+    const ledger = new ethers.Contract(KEEL_LEDGER_ADDRESS, LEDGER_ABI, signer);
+    walletPromptShow();
+    let tx1; try { tx1 = await ledger.setMemberProfile(addr, name, exp, gas); } finally { walletPromptHide(); }
+    showAdminResult("onb-mint-result","info","Step 1 — confirming profile…");
+    await tx1.wait();
+
+    // Tx 2 — issue initial monthly allocation
+    showAdminResult("onb-mint-result","info","Step 2 of 2 — minting 100 KEEL…");
+    const token = new ethers.Contract(KEEL_TOKEN_ADDRESS, TOKEN_ABI, signer);
+    const now = new Date();
+    walletPromptShow();
+    let tx2; try { tx2 = await token.issueMonthlyAllocation(addr, now.getFullYear(), now.getMonth()+1, gas); } finally { walletPromptHide(); }
+    showAdminResult("onb-mint-result","info","Step 2 — confirming mint…");
+    await tx2.wait();
+    clearStatus();
+
+    const short = addr.slice(0,8)+"…"+addr.slice(-6);
+    document.getElementById("onb-done-sub").textContent =
+      (name||short)+" is now a member — profile created and 100 KEEL minted to "+short+".";
+    onbGoTo(4);
+    Promise.all([adminLoadStats(), adminLoadMemberBalances()]).catch(()=>{});
+  } catch(e){
+    console.error("onboard failed", e);
+    showAdminResult("onb-mint-result","error","Failed: "+(e.reason||e.message||"transaction rejected"));
+    btn.disabled = false; btn.textContent = "⚡ Create & Mint";
+  }
+}
+
+function onbReset(){
+  const a = document.getElementById("onb-addr"); if(a) a.value = "";
+  const n = document.getElementById("onb-name"); if(n) n.value = "";
+  const ex = document.getElementById("onb-exp"); if(ex) ex.selectedIndex = 0;
+  const t2 = document.getElementById("onb-to-2"); if(t2) t2.disabled = true;
+  const mb = document.getElementById("onb-mint-btn"); if(mb){ mb.disabled = false; mb.textContent = "⚡ Create & Mint"; }
+  ["onb-addr-result","onb-mint-result"].forEach(id => { const el=document.getElementById(id); if(el){ el.className="admin-result"; el.textContent=""; } });
+  onbGoTo(1);
+}
+
+// ── QR scanner (jsQR) for capturing the member's wallet address ──────────────
+let _onbStream = null, _onbRAF = null;
+async function onbStartScan(){
+  const overlay = document.getElementById("onb-scanner");
+  const video   = document.getElementById("onb-video");
+  const hint    = document.getElementById("onb-scan-hint");
+  if(typeof jsQR === "undefined"){ showAdminResult("onb-addr-result","error","QR scanner library unavailable — type the address instead."); return; }
+  overlay.classList.add("show");
+  hint.textContent = "Point the camera at the member's wallet address QR…";
+  try {
+    _onbStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    video.srcObject = _onbStream;
+    await video.play();
+  } catch(e){
+    hint.textContent = "Camera unavailable: "+(e.message||e.name)+". Type the address instead.";
+    return;
+  }
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const tick = () => {
+    if(!_onbStream) return;
+    if(video.readyState === video.HAVE_ENOUGH_DATA){
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      let code = null;
+      try { code = jsQR(ctx.getImageData(0,0,canvas.width,canvas.height).data, canvas.width, canvas.height); } catch(_){}
+      if(code && code.data){
+        const m = code.data.match(/0x[a-fA-F0-9]{40}/);
+        if(m){
+          document.getElementById("onb-addr").value = m[0];
+          onbAddrInput();
+          onbStopScan();
+          showAdminResult("onb-addr-result","success","✓ Scanned "+m[0].slice(0,8)+"…"+m[0].slice(-6));
+          return;
+        } else {
+          hint.textContent = "That QR doesn't contain a wallet address. Try their wallet's Receive screen.";
+        }
+      }
+    }
+    _onbRAF = requestAnimationFrame(tick);
+  };
+  _onbRAF = requestAnimationFrame(tick);
+}
+
+function onbStopScan(){
+  if(_onbRAF){ cancelAnimationFrame(_onbRAF); _onbRAF = null; }
+  if(_onbStream){ _onbStream.getTracks().forEach(t => t.stop()); _onbStream = null; }
+  const overlay = document.getElementById("onb-scanner");
+  if(overlay) overlay.classList.remove("show");
+  const video = document.getElementById("onb-video");
+  if(video) video.srcObject = null;
+}
+
+// ── Settings: add Polygon Amoy + KEEL token to the member's own wallet ───────
+async function settingsAddNetwork(btn){
+  const eth = window.ethereum;
+  if(!eth){ showAdminResult("settings-wallet-add-result","info","Open this page inside your wallet's browser to add automatically, or add Polygon Amoy manually using the details below."); return; }
+  const t = btn.textContent; btn.disabled = true; btn.textContent = "Check wallet…";
+  try {
+    await eth.request({ method:"wallet_addEthereumChain", params:[{
+      chainId:"0x13882", chainName:"Polygon Amoy",
+      nativeCurrency:{ name:"POL", symbol:"POL", decimals:18 },
+      rpcUrls:["https://rpc-amoy.polygon.technology"],
+      blockExplorerUrls:["https://amoy.polygonscan.com"]
+    }]});
+    showAdminResult("settings-wallet-add-result","success","✓ Polygon Amoy added (or already present).");
+  } catch(e){
+    showAdminResult("settings-wallet-add-result", e && e.code===4001 ? "info" : "error",
+      e && e.code===4001 ? "Network add cancelled." : "Couldn't add network: "+(e.message||e));
+  }
+  btn.disabled = false; btn.textContent = t;
+}
+
+async function settingsAddToken(btn){
+  const eth = window.ethereum;
+  if(!eth){ showAdminResult("settings-wallet-add-result","info","Open this page inside your wallet's browser to add automatically, or import the token manually using the contract address below."); return; }
+  const t = btn.textContent; btn.disabled = true; btn.textContent = "Check wallet…";
+  try {
+    const ok = await eth.request({ method:"wallet_watchAsset", params:{
+      type:"ERC20", options:{ address:KEEL_TOKEN_ADDRESS, symbol:"KEEL", decimals:18 }
+    }});
+    showAdminResult("settings-wallet-add-result", ok!==false ? "success" : "info",
+      ok!==false ? "✓ KEEL token added to your wallet." : "Your wallet declined the token add — import it manually below.");
+  } catch(e){
+    showAdminResult("settings-wallet-add-result","error","Couldn't add token: "+(e.message||e));
+  }
+  btn.disabled = false; btn.textContent = t;
+}
+
+function settingsCopyTokenContract(btn){
+  const flip = () => { const t=btn.dataset.label||btn.textContent; btn.dataset.label=t; btn.textContent="Copied!"; setTimeout(()=>btn.textContent=t,1500); };
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = KEEL_TOKEN_ADDRESS; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.focus(); ta.select(); ta.setSelectionRange(0,99999);
+    const ok = document.execCommand("copy"); document.body.removeChild(ta);
+    if(ok) flip();
+  } catch(_){}
+  if(navigator.clipboard) navigator.clipboard.writeText(KEEL_TOKEN_ADDRESS).then(flip).catch(()=>{});
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
