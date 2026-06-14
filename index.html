@@ -176,6 +176,12 @@ body.setup-active  { overflow: hidden; }
 .setup-result.success { background:rgba(0,200,160,0.1); border:1px solid rgba(0,200,160,0.3); color:var(--teal); display:block; }
 .setup-result.error   { background:rgba(255,83,112,0.1); border:1px solid rgba(255,83,112,0.3); color:var(--danger); display:block; }
 .setup-result.info    { background:rgba(74,179,255,0.08); border:1px solid rgba(74,179,255,0.2); color:var(--accent); display:block; }
+.setup-field-label { font-size:11px; font-weight:600; color:var(--muted2); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:6px; }
+.setup-meta { margin-top:14px; }
+.setup-meta-row { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:13px; }
+.setup-meta-row:last-child { border-bottom:none; }
+.setup-meta-row span { color:var(--muted2); }
+.setup-meta-row b { color:var(--text); font-family:var(--mono); }
 body::before {
   content: '';
   position: fixed;
@@ -1172,16 +1178,33 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
       <div class="setup-card-title">📲 Open in your wallet's browser</div>
       <div class="setup-card-text">To add the network and token, this page needs to run <strong>inside your wallet app</strong>. Tap your wallet below — it'll reopen this page there and finish setup automatically.</div>
       <div class="setup-wallet-btns">
-        <a class="setup-wallet-btn" id="setup-link-mm"><span class="wemoji">🦊</span> MetaMask <span class="warrow">→</span></a>
-        <a class="setup-wallet-btn" id="setup-link-cb"><span class="wemoji">🔵</span> Coinbase Wallet <span class="warrow">→</span></a>
-        <a class="setup-wallet-btn" id="setup-link-tw"><span class="wemoji">🛡️</span> Trust Wallet <span class="warrow">→</span></a>
+        <a class="setup-wallet-btn" id="setup-link-mm" target="_blank" rel="noopener"><span class="wemoji">🦊</span> MetaMask <span class="warrow">→</span></a>
+        <a class="setup-wallet-btn" id="setup-link-cb" target="_blank" rel="noopener"><span class="wemoji">🔵</span> Coinbase Wallet <span class="warrow">→</span></a>
+        <a class="setup-wallet-btn" id="setup-link-tw" target="_blank" rel="noopener"><span class="wemoji">🛡️</span> Trust Wallet <span class="warrow">→</span></a>
       </div>
-      <div class="setup-card-text" style="margin:16px 0 0">Using a different wallet? Copy this link and paste it into your wallet app's built-in browser:</div>
+      <div class="setup-card-text" style="margin:16px 0 0">Using a different wallet? Copy this link and open it in your wallet app's built-in browser:</div>
       <div class="setup-url-row">
         <input id="setup-url-input" readonly>
         <button onclick="setupCopyUrl(this)">Copy</button>
       </div>
-      <button class="setup-btn setup-btn-ghost" onclick="setupContinue()" style="margin-top:16px">Continue to app without adding token</button>
+    </div>
+
+    <!-- Manual import — always works in any wallet -->
+    <div class="setup-card">
+      <div class="setup-card-title">✍️ Or add KEEL manually</div>
+      <div class="setup-card-text">Works in any wallet. In your wallet, switch to <strong>Polygon Amoy</strong>, open <em>Import / Add custom token</em>, and paste this contract address:</div>
+      <div class="setup-field-label">KEEL Token Contract</div>
+      <div class="setup-url-row">
+        <input id="setup-contract-input" readonly>
+        <button onclick="setupCopyContract(this)">Copy</button>
+      </div>
+      <div class="setup-meta">
+        <div class="setup-meta-row"><span>Network</span><b>Polygon Amoy</b></div>
+        <div class="setup-meta-row"><span>Chain ID</span><b>80002</b></div>
+        <div class="setup-meta-row"><span>Symbol</span><b>KEEL</b></div>
+        <div class="setup-meta-row"><span>Decimals</span><b>18</b></div>
+      </div>
+      <button class="setup-btn setup-btn-ghost" onclick="setupContinue()" style="margin-top:16px">Continue to app →</button>
     </div>
 
   </div>
@@ -4294,6 +4317,9 @@ function setupInit() {
   const injected = document.getElementById("setup-injected");
   const noinj    = document.getElementById("setup-noinjected");
 
+  // Manual-import contract address is always shown — wallet-agnostic fallback.
+  document.getElementById("setup-contract-input").value = KEEL_TOKEN_ADDRESS;
+
   if(window.ethereum) {
     // Inside a wallet's in-app browser (or desktop extension) — config will work.
     injected.style.display = "";
@@ -4389,13 +4415,20 @@ function setupContinue() {
   try { history.replaceState({}, "", location.pathname); } catch(_) {}
 }
 
-function setupCopyUrl(btn) {
-  const inp = document.getElementById("setup-url-input");
-  inp.select(); inp.setSelectionRange(0, 99999);
-  const done = () => { const t = btn.textContent; btn.textContent = "Copied!"; setTimeout(()=>btn.textContent=t, 1500); };
-  if(navigator.clipboard) navigator.clipboard.writeText(inp.value).then(done).catch(()=>{ document.execCommand("copy"); done(); });
-  else { document.execCommand("copy"); done(); }
+function _setupCopyFrom(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  if(!inp) return;
+  const flip = () => { const t = btn.dataset.label || btn.textContent; btn.dataset.label = t; btn.textContent = "Copied!"; setTimeout(()=>btn.textContent = t, 1500); };
+  // Synchronous execCommand first — works on the selected input even when the
+  // async Clipboard API is blocked (not focused, permissions, older mobile WebkViews).
+  try { inp.removeAttribute("readonly"); inp.focus(); inp.select(); inp.setSelectionRange(0, 99999);
+        const ok = document.execCommand("copy"); inp.setAttribute("readonly","");
+        if(ok) { flip(); } } catch(_) {}
+  // Best-effort async copy too (harmless if execCommand already worked).
+  if(navigator.clipboard) navigator.clipboard.writeText(inp.value).then(flip).catch(()=>{});
 }
+function setupCopyUrl(btn)      { _setupCopyFrom("setup-url-input", btn); }
+function setupCopyContract(btn) { _setupCopyFrom("setup-contract-input", btn); }
 
 // ── Member Onboarding Wizard ─────────────────────────────────────────────────
 
