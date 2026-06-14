@@ -1993,20 +1993,31 @@ async function loadExpiryStats(){
 // lower z-index, so we hide the splash before opening the modal and restore it
 // if the user cancels without connecting.
 async function splashConnect() {
-  // 1. Wait for AppKit to finish loading if needed
+  // 1. Wait for AppKit to finish loading if needed. The Reown bundle loads from
+  // esm.sh and on mobile can take a while; rather than rely on a one-shot ready
+  // event (which can be missed in a race), poll for window.keelAppKit and also
+  // listen for the event, with a generous timeout.
   if(!window.keelAppKit) {
-    showStatus("Opening wallet connection…","pending");
-    try {
-      await new Promise((resolve, reject) => {
-        if(window.keelAppKit){ resolve(); return; }
-        const t = setTimeout(() => reject(new Error("timeout")), 10000);
-        window.addEventListener("keel-appkit-ready", () => { clearTimeout(t); resolve(); }, {once:true});
-      });
-    } catch(_) {
+    showStatus("Loading wallet connector…","pending");
+    const ready = await new Promise((resolve) => {
+      if(window.keelAppKit){ resolve(true); return; }
+      let waited = 0;
+      const iv = setInterval(() => {
+        if(window.keelAppKit){ clearInterval(iv); resolve(true); return; }
+        waited += 250;
+        if(waited >= 25000){ clearInterval(iv); resolve(false); }
+      }, 250);
+      window.addEventListener("keel-appkit-ready", () => { clearInterval(iv); resolve(true); }, {once:true});
+    });
+    if(!ready) {
       clearStatus();
       if(window.ethereum){ await connectWallet(); return; }
-      showStatus("Could not load wallet — please refresh.","error");
-      setTimeout(clearStatus, 5000);
+      const failed = String(window.__keelAppKitStatus || "").startsWith("error");
+      showStatus(
+        failed ? "Wallet connector failed to load. Check your connection and refresh."
+               : "Still loading the wallet connector — wait a moment and tap Connect again.",
+        "error");
+      setTimeout(clearStatus, 6000);
       return;
     }
     clearStatus();
