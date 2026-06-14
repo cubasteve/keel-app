@@ -2026,16 +2026,31 @@ async function splashConnect() {
     return;
   }
 
-  // 3. Poll until connected or modal dismissed without connecting
+  // 3. Poll until connected or modal dismissed without connecting.
+  // modal.open() resolves BEFORE the modal web-component finishes mounting, so
+  // isOpen() can briefly read false right after opening. Only treat a closed
+  // modal as a user-cancel once we've actually seen it open — otherwise the
+  // first tick restores the splash on top of the still-mounting modal and it
+  // looks like the modal never opened (the inconsistency).
+  let sawOpen = false;
+  const restoreSplash = () => { sp.style.opacity = ""; sp.style.pointerEvents = ""; };
   const poll = setInterval(() => {
     if(walletAddress) {
       clearInterval(poll); // finishConnect() already hid splash permanently
-    } else if(!window.keelAppKit.isOpen()) {
-      clearInterval(poll);
-      sp.style.opacity = "";     // user cancelled — restore splash
-      sp.style.pointerEvents = "";
+      return;
     }
-  }, 400);
+    if(window.keelAppKit.isOpen()) {
+      sawOpen = true;
+    } else if(sawOpen) {
+      clearInterval(poll);
+      restoreSplash();     // it opened, now it's closed → user cancelled
+    }
+  }, 300);
+  // Safety net: if the modal never reports open within 5s and no wallet
+  // connected, stop polling and restore the splash so the user can retry.
+  setTimeout(() => {
+    if(!sawOpen && !walletAddress) { clearInterval(poll); restoreSplash(); }
+  }, 5000);
 }
 
 async function connectWallet() {
