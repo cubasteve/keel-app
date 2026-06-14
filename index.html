@@ -4218,7 +4218,7 @@ function onboardInitQR() {
   el.dataset.generated = "1";
   if(typeof QRCode === "undefined") { el.innerHTML = '<span style="color:#999;font-size:12px">QR library unavailable</span>'; return; }
   new QRCode(el, {
-    text: "https://cubasteve.github.io?setup=1",
+    text: "https://cubasteve.github.io/keel-app/?setup=1",
     width: 180, height: 180,
     colorDark: "#000000", colorLight: "#ffffff",
     correctLevel: QRCode.CorrectLevel.M
