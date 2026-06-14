@@ -137,6 +137,45 @@ body {
   position: relative;
 }
 body.splash-active { overflow: hidden; }
+body.setup-active  { overflow: hidden; }
+/* ── Wallet Setup Screen (onboarding ?setup=1) ─────────────────────────── */
+#setup-screen {
+  position:fixed; inset:0; z-index:99999; display:none;
+  background:radial-gradient(120% 100% at 50% 0%, #0e2247 0%, #081530 55%, #050d1f 100%);
+  overflow-y:auto; -webkit-overflow-scrolling:touch;
+}
+#setup-screen.show { display:block; }
+.setup-wrap { max-width:420px; margin:0 auto; padding:32px 22px 48px; min-height:100%; box-sizing:border-box; display:flex; flex-direction:column; }
+.setup-logo { text-align:center; font-size:44px; margin-bottom:6px; }
+.setup-title { text-align:center; font-family:var(--display); font-size:24px; font-weight:800; color:var(--foam); letter-spacing:1px; margin-bottom:4px; }
+.setup-sub { text-align:center; font-size:13px; color:var(--muted2); margin-bottom:26px; line-height:1.6; }
+.setup-card { background:rgba(13,28,54,0.7); border:1px solid var(--border); border-radius:18px; padding:22px; margin-bottom:16px; }
+.setup-card-title { font-family:var(--display); font-size:15px; font-weight:700; color:var(--foam); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.setup-card-text { font-size:13px; color:var(--muted2); line-height:1.6; margin-bottom:16px; }
+.setup-steps { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:12px; }
+.setup-step { display:flex; align-items:center; gap:12px; font-size:14px; color:var(--text); transition:opacity 0.3s; }
+.setup-step .sicon { width:30px; height:30px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; background:var(--surface3); color:var(--muted2); transition:all 0.3s; }
+.setup-step.active  .sicon { background:linear-gradient(135deg,var(--brass2),var(--brass)); color:#fff; box-shadow:0 0 14px rgba(212,168,64,0.45); }
+.setup-step.done    .sicon { background:var(--teal); color:#fff; }
+.setup-step.failed  .sicon { background:var(--danger); color:#fff; }
+.setup-step .stext small { display:block; font-size:11px; color:var(--muted2); margin-top:1px; }
+.setup-btn { font-family:var(--sans); font-weight:700; font-size:15px; padding:15px 20px; border-radius:12px; border:none; cursor:pointer; width:100%; transition:all 0.2s; }
+.setup-btn-primary { background:linear-gradient(135deg,#0a4090,var(--accent)); color:#fff; box-shadow:0 6px 20px rgba(74,179,255,0.3); }
+.setup-btn-primary:active { transform:translateY(1px); }
+.setup-btn-primary:disabled { opacity:0.5; }
+.setup-btn-ghost { background:transparent; color:var(--muted2); border:1px solid var(--border); margin-top:10px; font-weight:600; font-size:13px; padding:12px; }
+.setup-wallet-btns { display:flex; flex-direction:column; gap:10px; margin-bottom:6px; }
+.setup-wallet-btn { display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:12px; background:var(--surface3); border:1px solid var(--border); color:var(--text); font-size:14px; font-weight:600; text-decoration:none; transition:all 0.2s; }
+.setup-wallet-btn:active { transform:translateY(1px); background:rgba(74,179,255,0.08); }
+.setup-wallet-btn .wemoji { font-size:22px; }
+.setup-wallet-btn .warrow { margin-left:auto; color:var(--muted2); }
+.setup-url-row { display:flex; gap:8px; margin-top:14px; }
+.setup-url-row input { flex:1; background:var(--surface3); border:1px solid var(--border); border-radius:10px; padding:11px 12px; color:var(--text); font-family:var(--mono); font-size:12px; }
+.setup-url-row button { background:var(--surface3); border:1px solid var(--border); border-radius:10px; padding:0 16px; color:var(--brass); font-weight:700; font-size:13px; cursor:pointer; }
+.setup-result { margin-top:14px; padding:12px 14px; border-radius:10px; font-size:13px; display:none; line-height:1.5; }
+.setup-result.success { background:rgba(0,200,160,0.1); border:1px solid rgba(0,200,160,0.3); color:var(--teal); display:block; }
+.setup-result.error   { background:rgba(255,83,112,0.1); border:1px solid rgba(255,83,112,0.3); color:var(--danger); display:block; }
+.setup-result.info    { background:rgba(74,179,255,0.08); border:1px solid rgba(74,179,255,0.2); color:var(--accent); display:block; }
 body::before {
   content: '';
   position: fixed;
@@ -1108,6 +1147,46 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
     </svg>
   </div>
 </div>
+<!-- ── WALLET SETUP SCREEN (onboarding, shown when URL has ?setup=1) ──────── -->
+<div id="setup-screen">
+  <div class="setup-wrap">
+    <div class="setup-logo">⛵</div>
+    <div class="setup-title">Welcome Aboard</div>
+    <div class="setup-sub">Let's add the <strong style="color:var(--brass)">KEEL token</strong> to your wallet so you can see your balance.</div>
+
+    <!-- Path A: injected provider present — run config directly -->
+    <div class="setup-card" id="setup-injected" style="display:none">
+      <div class="setup-card-title">🔗 One tap to set up</div>
+      <div class="setup-card-text">Tap below and approve the two prompts in your wallet — first to add the <strong>Polygon Amoy</strong> network, then to add the <strong>KEEL</strong> token.</div>
+      <ul class="setup-steps" id="setup-steps">
+        <li class="setup-step" id="setup-step-net"><span class="sicon">1</span><span class="stext">Add Polygon Amoy network<small>The test network KEEL runs on</small></span></li>
+        <li class="setup-step" id="setup-step-tok"><span class="sicon">2</span><span class="stext">Add KEEL token<small>So your balance shows in your wallet</small></span></li>
+      </ul>
+      <div class="setup-result" id="setup-result"></div>
+      <button class="setup-btn setup-btn-primary" id="setup-run-btn" onclick="setupRunConfig()" style="margin-top:18px">Add to my wallet</button>
+      <button class="setup-btn setup-btn-ghost" onclick="setupContinue()">Skip — continue to app</button>
+    </div>
+
+    <!-- Path B: no injected provider — guide to open in wallet's browser -->
+    <div class="setup-card" id="setup-noinjected" style="display:none">
+      <div class="setup-card-title">📲 Open in your wallet's browser</div>
+      <div class="setup-card-text">To add the network and token, this page needs to run <strong>inside your wallet app</strong>. Tap your wallet below — it'll reopen this page there and finish setup automatically.</div>
+      <div class="setup-wallet-btns">
+        <a class="setup-wallet-btn" id="setup-link-mm"><span class="wemoji">🦊</span> MetaMask <span class="warrow">→</span></a>
+        <a class="setup-wallet-btn" id="setup-link-cb"><span class="wemoji">🔵</span> Coinbase Wallet <span class="warrow">→</span></a>
+        <a class="setup-wallet-btn" id="setup-link-tw"><span class="wemoji">🛡️</span> Trust Wallet <span class="warrow">→</span></a>
+      </div>
+      <div class="setup-card-text" style="margin:16px 0 0">Using a different wallet? Copy this link and paste it into your wallet app's built-in browser:</div>
+      <div class="setup-url-row">
+        <input id="setup-url-input" readonly>
+        <button onclick="setupCopyUrl(this)">Copy</button>
+      </div>
+      <button class="setup-btn setup-btn-ghost" onclick="setupContinue()" style="margin-top:16px">Continue to app without adding token</button>
+    </div>
+
+  </div>
+</div>
+
 <script>
 // Generate star field for splash
 (function(){
@@ -2325,28 +2404,6 @@ async function finishConnect(){
   // where a chain switch just happened).
   document.getElementById("splash").classList.add("hidden");
   document.body.classList.remove("splash-active");
-  // If opened via onboarding QR (?setup=1), prompt wallet to add Amoy + KEEL token.
-  // Run non-blocking after page settles so this never freezes the connect flow.
-  if(new URLSearchParams(location.search).get("setup") === "1") {
-    setTimeout(async () => {
-      const eth = window.ethereum;
-      if(!eth) return;
-      try {
-        await eth.request({ method:"wallet_addEthereumChain", params:[{
-          chainId:"0x13882", chainName:"Polygon Amoy",
-          nativeCurrency:{name:"MATIC",symbol:"MATIC",decimals:18},
-          rpcUrls:["https://rpc-amoy.polygon.technology"],
-          blockExplorerUrls:["https://amoy.polygonscan.com"]
-        }]});
-      } catch(e){ console.warn("addEthereumChain:", e); }
-      try {
-        await eth.request({ method:"wallet_watchAsset", params:{
-          type:"ERC20",
-          options:{address:KEEL_TOKEN_ADDRESS, symbol:"KEEL", decimals:18}
-        }});
-      } catch(e){ console.warn("watchAsset:", e); }
-    }, 1200);
-  }
   setTimeout(() => {
     if(currentPage === "trips")     loadTripsPage().catch(e => console.warn("trips load failed", e));
     if(currentPage === "keeltoken") loadKeelTokenPage().catch(e => console.warn("keel token load failed", e));
@@ -3175,6 +3232,7 @@ window.addEventListener("resize", ()=>{
 });
 
 window.addEventListener("load",()=>{
+  setupInit(); // onboarding ?setup=1 — show wallet-setup screen if present
   const today = todayKey(); // ET YYYY-MM-DD
   document.getElementById("trip-date").value = today;
   document.getElementById("cal-trigger-text").textContent =
@@ -4219,6 +4277,126 @@ function addToCalendar(startTs, endTs, typeLabel, burnAmt) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+// ── Wallet Setup Screen (member onboarding via ?setup=1) ─────────────────────
+// A web page can only add a network/token to a wallet that injects a provider
+// (i.e. when opened inside the wallet's in-app browser). On a plain mobile
+// browser there is no such API, so we route the member into their wallet's
+// browser via deeplinks. This screen is fully decoupled from the Reown/
+// WalletConnect connect flow, so it can never hang on that modal.
+
+function setupInit() {
+  if(new URLSearchParams(location.search).get("setup") !== "1") return;
+
+  const screen = document.getElementById("setup-screen");
+  screen.classList.add("show");
+  document.body.classList.add("setup-active");
+
+  const injected = document.getElementById("setup-injected");
+  const noinj    = document.getElementById("setup-noinjected");
+
+  if(window.ethereum) {
+    // Inside a wallet's in-app browser (or desktop extension) — config will work.
+    injected.style.display = "";
+    noinj.style.display    = "none";
+  } else {
+    // Plain mobile browser — guide them into their wallet's browser.
+    injected.style.display = "none";
+    noinj.style.display    = "";
+    const full      = location.href;                                  // includes ?setup=1
+    const noScheme  = location.host + location.pathname + location.search; // for MetaMask
+    document.getElementById("setup-link-mm").href =
+      "https://metamask.app.link/dapp/" + noScheme;
+    document.getElementById("setup-link-cb").href =
+      "https://go.cb-w.com/dapp?cb_url=" + encodeURIComponent(full);
+    document.getElementById("setup-link-tw").href =
+      "https://link.trustwallet.com/open_url?url=" + encodeURIComponent(full);
+    document.getElementById("setup-url-input").value = full;
+  }
+}
+
+function _setupStep(id, state) {
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.className = "setup-step" + (state ? " " + state : "");
+  const icon = el.querySelector(".sicon");
+  if(icon && state === "done")   icon.textContent = "✓";
+  if(icon && state === "failed") icon.textContent = "✕";
+}
+
+function _setupResult(type, msg) {
+  const r = document.getElementById("setup-result");
+  r.className = "setup-result " + type;
+  r.innerHTML = msg;
+}
+
+async function setupRunConfig() {
+  const eth = window.ethereum;
+  const btn = document.getElementById("setup-run-btn");
+  if(!eth) { _setupResult("error","No wallet detected in this browser."); return; }
+
+  btn.disabled = true; btn.textContent = "Check your wallet…";
+
+  // Wake/permission the provider first (some wallets require this before config).
+  try { await eth.request({ method:"eth_requestAccounts" }); } catch(_) {}
+
+  // Step 1 — add Polygon Amoy
+  _setupStep("setup-step-net","active");
+  let netOk = false;
+  try {
+    await eth.request({ method:"wallet_addEthereumChain", params:[{
+      chainId:"0x13882", chainName:"Polygon Amoy",
+      nativeCurrency:{ name:"POL", symbol:"POL", decimals:18 },
+      rpcUrls:["https://rpc-amoy.polygon.technology"],
+      blockExplorerUrls:["https://amoy.polygonscan.com"]
+    }]});
+    netOk = true; _setupStep("setup-step-net","done");
+  } catch(e) {
+    // 4001 = user rejected; anything else (incl. "already added") we treat as non-fatal
+    if(e && e.code === 4001) { _setupStep("setup-step-net","failed"); }
+    else { netOk = true; _setupStep("setup-step-net","done"); }
+  }
+
+  // Step 2 — add KEEL token
+  _setupStep("setup-step-tok","active");
+  let tokOk = false;
+  try {
+    const res = await eth.request({ method:"wallet_watchAsset", params:{
+      type:"ERC20",
+      options:{ address:KEEL_TOKEN_ADDRESS, symbol:"KEEL", decimals:18 }
+    }});
+    tokOk = (res !== false); _setupStep("setup-step-tok", tokOk ? "done" : "failed");
+  } catch(e) {
+    _setupStep("setup-step-tok","failed");
+  }
+
+  if(tokOk) {
+    _setupResult("success","✓ All set! Your KEEL balance will now show in your wallet. Tap below to continue to the app.");
+    btn.textContent = "Continue to app →";
+    btn.disabled = false;
+    btn.setAttribute("onclick","setupContinue()");
+  } else {
+    _setupResult(netOk ? "info" : "error",
+      "Couldn't add the KEEL token automatically — your wallet may not support it. You can still use the app; add KEEL manually later using the contract address in Settings.");
+    btn.textContent = "Try again";
+    btn.disabled = false;
+  }
+}
+
+function setupContinue() {
+  document.getElementById("setup-screen").classList.remove("show");
+  document.body.classList.remove("setup-active");
+  // Strip ?setup=1 so a refresh doesn't re-trigger the setup screen.
+  try { history.replaceState({}, "", location.pathname); } catch(_) {}
+}
+
+function setupCopyUrl(btn) {
+  const inp = document.getElementById("setup-url-input");
+  inp.select(); inp.setSelectionRange(0, 99999);
+  const done = () => { const t = btn.textContent; btn.textContent = "Copied!"; setTimeout(()=>btn.textContent=t, 1500); };
+  if(navigator.clipboard) navigator.clipboard.writeText(inp.value).then(done).catch(()=>{ document.execCommand("copy"); done(); });
+  else { document.execCommand("copy"); done(); }
+}
+
 // ── Member Onboarding Wizard ─────────────────────────────────────────────────
 
 let _onboardStep = 1;
