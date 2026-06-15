@@ -84,15 +84,15 @@ Members transact **without POL** — they sign an EIP-712 message and a Cloudfla
 
 Burn amount is computed **entirely by the contract** (`quoteHundredths`); the app mirrors the same integer math so the UI never disagrees with the burn.
 
-**Base rate grid** (KEEL per hour; evening = half daytime):
-- Weekday: day **2.0**, evening **1.0**
-- Weekend: day **4.0**, evening **2.0**
+**Base rate grid** (KEEL per hour; evening = half daytime). Halved 2026-06-15 (hours charges cut 50%; multipliers unchanged):
+- Weekday: day **1.0**, evening **0.5**
+- Weekend: day **2.0**, evening **1.0**
 
 **Per-slot multipliers** (basis points, 10000 = 1.00×), applied **per hour by slot**, and they **stack** when both apply:
 - Holiday: day **1.15×** (11500), evening **1.10×** (11000)
 - Competitive: day **1.10×** (11000), evening **1.10×** (11000)
 
-A holiday hour multiplies *whatever its underlying base would be* (weekday base on weekdays, weekend base on weekends). Example: a 4h weekend-holiday daytime competitive trip = 4 × 4.0 × 1.15 × 1.10 = **20.24 KEEL**.
+A holiday hour multiplies *whatever its underlying base would be* (weekday base on weekdays, weekend base on weekends). Example: a 4h weekend-holiday daytime competitive trip = 4 × 2.0 × 1.15 × 1.10 = **10.12 KEEL**.
 
 **Time rules:** Daytime 07:00–17:59, Evening 18:00–06:59. Weekend = Sat 00:00 → Sun 23:59. Billed hour-by-hour across boundaries, all US Eastern, DST-safe. Holidays computed from OPM rules for any year; a Fri or Mon federal holiday extends the holiday surcharge across the adjacent Sat & Sun; Black Friday billed as a holiday. Hours in tenths, KEEL in hundredths, burn rounds **up**, scaled to wei (×1e16).
 
