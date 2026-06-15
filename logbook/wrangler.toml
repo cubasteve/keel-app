@@ -1,0 +1,22 @@
+name = "keel-logbook"
+main = "worker.js"
+compatibility_date = "2026-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 database binding — fill database_id after `wrangler d1 create keel-logbook`.
+[[d1_databases]]
+binding = "DB"
+database_name = "keel-logbook"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+# R2 bucket for photos — create with `wrangler r2 bucket create keel-logbook-photos`.
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "keel-logbook-photos"
+
+# Setup:
+#   cd logbook && npm install
+#   npx wrangler d1 create keel-logbook            # paste database_id above
+#   npx wrangler r2 bucket create keel-logbook-photos
+#   npx wrangler d1 execute keel-logbook --remote --file=schema.sql
+#   npx wrangler deploy

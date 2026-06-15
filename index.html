@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15b";
+    const APP_VERSION = "2025-06-15c";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15b"></script>
+<script src="keel-core.js?v=2025-06-15c"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -942,6 +942,33 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 .batch-row-meta { font-size:11px; color:var(--muted2); white-space:nowrap; }
 .batch-amt { width:90px; flex-shrink:0; text-align:right; font-family:var(--mono); font-size:13px; padding:8px 10px; }
 @media(max-width:560px){ .batch-row-meta { display:none; } .batch-amt { width:76px; } }
+/* ── Digital logbook ──────────────────────────────────────────────────── */
+.lb-modal { display:none; position:fixed; inset:0; z-index:100001; background:rgba(2,9,18,.92); align-items:center; justify-content:center; padding:16px; overflow-y:auto; }
+.lb-modal.show { display:flex; }
+.lb-modal-inner { width:min(94vw,460px); max-height:92vh; overflow-y:auto; background:var(--surface2); border:1px solid var(--border); border-radius:18px; padding:22px; }
+.lb-modal-title { font-family:var(--display); font-size:17px; font-weight:700; color:var(--foam); margin-bottom:16px; }
+.lb-field { display:flex; flex-direction:column; gap:6px; margin-bottom:13px; }
+.lb-field label { font-size:11px; font-weight:600; color:var(--muted2); text-transform:uppercase; letter-spacing:.6px; }
+.lb-field textarea.inp { resize:vertical; font-family:var(--sans); }
+.lb-check { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); margin-bottom:13px; cursor:pointer; }
+.lb-thumbs { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px; }
+.lb-thumbs img { width:56px; height:56px; object-fit:cover; border-radius:8px; border:1px solid var(--border); }
+.lb-btn-row { display:flex; gap:10px; margin-top:6px; }
+.lb-btn-row .btn-admin { flex:1; }
+.lb-btn-row .btn-admin-gold { flex:2; }
+.lb-entry { background:var(--surface3); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:10px; }
+.lb-entry.issue { border-color:rgba(255,83,112,0.4); }
+.lb-entry-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:6px; }
+.lb-entry-kind { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--brass); }
+.lb-entry-kind.maintenance { color:var(--accent); }
+.lb-entry-date { font-size:11px; color:var(--muted2); }
+.lb-entry-stats { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:12px; color:var(--text); margin-bottom:5px; }
+.lb-entry-stats b { color:var(--foam); font-family:var(--mono); }
+.lb-entry-notes { font-size:13px; color:var(--muted2); line-height:1.5; }
+.lb-entry-author { font-family:var(--mono); font-size:10px; color:var(--muted); margin-top:6px; }
+.lb-issue-tag { font-size:10px; font-weight:700; color:var(--danger); background:rgba(255,83,112,0.12); padding:2px 8px; border-radius:20px; }
+.lb-entry-photos { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.lb-entry-photos a img { width:64px; height:64px; object-fit:cover; border-radius:8px; border:1px solid var(--border); }
 /* ── TRIPS PAGE ─────────────────────────────────────────────────────────── */
 .page { display:none; }
 .page.active { display:block; }
@@ -1216,6 +1243,25 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   <span class="wp-icon" aria-hidden="true">👛</span>
   <span class="wp-text"><b>Waiting for your wallet…</b><br>Tap here to open your wallet and approve</span>
   <span class="wp-arrow" aria-hidden="true">→</span>
+</div>
+
+<!-- ── DIGITAL LOGBOOK MODAL (trip & maintenance entries) ─────────────────── -->
+<div id="lb-modal" class="lb-modal">
+  <div class="lb-modal-inner">
+    <div class="lb-modal-title" id="lb-title">📓 Voyage Log</div>
+    <div class="lb-field"><label>Engine hours (reading)</label><input class="inp" id="lb-engine" type="number" min="0" step="0.1" placeholder="e.g. 142.5"></div>
+    <div class="lb-field"><label>Fuel level (%)</label><input class="inp" id="lb-fuel" type="number" min="0" max="100" step="1" placeholder="e.g. 75"></div>
+    <div class="lb-field"><label>Conditions</label><input class="inp" id="lb-cond" maxlength="200" placeholder="e.g. Sunny, 8–12 kt SW"></div>
+    <div class="lb-field"><label>Notes</label><textarea class="inp" id="lb-notes" rows="3" maxlength="2000" placeholder="Anything noteworthy…"></textarea></div>
+    <label class="lb-check"><input type="checkbox" id="lb-issue"> Flag a problem / damage needing attention</label>
+    <div class="lb-field"><label>Photos (up to 4)</label><input id="lb-photos" type="file" accept="image/*" multiple capture="environment" onchange="logbookPhotosPicked(this)"></div>
+    <div id="lb-thumbs" class="lb-thumbs"></div>
+    <div class="admin-result" id="lb-result" style="margin-top:10px"></div>
+    <div class="lb-btn-row">
+      <button class="btn-admin btn-admin-primary" onclick="logbookCloseForm()">Cancel</button>
+      <button class="btn-admin btn-admin-gold" id="lb-submit" onclick="logbookSubmit()">📓 Save Log</button>
+    </div>
+  </div>
 </div>
 
 <!-- OCEAN WAVES -->
@@ -1877,6 +1923,20 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
             <div id="admin-trips-list">
               <div class="empty-state"><div class="empty-anchor">⚓</div><div class="empty-title">Loading…</div></div>
             </div>
+          </div>
+        </div>
+
+        <!-- Boat Logbook (admin view) -->
+        <div class="admin-card" id="admin-logbook-card" style="margin-bottom:20px;display:none">
+          <div class="admin-card-title" style="justify-content:space-between;flex-wrap:wrap;gap:10px">
+            <span>📓 Boat Logbook</span>
+            <span style="display:flex;gap:8px">
+              <button class="btn-admin btn-admin-primary" style="width:auto;padding:6px 14px;font-size:12px;margin-top:0" onclick="loadBoatLogbook()">↻ Refresh</button>
+              <button class="btn-admin btn-admin-gold" style="width:auto;padding:6px 14px;font-size:12px;margin-top:0" onclick="logbookOpenForm('maintenance','',0)">＋ Maintenance Entry</button>
+            </span>
+          </div>
+          <div id="admin-logbook-list">
+            <div class="empty-state" style="padding:20px 0"><div class="empty-anchor">📓</div><div class="empty-title">Loading…</div></div>
           </div>
         </div>
 
@@ -3482,6 +3542,7 @@ function tripCardHTML(t) {
       <div class="trip-burn-badge">−${t.burn.toFixed(2)} KEEL</div>
       <div class="trip-status-badge ${t.status}">${statusLabel}</div>
       ${canAddCal  ? `<button class="btn-add-cal" onclick="addToCalendar(${t.startTs}, ${t.endTs}, '${typeLabel}', ${t.burn.toFixed(2)})">📅 Add to Calendar</button>` : ""}
+      ${(typeof logbookEnabled==="function" && logbookEnabled() && !t.cancelled) ? `<button class="btn-add-cal" onclick="logbookOpenForm('trip','${t.id}',${t.boatId||0})">📓 Add Log</button>` : ""}
       ${canCancel  ? `<button class="btn-cancel-trip" id="cbtn-${t.id}" onclick="cancelTrip('${t.id}', ${t.burn.toFixed(2)})">Cancel & Refund</button>` : ""}
     </div>
   </div>`;
@@ -3859,6 +3920,13 @@ async function loadAdminPage() {
   const monthVal = now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
   document.getElementById("admin-batch-month").value = monthVal;
 
+  // Boat logbook (only if the logbook Worker is configured)
+  const lbCard = document.getElementById("admin-logbook-card");
+  if(lbCard){
+    if(logbookEnabled()){ lbCard.style.display = ""; loadBoatLogbook(); }
+    else { lbCard.style.display = "none"; }
+  }
+
   await Promise.all([ adminLoadStats(), adminLoadAllTrips(), adminLoadMemberBalances() ]);
 }
 
@@ -4221,8 +4289,126 @@ function resetAdminPage() {
   _batchRows = [];
   const bg = document.getElementById("admin-batch-grid"); if(bg) bg.innerHTML = "";
   const bb = document.getElementById("admin-batch-btn"); if(bb) bb.style.display = "none";
+  try { logbookCloseForm(); } catch(_){}
+  const lbc = document.getElementById("admin-logbook-card"); if(lbc) lbc.style.display = "none";
 }
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ── DIGITAL LOGBOOK ───────────────────────────────────────────────────────────
+function logbookEnabled(){ return typeof KEEL_LOGBOOK_ENDPOINT === "string" && KEEL_LOGBOOK_ENDPOINT.length > 0; }
+let _lbCtx = { kind:"trip", tripId:"", boatId:0 };
+let _lbPhotos = [];
+
+function logbookOpenForm(kind, tripId, boatId){
+  if(!signer){ showStatus("Connect your wallet first.","error"); setTimeout(clearStatus,3500); return; }
+  _lbCtx = { kind, tripId: tripId||"", boatId: boatId||0 };
+  _lbPhotos = [];
+  ["lb-engine","lb-fuel","lb-cond","lb-notes"].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=""; });
+  document.getElementById("lb-issue").checked = false;
+  document.getElementById("lb-photos").value = "";
+  document.getElementById("lb-thumbs").innerHTML = "";
+  const r = document.getElementById("lb-result"); r.className="admin-result"; r.textContent="";
+  document.getElementById("lb-title").textContent = kind==="maintenance" ? "🔧 Maintenance Log" : "📓 Voyage Log";
+  const sb = document.getElementById("lb-submit"); sb.disabled=false; sb.textContent="📓 Save Log";
+  document.getElementById("lb-modal").classList.add("show");
+}
+function logbookCloseForm(){ document.getElementById("lb-modal").classList.remove("show"); }
+
+// Resize a picked image to <=1280px and return a base64 JPEG (keeps uploads small).
+function logbookResizePhoto(file){
+  return new Promise((resolve,reject)=>{
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const max = 1280;
+      let { width:w, height:h } = img;
+      if(w > max || h > max){ const s = max/Math.max(w,h); w = Math.round(w*s); h = Math.round(h*s); }
+      const c = document.createElement("canvas"); c.width=w; c.height=h;
+      c.getContext("2d").drawImage(img,0,0,w,h);
+      resolve(c.toDataURL("image/jpeg", 0.8));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("bad image")); };
+    img.src = url;
+  });
+}
+async function logbookPhotosPicked(input){
+  const files = Array.from(input.files||[]).slice(0,4);
+  _lbPhotos = [];
+  const thumbs = document.getElementById("lb-thumbs"); thumbs.innerHTML = "";
+  for(const f of files){
+    try { const b64 = await logbookResizePhoto(f); _lbPhotos.push(b64);
+      const im = document.createElement("img"); im.src = b64; thumbs.appendChild(im);
+    } catch(_){}
+  }
+}
+
+async function logbookSubmit(){
+  const sb = document.getElementById("lb-submit");
+  if(!signer){ showAdminResult("lb-result","error","Connect your wallet first."); return; }
+  const engine = document.getElementById("lb-engine").value;
+  const fuel   = document.getElementById("lb-fuel").value;
+  const cond   = document.getElementById("lb-cond").value.trim();
+  const notes  = document.getElementById("lb-notes").value.trim();
+  const issue  = document.getElementById("lb-issue").checked;
+  if(!engine && !fuel && !cond && !notes && !issue && !_lbPhotos.length){
+    showAdminResult("lb-result","error","Add at least one detail or photo."); return;
+  }
+  sb.disabled = true; sb.textContent = "Signing…";
+  try {
+    const payloadObj = { kind:_lbCtx.kind, tripId:_lbCtx.tripId, boatId:_lbCtx.boatId,
+      engineHours:engine, fuelPct:fuel, conditions:cond, notes, issue };
+    const payload = JSON.stringify(payloadObj);
+    const deadline = Math.floor(Date.now()/1000) + 3600;
+    const signature = await signer._signTypedData(LOGBOOK_DOMAIN, LOGBOOK_TYPES, { author: walletAddress, payload, deadline });
+    sb.textContent = "Saving…";
+    const resp = await fetch(KEEL_LOGBOOK_ENDPOINT + "/entry", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ author: walletAddress, payload, deadline, signature, photos:_lbPhotos })
+    });
+    let data={}; try{ data = await resp.json(); }catch(_){}
+    if(!resp.ok || !data.ok) throw new Error(data.error || ("Save failed ("+resp.status+")"));
+    showAdminResult("lb-result","success","✓ Log saved.");
+    setTimeout(()=>{ logbookCloseForm(); if(typeof loadBoatLogbook==="function" && document.getElementById("admin-logbook-card")?.offsetParent) loadBoatLogbook(); }, 800);
+  } catch(e){
+    showAdminResult("lb-result","error","Failed: "+(e.reason||e.message||e));
+    sb.disabled = false; sb.textContent = "📓 Save Log";
+  }
+}
+
+async function loadBoatLogbook(){
+  const el = document.getElementById("admin-logbook-list");
+  if(!logbookEnabled()){ el.innerHTML = '<div class="empty-state" style="padding:18px 0"><div class="empty-title">Logbook not configured</div></div>'; return; }
+  el.innerHTML = '<div class="empty-state" style="padding:18px 0"><div class="empty-anchor">📓</div><div class="empty-title">Loading…</div></div>';
+  try {
+    const resp = await fetch(KEEL_LOGBOOK_ENDPOINT + "/entries?boatId=0");
+    const data = await resp.json();
+    const entries = data.entries || [];
+    if(!entries.length){ el.innerHTML = '<div class="empty-state" style="padding:18px 0"><div class="empty-anchor">📓</div><div class="empty-title">No log entries yet</div></div>'; return; }
+    el.innerHTML = entries.map(renderLogEntry).join("");
+  } catch(e){ el.innerHTML = '<div class="empty-state" style="padding:18px 0"><div class="empty-title">Failed to load logbook</div></div>'; }
+}
+
+function renderLogEntry(en){
+  const date = new Date((en.createdAt||0)*1000).toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"});
+  const who = (en.author||"").slice(0,6)+"…"+(en.author||"").slice(-4);
+  const stats = [];
+  if(en.engineHours!=null) stats.push(`Engine <b>${en.engineHours}h</b>`);
+  if(en.fuelPct!=null)     stats.push(`Fuel <b>${en.fuelPct}%</b>`);
+  if(en.conditions)        stats.push(`<span style="color:var(--muted2)">${escapeHtml(en.conditions)}</span>`);
+  const photos = (en.photos||[]).map(u=>`<a href="${u}" target="_blank" rel="noopener"><img src="${u}" loading="lazy"></a>`).join("");
+  return `<div class="lb-entry ${en.issue?'issue':''}">
+    <div class="lb-entry-head">
+      <span class="lb-entry-kind ${en.kind}">${en.kind==='maintenance'?'🔧 Maintenance':'📓 Voyage'}</span>
+      <span class="lb-entry-date">${date}${en.issue?' · <span class="lb-issue-tag">ISSUE</span>':''}</span>
+    </div>
+    ${stats.length?`<div class="lb-entry-stats">${stats.join("")}</div>`:""}
+    ${en.notes?`<div class="lb-entry-notes">${escapeHtml(en.notes)}</div>`:""}
+    ${photos?`<div class="lb-entry-photos">${photos}</div>`:""}
+    <div class="lb-entry-author">by ${who}</div>
+  </div>`;
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 // ── MEMBER ONBOARDING WIZARD (admin) ─────────────────────────────────────────
 function onbGoTo(step){

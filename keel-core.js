@@ -32,6 +32,19 @@ const MONTHLY_ISSUED = 100; // KEEL issued per member per month (matches token c
 // Empty = disabled (app uses normal member-paid transactions). Set this to the
 // deployed keel-relayer Worker URL to turn on gasless member actions.
 const KEEL_RELAYER_ENDPOINT = "https://keel-relayer.keel-app.workers.dev";
+// ── Digital logbook (signed trip & maintenance entries; D1 + R2) ──────────────
+// Empty = feature hidden. Set to the deployed keel-logbook Worker URL to enable.
+const KEEL_LOGBOOK_ENDPOINT = "";
+// MUST match logbook/worker.js exactly.
+const LOGBOOK_DOMAIN = { name: "KeelLogbook", version: "1", chainId: AMOY_CHAIN_ID };
+const LOGBOOK_TYPES = {
+  LogEntry: [
+    { name: "author",   type: "address" },
+    { name: "payload",  type: "string"  },
+    { name: "deadline", type: "uint256" }
+  ]
+};
+
 // EIP-712 domain + types — MUST stay byte-for-byte identical to relayer/worker.js.
 const RELAY_DOMAIN = { name: "KeelUsageLedger", version: "1", chainId: AMOY_CHAIN_ID, verifyingContract: KEEL_LEDGER_ADDRESS };
 const RELAY_TYPES = {

@@ -1,0 +1,9 @@
+{
+  "name": "keel-logbook",
+  "version": "1.0.0",
+  "private": true,
+  "description": "KEEL digital logbook — signed trip & maintenance entries (D1 + R2).",
+  "dependencies": {
+    "ethers": "^6.13.0"
+  }
+}
