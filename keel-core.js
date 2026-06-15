@@ -34,7 +34,7 @@ const MONTHLY_ISSUED = 100; // KEEL issued per member per month (matches token c
 const KEEL_RELAYER_ENDPOINT = "https://keel-relayer.keel-app.workers.dev";
 // ── Digital logbook (signed trip & maintenance entries; D1 + R2) ──────────────
 // Empty = feature hidden. Set to the deployed keel-logbook Worker URL to enable.
-const KEEL_LOGBOOK_ENDPOINT = "";
+const KEEL_LOGBOOK_ENDPOINT = "https://keel-logbook.keel-app.workers.dev";
 // MUST match logbook/worker.js exactly.
 const LOGBOOK_DOMAIN = { name: "KeelLogbook", version: "1", chainId: AMOY_CHAIN_ID };
 const LOGBOOK_TYPES = {

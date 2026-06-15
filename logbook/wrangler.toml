@@ -7,7 +7,7 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "keel-logbook"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "27cf400f-5078-4894-854e-0d54c2924324"
 
 # R2 bucket for photos — create with `wrangler r2 bucket create keel-logbook-photos`.
 [[r2_buckets]]
