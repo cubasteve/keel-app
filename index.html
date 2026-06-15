@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15d";
+    const APP_VERSION = "2025-06-15e";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15d"></script>
+<script src="keel-core.js?v=2025-06-15e"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -4333,14 +4333,25 @@ function logbookResizePhoto(file){
   });
 }
 async function logbookPhotosPicked(input){
-  const files = Array.from(input.files||[]).slice(0,4);
-  _lbPhotos = [];
-  const thumbs = document.getElementById("lb-thumbs"); thumbs.innerHTML = "";
+  // APPEND each pick (phone camera fires one shot per change event) up to 4.
+  const files = Array.from(input.files||[]);
   for(const f of files){
-    try { const b64 = await logbookResizePhoto(f); _lbPhotos.push(b64);
-      const im = document.createElement("img"); im.src = b64; thumbs.appendChild(im);
-    } catch(_){}
+    if(_lbPhotos.length >= 4) break;
+    try { _lbPhotos.push(await logbookResizePhoto(f)); } catch(_){}
   }
+  input.value = ""; // reset so the next camera shot fires a fresh change event
+  logbookRenderThumbs();
+}
+function logbookRenderThumbs(){
+  const thumbs = document.getElementById("lb-thumbs");
+  if(!thumbs) return;
+  thumbs.innerHTML = "";
+  _lbPhotos.forEach((b64, i) => {
+    const im = document.createElement("img");
+    im.src = b64; im.title = "Tap to remove"; im.style.cursor = "pointer";
+    im.onclick = () => { _lbPhotos.splice(i,1); logbookRenderThumbs(); };
+    thumbs.appendChild(im);
+  });
 }
 
 async function logbookSubmit(){
@@ -4354,17 +4365,16 @@ async function logbookSubmit(){
   if(!engine && !fuel && !cond && !notes && !issue && !_lbPhotos.length){
     showAdminResult("lb-result","error","Add at least one detail or photo."); return;
   }
-  sb.disabled = true; sb.textContent = "Signing…";
+  sb.disabled = true; sb.textContent = "Saving…";
   try {
     const payloadObj = { kind:_lbCtx.kind, tripId:_lbCtx.tripId, boatId:_lbCtx.boatId,
       engineHours:engine, fuelPct:fuel, conditions:cond, notes, issue };
     const payload = JSON.stringify(payloadObj);
-    const deadline = Math.floor(Date.now()/1000) + 3600;
-    const signature = await signer._signTypedData(LOGBOOK_DOMAIN, LOGBOOK_TYPES, { author: walletAddress, payload, deadline });
-    sb.textContent = "Saving…";
+    // No wallet signature — the connected address is the author; the Worker
+    // still verifies on-chain that they own the trip (or hold OPERATOR_ROLE).
     const resp = await fetch(KEEL_LOGBOOK_ENDPOINT + "/entry", {
       method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ author: walletAddress, payload, deadline, signature, photos:_lbPhotos })
+      body: JSON.stringify({ author: walletAddress, payload, photos:_lbPhotos })
     });
     let data={}; try{ data = await resp.json(); }catch(_){}
     if(!resp.ok || !data.ok) throw new Error(data.error || ("Save failed ("+resp.status+")"));

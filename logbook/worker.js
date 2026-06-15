@@ -73,17 +73,15 @@ export default {
     if (request.method !== "POST" || url.pathname !== "/entry") return json({ error: "Not found" }, 404);
 
     // ── Create an entry ────────────────────────────────────────────────────
+    // No wallet signature required: the connected address is the author. We
+    // still enforce on-chain authorization below (trip owner / operator), which
+    // constrains who an entry can be attributed to.
     let req;
     try { req = await request.json(); } catch { return json({ error: "Bad JSON" }, 400); }
-    const { author, payload, deadline, signature, photos } = req || {};
-    if (!author || !payload || !deadline || !signature) return json({ error: "Missing fields" }, 400);
-
-    // 1. Verify signature.
-    let recovered;
-    try { recovered = ethers.verifyTypedData(DOMAIN, TYPES, { author, payload, deadline }, signature); }
-    catch { return json({ error: "Invalid signature" }, 400); }
-    if (recovered.toLowerCase() !== String(author).toLowerCase()) return json({ error: "Signature mismatch" }, 401);
-    if (Number(deadline) < Math.floor(Date.now()/1000)) return json({ error: "Request expired" }, 400);
+    const { author, payload, photos } = req || {};
+    if (!author || !payload) return json({ error: "Missing fields" }, 400);
+    if (!ethers.isAddress(author)) return json({ error: "Bad author" }, 400);
+    const recovered = ethers.getAddress(author); // normalize
 
     let e;
     try { e = JSON.parse(payload); } catch { return json({ error: "Bad payload" }, 400); }
