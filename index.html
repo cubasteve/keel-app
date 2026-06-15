@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15a";
+    const APP_VERSION = "2025-06-15b";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15a"></script>
+<script src="keel-core.js?v=2025-06-15b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -1997,8 +1997,8 @@ let inReview = false;
 // Defaults mirror the deployed base rateGrid and multipliers; overwritten by
 // loadRatesFromChain() on load. quoteHundredths() remains the source of truth.
 let RATE_H = {
-  weekday: { day: 200, evening: 100 },
-  weekend: { day: 400, evening: 200 }
+  weekday: { day: 100, evening: 50 },
+  weekend: { day: 200, evening: 100 }
 };
 let HOLIDAY_BPS = { day: 11500, evening: 11000 }; // holiday day 1.15x, eve 1.10x
 let COMP_BPS    = { day: 11000, evening: 11000 }; // competitive day 1.10x, eve 1.10x

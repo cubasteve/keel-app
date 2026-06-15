@@ -13,45 +13,25 @@
 const hre = require("hardhat");
 
 async function main() {
-  const LEDGER = "0x6E26D169340dC846faeeAf78d5ef11584e3492Db";
+  const LEDGER = "0x5c27f0399C3737a68e0933183609b8a273A98eC0"; // ACTIVE v5 ledger proxy
 
   // --- BASE rates (hundredths of KEEL/hr). period: 0=weekday, 1=weekend ---
+  // Halved 2026-06-15: hours charges cut 50% (multipliers unchanged).
+  //   weekday day 1.00 / eve 0.50 ; weekend day 2.00 / eve 1.00
   const BASE_RATES = [
-    { period: 0, day: 200, evening: 100, label: "Weekday" },
-    { period: 1, day: 400, evening: 200, label: "Weekend" }
+    { period: 0, day: 100, evening: 50,  label: "Weekday" },
+    { period: 1, day: 200, evening: 100, label: "Weekend" }
   ];
-
-  // --- Per-slot multipliers (basis points). slot: 0=day, 1=evening ---
-  const HOLIDAY_MULT     = [ { slot: 0, bps: 11500 }, { slot: 1, bps: 11000 } ]; // 1.15x / 1.10x
-  const COMPETITIVE_MULT = [ { slot: 0, bps: 11000 }, { slot: 1, bps: 11000 } ]; // 1.10x / 1.10x
 
   const [admin] = await hre.ethers.getSigners();
   console.log("Admin:", admin.address);
 
   const ledger = await hre.ethers.getContractAt("KeelUsageLedger", LEDGER);
 
-  // 1) Base rate grid
+  // Base rate grid only — multipliers (holiday/competitive) left untouched.
   for (const r of BASE_RATES) {
     process.stdout.write(`setRate ${r.label}: day=${r.day} evening=${r.evening} ... `);
     const tx = await ledger.setRate(r.period, r.day, r.evening);
-    await tx.wait();
-    console.log("done");
-  }
-
-  // 2) Holiday multipliers (per slot)
-  for (const m of HOLIDAY_MULT) {
-    const slotName = m.slot === 0 ? "day" : "evening";
-    process.stdout.write(`setHolidayMultiplier ${slotName}: ${m.bps} bps (${(m.bps/10000).toFixed(2)}x) ... `);
-    const tx = await ledger.setHolidayMultiplier(m.slot, m.bps);
-    await tx.wait();
-    console.log("done");
-  }
-
-  // 3) Competitive multipliers (per slot)
-  for (const m of COMPETITIVE_MULT) {
-    const slotName = m.slot === 0 ? "day" : "evening";
-    process.stdout.write(`setCompetitiveMultiplier ${slotName}: ${m.bps} bps (${(m.bps/10000).toFixed(2)}x) ... `);
-    const tx = await ledger.setCompetitiveMultiplier(m.slot, m.bps);
     await tx.wait();
     console.log("done");
   }
@@ -64,10 +44,10 @@ async function main() {
     const eve = await ledger.rateGrid(p, 1);
     console.log(`  ${baseNames[p]}: day=${day} evening=${eve}`);
   }
-  const hd = await ledger.holidayMultiplierBps(0);
-  const he = await ledger.holidayMultiplierBps(1);
-  const cd = await ledger.competitiveMultiplierBps(0);
-  const ce = await ledger.competitiveMultiplierBps(1);
+  const hd = Number(await ledger.holidayMultiplierBps(0));
+  const he = Number(await ledger.holidayMultiplierBps(1));
+  const cd = Number(await ledger.competitiveMultiplierBps(0));
+  const ce = Number(await ledger.competitiveMultiplierBps(1));
   console.log(`  Holiday mult:     day=${hd} (${(hd/10000).toFixed(2)}x)  evening=${he} (${(he/10000).toFixed(2)}x)`);
   console.log(`  Competitive mult: day=${cd} (${(cd/10000).toFixed(2)}x)  evening=${ce} (${(ce/10000).toFixed(2)}x)`);
 
