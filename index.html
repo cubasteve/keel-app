@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-14n";
+    const APP_VERSION = "2025-06-15a";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-14n"></script>
+<script src="keel-core.js?v=2025-06-15a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -2005,12 +2005,13 @@ let COMP_BPS    = { day: 11000, evening: 11000 }; // competitive day 1.10x, eve 
 let ratesLoaded = false;
 
 // ── "This Month" figures, all read from chain (no more hardcoded assumptions) ──
-let monthlyCap    = MAX_CAP;  // KEEL · rolling 3-month ceiling (300)
-let monthlyIssued = 0;        // KEEL · token.monthlyMinted(member, year, month)
-let monthlyUsed   = 0;        // KEEL burned this month · summed from on-chain history
+let monthlyCap       = MAX_CAP;        // KEEL · this member's wallet cap (capOf = share×3)
+let monthlyAllowance = MONTHLY_ISSUED; // KEEL · this member's monthly allocation (their share)
+let monthlyIssued    = 0;              // KEEL · token.monthlyMinted(member, year, month)
+let monthlyUsed      = 0;              // KEEL burned this month · summed from on-chain history
 
 function updateBalanceUI() {
-  const totalCap = MAX_CAP; // 300 — rolling 3-month ceiling, always the denominator
+  const totalCap = monthlyCap || MAX_CAP; // this member's wallet cap is the denominator
   const issued   = monthlyIssued;
   const avail    = keelBalance;
   const used     = monthlyUsed != null ? monthlyUsed : Math.max(issued - avail, 0);
@@ -2036,12 +2037,14 @@ async function loadMonthlyStats(){
       ["address","uint256","uint256"],
       [walletAddress, now.getFullYear(), now.getMonth()+1]
     );
-    const [capWei, mintedWei] = await Promise.all([
-      token.monthlyIssuanceCap(),
+    const [capWei, allocWei, mintedWei] = await Promise.all([
+      token.capOf(walletAddress),         // member's wallet cap (share×3, or global)
+      token.allocationOf(walletAddress),  // member's monthly allocation (their share)
       token.monthlyMinted(key)
     ]);
-    monthlyCap    = parseFloat(ethers.utils.formatUnits(capWei, 18));
-    monthlyIssued = parseFloat(ethers.utils.formatUnits(mintedWei, 18));
+    monthlyCap       = parseFloat(ethers.utils.formatUnits(capWei, 18));
+    monthlyAllowance = parseFloat(ethers.utils.formatUnits(allocWei, 18));
+    monthlyIssued    = parseFloat(ethers.utils.formatUnits(mintedWei, 18));
     updateBalanceUI();
   } catch(e){ console.warn("monthly stats load failed", e); }
   try { await loadExpiryStats(); } catch(e){ console.warn("expiry stats load failed", e); }
@@ -2068,7 +2071,7 @@ async function loadExpiryStats(){
       .toLocaleDateString("en-US",{month:"short",day:"numeric"});
   }
   const bar = document.getElementById("expiring-bar");
-  if(bar) bar.style.width = Math.min((expiring/MAX_CAP)*100,100)+"%";
+  if(bar) bar.style.width = Math.min((expiring/(monthlyCap||MAX_CAP))*100,100)+"%";
 }
 
 // Recovery escape hatch: clears stale WalletConnect/Reown session state and
@@ -2359,7 +2362,7 @@ async function disconnectWallet(e) {
   const expRow = document.getElementById("ms-expiring-row"); if(expRow) expRow.style.display = "none";
   // Reset page content — splash is the connect gate
   document.getElementById("kt-content").style.display = "none";
-  monthlyUsed = 0; monthlyIssued = 0; monthlyCap = MAX_CAP;
+  monthlyUsed = 0; monthlyIssued = 0; monthlyCap = MAX_CAP; monthlyAllowance = MONTHLY_ISSUED;
   document.getElementById("settings-display-name").value = "";
   document.getElementById("settings-experience").value   = "";
   document.getElementById("settings-avatar").textContent = "⚓";
@@ -3586,8 +3589,8 @@ async function loadKeelTokenPage() {
       token.balanceOf(walletAddress),
       token.expiringWithin(walletAddress, 30*24*3600),
       token.monthlyMinted(mintKey),
-      token.walletCap(),
-      token.monthlyAllocation(),
+      token.capOf(walletAddress),         // this member's wallet cap (share×3)
+      token.allocationOf(walletAddress),  // this member's monthly allocation (their share)
       token.tranchesOf(walletAddress)
     ]);
     const balF = parseFloat(ethers.utils.formatUnits(bal,18));
