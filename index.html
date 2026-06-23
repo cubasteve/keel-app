@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15l";
+    const APP_VERSION = "2025-06-15m";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15l"></script>
+<script src="keel-core.js?v=2025-06-15m"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -1672,6 +1672,44 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 
         </div>
 
+        <!-- Wallet & Network (moved from Settings; deduped vs Token Facts) -->
+        <div class="admin-card" style="margin-bottom:20px">
+          <div class="admin-card-title">⬡ Wallet & Network</div>
+          <div class="admin-stat-row"><span class="admin-stat-label">Connected Wallet</span><span class="admin-stat-val" id="settings-wallet-addr" style="font-size:12px">—</span></div>
+          <div class="admin-stat-row"><span class="admin-stat-label">Ledger Contract</span><span class="admin-stat-val" id="settings-ledger-addr" style="font-size:11px">—</span></div>
+          <div style="display:flex;gap:10px;margin-top:16px">
+            <button class="btn-continue" style="flex:1;padding:10px;font-size:12px" onclick="openExplorer()">↗ View on Explorer</button>
+            <button class="btn-continue" style="flex:1;padding:10px;font-size:12px" onclick="copyWalletAddress()">⧉ Copy Address</button>
+          </div>
+        </div>
+
+        <!-- See KEEL in Your Wallet (moved from Settings) -->
+        <div class="admin-card" style="margin-bottom:20px">
+          <div class="admin-card-title">⬡ See KEEL in Your Wallet</div>
+          <p style="font-size:12px;color:var(--muted2);margin-bottom:14px;line-height:1.6">
+            Your balance always shows here in the app — adding KEEL to your wallet app is optional. <strong>One-tap works on desktop MetaMask</strong>; <strong>MetaMask mobile usually blocks auto-adding testnet tokens</strong>, so on a phone use the quick manual steps below.
+          </p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+            <button class="btn-continue" style="flex:1;min-width:160px;padding:11px;font-size:12px" onclick="settingsAddNetwork(this)">➕ Add Polygon Amoy</button>
+            <button class="btn-continue" style="flex:1;min-width:160px;padding:11px;font-size:12px" onclick="settingsAddToken(this)">➕ Add KEEL Token</button>
+          </div>
+          <div class="admin-result" id="settings-wallet-add-result" style="margin-bottom:14px"></div>
+          <div class="settings-manual-box">
+            <div class="settings-manual-title">📲 Add manually (works on any wallet)</div>
+            <ol class="settings-manual-steps">
+              <li>In your wallet, switch the network to <strong>Polygon Amoy</strong>.</li>
+              <li>Open <strong>Import tokens → Custom token</strong>.</li>
+              <li>Paste the <strong>token contract address</strong> below (symbol &amp; decimals auto-fill).</li>
+              <li>Confirm — KEEL now shows in your wallet.</li>
+            </ol>
+          </div>
+          <div class="admin-stat-row"><span class="admin-stat-label">Chain ID</span><span class="admin-stat-val">80002</span></div>
+          <div class="admin-stat-row"><span class="admin-stat-label">Symbol</span><span class="admin-stat-val">KEEL</span></div>
+          <div class="admin-stat-row"><span class="admin-stat-label">Decimals</span><span class="admin-stat-val">18</span></div>
+          <div class="admin-stat-row"><span class="admin-stat-label">Token Contract</span><span class="admin-stat-val" style="font-size:11px" id="settings-add-token-addr">—</span></div>
+          <button class="btn-continue" style="width:100%;padding:10px;font-size:12px;margin-top:12px" onclick="settingsCopyTokenContract(this)">⧉ Copy Token Contract Address</button>
+        </div>
+
       </div><!-- /kt-content -->
     </div><!-- /page-keeltoken -->
 
@@ -1707,65 +1745,6 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
           <p style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.5">
             Display name and experience level are saved on-chain and are publicly readable.
           </p>
-        </div>
-
-        <!-- Wallet info card -->
-        <div class="settings-card">
-          <div class="settings-card-title">⬡ Wallet & Network</div>
-          <div class="settings-info-row">
-            <span class="settings-info-label">Connected Wallet</span>
-            <span class="settings-info-val" id="settings-wallet-addr">—</span>
-          </div>
-          <div class="settings-info-row">
-            <span class="settings-info-label">Network</span>
-            <span class="settings-info-val" style="color:var(--teal)">Polygon Amoy</span>
-          </div>
-          <div class="settings-info-row">
-            <span class="settings-info-label">KEEL Balance</span>
-            <span class="settings-info-val" id="settings-balance">—</span>
-          </div>
-          <div class="settings-info-row">
-            <span class="settings-info-label">Token Contract</span>
-            <span class="settings-info-val" style="font-size:10px" id="settings-token-addr">—</span>
-          </div>
-          <div class="settings-info-row">
-            <span class="settings-info-label">Ledger Contract</span>
-            <span class="settings-info-val" style="font-size:10px" id="settings-ledger-addr">—</span>
-          </div>
-          <div style="display:flex;gap:10px;margin-top:16px">
-            <button class="btn-continue" style="flex:1;padding:10px;font-size:12px" onclick="openExplorer()">↗ View on Explorer</button>
-            <button class="btn-continue" style="flex:1;padding:10px;font-size:12px" onclick="copyWalletAddress()">⧉ Copy Address</button>
-          </div>
-        </div>
-
-        <!-- Add KEEL to your wallet -->
-        <div class="settings-card" style="grid-column:1/-1">
-          <div class="settings-card-title">⬡ See KEEL in Your Wallet</div>
-          <p style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6">
-            Your balance always shows here in the app. Adding KEEL to your wallet app is optional. <strong>One-tap add works on desktop MetaMask</strong>; <strong>MetaMask mobile usually blocks auto-adding testnet tokens</strong>, so on a phone use the quick manual steps below — it takes about 20 seconds.
-          </p>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-            <button class="btn-continue" style="flex:1;min-width:160px;padding:11px;font-size:12px" onclick="settingsAddNetwork(this)">➕ Add Polygon Amoy</button>
-            <button class="btn-continue" style="flex:1;min-width:160px;padding:11px;font-size:12px" onclick="settingsAddToken(this)">➕ Add KEEL Token</button>
-          </div>
-          <div class="admin-result" id="settings-wallet-add-result" style="margin-bottom:14px"></div>
-
-          <div class="settings-manual-box">
-            <div class="settings-manual-title">📲 Add manually (works on any wallet)</div>
-            <ol class="settings-manual-steps">
-              <li>In your wallet, switch the network to <strong>Polygon Amoy</strong>.</li>
-              <li>Open <strong>Import tokens → Custom token</strong>.</li>
-              <li>Paste the <strong>token contract address</strong> below (symbol &amp; decimals auto-fill).</li>
-              <li>Confirm — KEEL now shows in your wallet.</li>
-            </ol>
-          </div>
-
-          <div class="settings-info-row"><span class="settings-info-label">Network</span><span class="settings-info-val">Polygon Amoy</span></div>
-          <div class="settings-info-row"><span class="settings-info-label">Chain ID</span><span class="settings-info-val">80002</span></div>
-          <div class="settings-info-row"><span class="settings-info-label">Symbol</span><span class="settings-info-val">KEEL</span></div>
-          <div class="settings-info-row"><span class="settings-info-label">Decimals</span><span class="settings-info-val">18</span></div>
-          <div class="settings-info-row"><span class="settings-info-label">Token Contract</span><span class="settings-info-val" style="font-size:10px" id="settings-add-token-addr">—</span></div>
-          <button class="btn-continue" style="width:100%;padding:10px;font-size:12px;margin-top:12px" onclick="settingsCopyTokenContract(this)">⧉ Copy Token Contract Address</button>
         </div>
 
       </div>
@@ -3687,6 +3666,11 @@ async function loadKeelTokenPage() {
   link.textContent = KEEL_TOKEN_ADDRESS.slice(0,8)+"…"+KEEL_TOKEN_ADDRESS.slice(-6);
   link.href = "https://amoy.polygonscan.com/address/"+KEEL_TOKEN_ADDRESS;
 
+  // Wallet & Network + add-to-wallet fields (moved here from Settings)
+  const _wa = document.getElementById("settings-wallet-addr"); if(_wa) _wa.textContent = walletAddress.slice(0,10)+"…"+walletAddress.slice(-6);
+  const _la = document.getElementById("settings-ledger-addr"); if(_la) _la.textContent = KEEL_LEDGER_ADDRESS.slice(0,10)+"…"+KEEL_LEDGER_ADDRESS.slice(-6);
+  const _ta = document.getElementById("settings-add-token-addr"); if(_ta) _ta.textContent = KEEL_TOKEN_ADDRESS.slice(0,10)+"…"+KEEL_TOKEN_ADDRESS.slice(-6);
+
   // ── Balance, expiry, config — all in parallel ──
   try {
     const mintKey = ethers.utils.solidityKeccak256(
@@ -3841,16 +3825,10 @@ function getProfileSync(addr) {
 }
 
 async function loadSettingsPage() {
-  document.getElementById("settings-token-addr").textContent  = KEEL_TOKEN_ADDRESS.slice(0,10)+"…"+KEEL_TOKEN_ADDRESS.slice(-6);
-  document.getElementById("settings-ledger-addr").textContent = KEEL_LEDGER_ADDRESS.slice(0,10)+"…"+KEEL_LEDGER_ADDRESS.slice(-6);
-  const addTok = document.getElementById("settings-add-token-addr");
-  if(addTok) addTok.textContent = KEEL_TOKEN_ADDRESS.slice(0,10)+"…"+KEEL_TOKEN_ADDRESS.slice(-6);
-  document.getElementById("settings-balance").textContent = keelBalance > 0 ? keelBalance.toFixed(2)+" KEEL" : "—";
-
+  // Wallet/network + add-to-wallet info now live on the Keel Token tab.
   if(!walletAddress) return;
   document.getElementById("settings-content").style.display = "";
 
-  document.getElementById("settings-wallet-addr").textContent = walletAddress.slice(0,10)+"…"+walletAddress.slice(-6);
   document.getElementById("settings-addr-display").textContent = walletAddress.slice(0,6)+"…"+walletAddress.slice(-4);
   document.getElementById("settings-save-btn").disabled = false;
 
