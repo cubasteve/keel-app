@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15m";
+    const APP_VERSION = "2025-06-15n";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15m"></script>
+<script src="keel-core.js?v=2025-06-15n"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -2016,9 +2016,6 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
             </div>
           </div>
           <div class="ms-val" id="ms-expiring" style="color:var(--danger);display:flex;flex-direction:column;align-items:flex-end;gap:1px;line-height:1.1"><span>0 KEEL</span><span style="font-size:10px;font-weight:400;opacity:0.7" id="ms-expiring-date"></span></div>
-        </div>
-        <div style="margin-top:12px">
-          <a href="#" style="font-size:12px;color:var(--accent);text-decoration:none">↗ View full analytics</a>
         </div>
       </div>
 
