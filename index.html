@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15h";
+    const APP_VERSION = "2025-06-15i";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15h"></script>
+<script src="keel-core.js?v=2025-06-15i"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -951,8 +951,10 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 .lb-field label { font-size:11px; font-weight:600; color:var(--muted2); text-transform:uppercase; letter-spacing:.6px; }
 .lb-field textarea.inp { resize:vertical; font-family:var(--sans); }
 .lb-check { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); margin-bottom:13px; cursor:pointer; }
-.lb-thumbs { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px; }
-.lb-thumbs img { width:56px; height:56px; object-fit:cover; border-radius:8px; border:1px solid var(--border); }
+.lb-thumbs { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:6px; }
+.lb-thumb { position:relative; flex-shrink:0; }
+.lb-thumb img { width:56px; height:56px; object-fit:cover; border-radius:8px; border:1px solid var(--border); display:block; }
+.lb-thumb button { position:absolute; top:-7px; right:-7px; width:20px; height:20px; border-radius:50%; background:var(--danger); color:#fff; border:2px solid var(--surface2); font-size:11px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
 .lb-btn-row { display:flex; gap:10px; margin-top:6px; }
 .lb-btn-row .btn-admin { flex:1; }
 .lb-btn-row .btn-admin-gold { flex:2; }
@@ -4392,11 +4394,11 @@ function logbookRenderThumbs(){
   if(!thumbs) return;
   thumbs.innerHTML = "";
   _lbPhotos.forEach((p, i) => {
-    const im = document.createElement("img");
-    im.src = p.type==="new" ? p.data : p.url;
-    im.title = "Tap to remove"; im.style.cursor = "pointer";
-    im.onclick = () => { _lbPhotos.splice(i,1); logbookRenderThumbs(); };
-    thumbs.appendChild(im);
+    const d = document.createElement("div"); d.className = "lb-thumb";
+    const im = document.createElement("img"); im.src = p.type==="new" ? p.data : p.url;
+    const b = document.createElement("button"); b.textContent = "✕"; b.title = "Remove / retake";
+    b.onclick = (e) => { e.stopPropagation(); _lbPhotos.splice(i,1); logbookRenderThumbs(); };
+    d.appendChild(im); d.appendChild(b); thumbs.appendChild(d);
   });
 }
 
