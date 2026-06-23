@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15f";
+    const APP_VERSION = "2025-06-15g";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15f"></script>
+<script src="keel-core.js?v=2025-06-15g"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -1269,6 +1269,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
         <button type="button" class="btn-admin btn-admin-primary" style="flex:1;margin-top:0" onclick="document.getElementById('lb-photos').click()">🖼 Library</button>
       </div>
       <input id="lb-photos" type="file" accept="image/*" multiple onchange="logbookPhotosPicked(this)" style="display:none">
+      <input id="lb-cam-native" type="file" accept="image/*" capture="environment" onchange="logbookPhotosPicked(this)" style="display:none">
     </div>
     <div id="lb-thumbs" class="lb-thumbs"></div>
     <div class="admin-result" id="lb-result" style="margin-top:10px"></div>
@@ -4396,19 +4397,29 @@ function logbookRenderThumbs(){
 
 // ── In-app camera: snap several photos into the strip, then continue the log ──
 let _lbCamStream = null;
+// Open the in-app live camera where allowed; otherwise fall back to the native
+// camera (iOS in-app browsers / WKWebViews block getUserMedia — the native
+// file-capture input still works and now appends each shot).
+function logbookNativeCamera(){
+  const ni = document.getElementById("lb-cam-native");
+  if(ni){ ni.value = ""; ni.click(); }
+}
 async function logbookStartCamera(){
   if(_lbPhotos.length >= 4){ showAdminResult("lb-result","info","Maximum 4 photos."); return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ logbookNativeCamera(); return; }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment" }, audio:false });
+  } catch(e){
+    logbookNativeCamera(); // not allowed here → native camera
+    return;
+  }
+  _lbCamStream = stream;
   const ov = document.getElementById("lb-cam");
   const v  = document.getElementById("lb-cam-video");
   ov.classList.add("show");
-  try {
-    _lbCamStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment" }, audio:false });
-    v.srcObject = _lbCamStream; await v.play();
-  } catch(e){
-    ov.classList.remove("show");
-    showAdminResult("lb-result","error","Camera unavailable: "+(e.message||e.name)+". Use 🖼 Library instead.");
-    return;
-  }
+  v.srcObject = _lbCamStream;
+  try { await v.play(); } catch(_){}
   logbookUpdateCamCount();
 }
 function logbookShutter(){
