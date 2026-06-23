@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15j";
+    const APP_VERSION = "2025-06-15k";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15j"></script>
+<script src="keel-core.js?v=2025-06-15k"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -4556,27 +4556,28 @@ function renderLogEntry(en, canEdit){
     ${photos?`<div class="lb-entry-photos">${photos}</div>`:""}
     <div class="lb-entry-author">by ${who}${
       en.locked
-        ? ` · <span class="lb-issue-tag" style="color:var(--teal);background:rgba(0,200,160,0.12)">🔒 Locked</span>`
+        ? ` · <span class="lb-issue-tag" style="color:var(--teal);background:rgba(0,200,160,0.12)">🔒 Locked</span>${canEdit?` · <a href="#" onclick="adminLockLog(${en.id},false);return false;" style="color:var(--muted2)">🔓 Unlock</a>`:""}`
         : (canEdit
-            ? ` · <a href="#" onclick="logbookEditById(${en.id});return false;" style="color:var(--accent)">✎ Edit</a> · <a href="#" onclick="adminLockLog(${en.id});return false;" style="color:var(--muted2)">🔒 Lock</a>`
+            ? ` · <a href="#" onclick="logbookEditById(${en.id});return false;" style="color:var(--accent)">✎ Edit</a> · <a href="#" onclick="adminLockLog(${en.id},true);return false;" style="color:var(--muted2)">🔒 Lock</a>`
             : "")
     }</div>
   </div>`;
 }
 function logbookLockedNote(){ showStatus("This log has been locked by the captain and can no longer be edited.","info"); setTimeout(clearStatus,2800); }
-async function adminLockLog(id){
+async function adminLockLog(id, lock){
+  if(lock === undefined) lock = true;
   if(!walletAddress){ showStatus("Connect your admin wallet first.","error"); setTimeout(clearStatus,3500); return; }
-  if(!confirm("Lock this log entry? It can no longer be edited by anyone.")) return;
+  if(!confirm(lock ? "Lock this log entry? It can no longer be edited by anyone." : "Unlock this log entry so it can be edited again?")) return;
   try {
     const resp = await fetch(KEEL_LOGBOOK_ENDPOINT + "/lock", {
       method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ author: walletAddress, id })
+      body: JSON.stringify({ author: walletAddress, id, locked: lock })
     });
     let data={}; try{ data = await resp.json(); }catch(_){}
-    if(!resp.ok || !data.ok) throw new Error(data.error || ("Lock failed ("+resp.status+")"));
-    showStatus("✓ Log locked.","success"); setTimeout(clearStatus,3000);
+    if(!resp.ok || !data.ok) throw new Error(data.error || ((lock?"Lock":"Unlock")+" failed ("+resp.status+")"));
+    showStatus(lock ? "✓ Log locked." : "✓ Log unlocked.","success"); setTimeout(clearStatus,3000);
     loadBoatLogbook();
-  } catch(e){ showStatus("Lock failed: "+(e.reason||e.message||e),"error"); setTimeout(clearStatus,4500); }
+  } catch(e){ showStatus((lock?"Lock":"Unlock")+" failed: "+(e.reason||e.message||e),"error"); setTimeout(clearStatus,4500); }
 }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
