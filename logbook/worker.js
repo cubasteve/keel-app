@@ -67,11 +67,29 @@ export default {
           id: r.id, kind: r.kind, tripId: r.trip_id, boatId: r.boat_id, author: r.author,
           engineHours: r.engine_hours, fuelPct: r.fuel_pct, conditions: r.conditions,
           notes: r.notes, issue: !!r.issue, createdAt: r.created_at,
+          locked: !!r.locked,
           photoKeys: keys,
           photos: keys.map(k => base + "/photo/" + encodeURIComponent(k))
         };
       });
       return json({ entries: out });
+    }
+
+    // ── Lock / unlock an entry (operator-only) ─────────────────────────────
+    if (request.method === "POST" && url.pathname === "/lock") {
+      let lreq; try { lreq = await request.json(); } catch { return json({ error: "Bad JSON" }, 400); }
+      const a = lreq && lreq.author;
+      if (!a || !ethers.isAddress(a)) return json({ error: "Bad author" }, 400);
+      if (lreq.id == null) return json({ error: "id required" }, 400);
+      const provider = new ethers.JsonRpcProvider(RPC_URL, CHAIN_ID, { staticNetwork: true });
+      const ledger = new ethers.Contract(LEDGER, LEDGER_ABI, provider);
+      let isOp = false;
+      try { isOp = await ledger.hasRole(await ledger.OPERATOR_ROLE(), ethers.getAddress(a)); } catch {}
+      if (!isOp) return json({ error: "Locking is operator-only" }, 403);
+      const locked = lreq.locked === false ? 0 : 1;
+      try { await env.DB.prepare("UPDATE log_entries SET locked=? WHERE id=?").bind(locked, Number(lreq.id)).run(); }
+      catch (err) { return json({ error: "Lock failed: " + (err.message || err) }, 500); }
+      return json({ ok: true, locked: !!locked });
     }
 
     if (request.method !== "POST" || url.pathname !== "/entry") return json({ error: "Not found" }, 404);
@@ -101,6 +119,7 @@ export default {
     if (isEdit) {
       existing = await env.DB.prepare("SELECT * FROM log_entries WHERE id = ?").bind(Number(id)).first();
       if (!existing) return json({ error: "Entry not found" }, 404);
+      if (existing.locked) return json({ error: "This log is locked and can no longer be edited." }, 423);
       if (existing.author.toLowerCase() !== recovered.toLowerCase() && !(await isOperator())) {
         return json({ error: "Not your log entry" }, 403);
       }

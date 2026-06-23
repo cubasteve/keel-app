@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS log_entries (
   notes        TEXT,
   issue        INTEGER NOT NULL DEFAULT 0,  -- 1 = flagged problem/damage
   photo_keys   TEXT,                        -- JSON array of R2 object keys
-  created_at   INTEGER NOT NULL             -- unix seconds
+  created_at   INTEGER NOT NULL,            -- unix seconds
+  locked       INTEGER NOT NULL DEFAULT 0   -- 1 = finalized by admin, no longer editable
 );
 CREATE INDEX IF NOT EXISTS idx_log_boat ON log_entries(boat_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_log_trip ON log_entries(trip_id);

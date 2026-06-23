@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15i";
+    const APP_VERSION = "2025-06-15j";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15i"></script>
+<script src="keel-core.js?v=2025-06-15j"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -3565,6 +3565,14 @@ function tripCardHTML(t) {
   const canCancel  = (t.status === "upcoming") && !!walletAddress;
   const canAddCal  = (t.status === "upcoming" || t.status === "active-now");
 
+  // Logbook button: Add / Edit, or a locked indicator once the captain finalizes it.
+  const lbOn    = (typeof logbookEnabled==="function" && logbookEnabled() && !t.cancelled);
+  const lbEntry = (typeof _lbByTrip!=="undefined") ? _lbByTrip[t.id] : null;
+  const lbBtn   = !lbOn ? ""
+    : (lbEntry && lbEntry.locked)
+      ? `<button class="btn-add-cal" onclick="logbookLockedNote()">🔒 Log Locked</button>`
+      : `<button class="btn-add-cal" onclick="logbookOpenTrip('${t.id}',${t.boatId||0})">${lbEntry ? "✎ Edit Log" : "📓 Add Log"}</button>`;
+
   return `<div class="trip-card-full ${t.status}" id="tcard-${t.id}">
     <div class="trip-card-icon ${t.status}">${iconMap[t.status]}</div>
     <div class="trip-card-body">
@@ -3579,7 +3587,7 @@ function tripCardHTML(t) {
       <div class="trip-burn-badge">−${t.burn.toFixed(2)} KEEL</div>
       <div class="trip-status-badge ${t.status}">${statusLabel}</div>
       ${canAddCal  ? `<button class="btn-add-cal" onclick="addToCalendar(${t.startTs}, ${t.endTs}, '${typeLabel}', ${t.burn.toFixed(2)})">📅 Add to Calendar</button>` : ""}
-      ${(typeof logbookEnabled==="function" && logbookEnabled() && !t.cancelled) ? `<button class="btn-add-cal" onclick="logbookOpenTrip('${t.id}',${t.boatId||0})">${(typeof _lbByTrip!=="undefined" && _lbByTrip[t.id]) ? "✎ Edit Log" : "📓 Add Log"}</button>` : ""}
+      ${lbBtn}
       ${canCancel  ? `<button class="btn-cancel-trip" id="cbtn-${t.id}" onclick="cancelTrip('${t.id}', ${t.burn.toFixed(2)})">Cancel & Refund</button>` : ""}
     </div>
   </div>`;
@@ -4546,8 +4554,29 @@ function renderLogEntry(en, canEdit){
     ${stats.length?`<div class="lb-entry-stats">${stats.join("")}</div>`:""}
     ${en.notes?`<div class="lb-entry-notes">${escapeHtml(en.notes)}</div>`:""}
     ${photos?`<div class="lb-entry-photos">${photos}</div>`:""}
-    <div class="lb-entry-author">by ${who}${canEdit?` · <a href="#" onclick="logbookEditById(${en.id});return false;" style="color:var(--accent)">✎ Edit</a>`:""}</div>
+    <div class="lb-entry-author">by ${who}${
+      en.locked
+        ? ` · <span class="lb-issue-tag" style="color:var(--teal);background:rgba(0,200,160,0.12)">🔒 Locked</span>`
+        : (canEdit
+            ? ` · <a href="#" onclick="logbookEditById(${en.id});return false;" style="color:var(--accent)">✎ Edit</a> · <a href="#" onclick="adminLockLog(${en.id});return false;" style="color:var(--muted2)">🔒 Lock</a>`
+            : "")
+    }</div>
   </div>`;
+}
+function logbookLockedNote(){ showStatus("This log has been locked by the captain and can no longer be edited.","info"); setTimeout(clearStatus,2800); }
+async function adminLockLog(id){
+  if(!walletAddress){ showStatus("Connect your admin wallet first.","error"); setTimeout(clearStatus,3500); return; }
+  if(!confirm("Lock this log entry? It can no longer be edited by anyone.")) return;
+  try {
+    const resp = await fetch(KEEL_LOGBOOK_ENDPOINT + "/lock", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ author: walletAddress, id })
+    });
+    let data={}; try{ data = await resp.json(); }catch(_){}
+    if(!resp.ok || !data.ok) throw new Error(data.error || ("Lock failed ("+resp.status+")"));
+    showStatus("✓ Log locked.","success"); setTimeout(clearStatus,3000);
+    loadBoatLogbook();
+  } catch(e){ showStatus("Lock failed: "+(e.reason||e.message||e),"error"); setTimeout(clearStatus,4500); }
 }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
