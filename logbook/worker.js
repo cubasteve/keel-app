@@ -61,12 +61,16 @@ export default {
       else             stmt = env.DB.prepare("SELECT * FROM log_entries ORDER BY created_at DESC LIMIT 200");
       const { results } = await stmt.all();
       const base = url.origin;
-      const out = (results || []).map(r => ({
-        id: r.id, kind: r.kind, tripId: r.trip_id, boatId: r.boat_id, author: r.author,
-        engineHours: r.engine_hours, fuelPct: r.fuel_pct, conditions: r.conditions,
-        notes: r.notes, issue: !!r.issue, createdAt: r.created_at,
-        photos: JSON.parse(r.photo_keys || "[]").map(k => base + "/photo/" + encodeURIComponent(k))
-      }));
+      const out = (results || []).map(r => {
+        const keys = JSON.parse(r.photo_keys || "[]");
+        return {
+          id: r.id, kind: r.kind, tripId: r.trip_id, boatId: r.boat_id, author: r.author,
+          engineHours: r.engine_hours, fuelPct: r.fuel_pct, conditions: r.conditions,
+          notes: r.notes, issue: !!r.issue, createdAt: r.created_at,
+          photoKeys: keys,
+          photos: keys.map(k => base + "/photo/" + encodeURIComponent(k))
+        };
+      });
       return json({ entries: out });
     }
 
@@ -78,7 +82,7 @@ export default {
     // constrains who an entry can be attributed to.
     let req;
     try { req = await request.json(); } catch { return json({ error: "Bad JSON" }, 400); }
-    const { author, payload, photos } = req || {};
+    const { author, payload, photos, id, keepKeys } = req || {};
     if (!author || !payload) return json({ error: "Missing fields" }, 400);
     if (!ethers.isAddress(author)) return json({ error: "Bad author" }, 400);
     const recovered = ethers.getAddress(author); // normalize
@@ -86,27 +90,45 @@ export default {
     let e;
     try { e = JSON.parse(payload); } catch { return json({ error: "Bad payload" }, 400); }
     const kind = e.kind === "maintenance" ? "maintenance" : "trip";
+    const isEdit = id != null && id !== "";
 
-    // 2. Authorization.
     const provider = new ethers.JsonRpcProvider(RPC_URL, CHAIN_ID, { staticNetwork: true });
     const ledger = new ethers.Contract(LEDGER, LEDGER_ABI, provider);
-    try {
-      if (kind === "trip") {
-        if (!e.tripId) return json({ error: "tripId required" }, 400);
-        const t = await ledger.trips(e.tripId);
-        const isOwner = t.member.toLowerCase() === recovered.toLowerCase();
-        const isOp = await ledger.hasRole(await ledger.OPERATOR_ROLE(), recovered);
-        if (!isOwner && !isOp) return json({ error: "Not your trip" }, 403);
-      } else {
-        const isOp = await ledger.hasRole(await ledger.OPERATOR_ROLE(), recovered);
-        if (!isOp) return json({ error: "Maintenance entries are operator-only" }, 403);
-      }
-    } catch (err) { return json({ error: "Authorization check failed" }, 502); }
+    const isOperator = async () => { try { return await ledger.hasRole(await ledger.OPERATOR_ROLE(), recovered); } catch { return false; } };
 
-    // 3. Store photos in R2.
-    const photoKeys = [];
+    // ── Existing entry (edit): fetch + authorize as author-of-entry or operator ──
+    let existing = null;
+    if (isEdit) {
+      existing = await env.DB.prepare("SELECT * FROM log_entries WHERE id = ?").bind(Number(id)).first();
+      if (!existing) return json({ error: "Entry not found" }, 404);
+      if (existing.author.toLowerCase() !== recovered.toLowerCase() && !(await isOperator())) {
+        return json({ error: "Not your log entry" }, 403);
+      }
+    } else {
+      // ── New entry: authorize by trip ownership / operator role ──
+      try {
+        if (kind === "trip") {
+          if (!e.tripId) return json({ error: "tripId required" }, 400);
+          const t = await ledger.trips(e.tripId);
+          const isOwner = t.member.toLowerCase() === recovered.toLowerCase();
+          if (!isOwner && !(await isOperator())) return json({ error: "Not your trip" }, 403);
+        } else {
+          if (!(await isOperator())) return json({ error: "Maintenance entries are operator-only" }, 403);
+        }
+      } catch (err) { return json({ error: "Authorization check failed" }, 502); }
+    }
+
+    // ── Photos: keep some existing (edit), delete removed, add new ──
+    const existingKeys = existing ? JSON.parse(existing.photo_keys || "[]") : [];
+    const keep = Array.isArray(keepKeys) ? keepKeys.filter(k => existingKeys.includes(k)) : existingKeys;
     try {
-      const arr = Array.isArray(photos) ? photos.slice(0, MAX_PHOTOS) : [];
+      // delete removed objects (only on edit)
+      for (const k of existingKeys) { if (!keep.includes(k)) { try { await env.PHOTOS.delete(k); } catch {} } }
+    } catch {}
+    const newKeys = [];
+    try {
+      const room = Math.max(0, MAX_PHOTOS - keep.length);
+      const arr = Array.isArray(photos) ? photos.slice(0, room) : [];
       for (let i = 0; i < arr.length; i++) {
         const m = /^data:(image\/\w+);base64,(.+)$/.exec(arr[i] || "");
         if (!m) continue;
@@ -114,30 +136,34 @@ export default {
         if (bytes.length > MAX_PHOTO_BYTES) return json({ error: "Photo too large (max ~1.5MB each)" }, 400);
         const key = `${kind}/${Date.now()}-${i}-${Math.random().toString(36).slice(2,8)}.jpg`;
         await env.PHOTOS.put(key, bytes, { httpMetadata: { contentType: m[1] } });
-        photoKeys.push(key);
+        newKeys.push(key);
       }
     } catch (err) { return json({ error: "Photo upload failed" }, 500); }
+    const photoKeys = [...keep, ...newKeys];
 
-    // 4. Insert row.
+    const engineHours = (e.engineHours === "" || e.engineHours == null) ? null : Number(e.engineHours);
+    const fuelPct     = (e.fuelPct === "" || e.fuelPct == null) ? null : Math.max(0, Math.min(100, Math.round(Number(e.fuelPct))));
+    const conditions  = e.conditions ? String(e.conditions).slice(0, 200) : null;
+    const notes       = e.notes ? String(e.notes).slice(0, 2000) : null;
+
     try {
-      await env.DB.prepare(
-        `INSERT INTO log_entries (kind, trip_id, boat_id, author, engine_hours, fuel_pct, conditions, notes, issue, photo_keys, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        kind,
-        kind === "trip" ? String(e.tripId) : null,
-        Number.isFinite(+e.boatId) ? +e.boatId : 0,
-        recovered,
-        (e.engineHours === "" || e.engineHours == null) ? null : Number(e.engineHours),
-        (e.fuelPct === "" || e.fuelPct == null) ? null : Math.max(0, Math.min(100, Math.round(Number(e.fuelPct)))),
-        e.conditions ? String(e.conditions).slice(0, 200) : null,
-        e.notes ? String(e.notes).slice(0, 2000) : null,
-        e.issue ? 1 : 0,
-        JSON.stringify(photoKeys),
-        Math.floor(Date.now()/1000)
-      ).run();
+      if (isEdit) {
+        await env.DB.prepare(
+          `UPDATE log_entries SET engine_hours=?, fuel_pct=?, conditions=?, notes=?, issue=?, photo_keys=? WHERE id=?`
+        ).bind(engineHours, fuelPct, conditions, notes, e.issue ? 1 : 0, JSON.stringify(photoKeys), Number(id)).run();
+      } else {
+        await env.DB.prepare(
+          `INSERT INTO log_entries (kind, trip_id, boat_id, author, engine_hours, fuel_pct, conditions, notes, issue, photo_keys, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          kind, kind === "trip" ? String(e.tripId) : null,
+          Number.isFinite(+e.boatId) ? +e.boatId : 0, recovered,
+          engineHours, fuelPct, conditions, notes, e.issue ? 1 : 0,
+          JSON.stringify(photoKeys), Math.floor(Date.now()/1000)
+        ).run();
+      }
     } catch (err) { return json({ error: "Save failed: " + (err.message || err) }, 500); }
 
-    return json({ ok: true, photos: photoKeys.length });
+    return json({ ok: true, edited: isEdit, photos: photoKeys.length });
   }
 };
