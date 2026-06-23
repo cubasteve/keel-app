@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15k";
+    const APP_VERSION = "2025-06-15l";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15k"></script>
+<script src="keel-core.js?v=2025-06-15l"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -1269,7 +1269,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
     <div class="lb-field"><label>Conditions</label><input class="inp" id="lb-cond" maxlength="200" placeholder="e.g. Sunny, 8–12 kt SW"></div>
     <div class="lb-field"><label>Notes</label><textarea class="inp" id="lb-notes" rows="3" maxlength="2000" placeholder="Anything noteworthy…"></textarea></div>
     <label class="lb-check"><input type="checkbox" id="lb-issue"> Flag a problem / damage needing attention</label>
-    <div class="lb-field"><label>Photos (up to 4)</label>
+    <div class="lb-field"><label>Photos (up to 10)</label>
       <div style="display:flex;gap:8px">
         <button type="button" class="btn-admin btn-admin-primary" style="flex:1;margin-top:0" onclick="logbookStartCamera()">📷 Take Photos</button>
         <button type="button" class="btn-admin btn-admin-primary" style="flex:1;margin-top:0" onclick="document.getElementById('lb-photos').click()">🖼 Library</button>
@@ -1290,7 +1290,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 <div id="lb-cam" class="lb-cam">
   <div class="lb-cam-inner">
     <video id="lb-cam-video" playsinline muted></video>
-    <div class="lb-cam-count" id="lb-cam-count">0 / 4 photos</div>
+    <div class="lb-cam-count" id="lb-cam-count">0 / 10 photos</div>
     <div class="lb-cam-thumbs" id="lb-cam-thumbs"></div>
     <div class="lb-cam-controls">
       <button class="btn-admin btn-admin-primary" onclick="logbookStopCamera()" style="flex:1">Done</button>
@@ -4391,7 +4391,7 @@ function logbookResizePhoto(file){
 async function logbookPhotosPicked(input){
   const files = Array.from(input.files||[]);
   for(const f of files){
-    if(_lbPhotos.length >= 4) break;
+    if(_lbPhotos.length >= 10) break;
     try { _lbPhotos.push({ type:"new", data: await logbookResizePhoto(f) }); } catch(_){}
   }
   input.value = "";
@@ -4420,7 +4420,7 @@ function logbookNativeCamera(){
   if(ni){ ni.value = ""; ni.click(); }
 }
 async function logbookStartCamera(){
-  if(_lbPhotos.length >= 4){ showAdminResult("lb-result","info","Maximum 4 photos."); return; }
+  if(_lbPhotos.length >= 10){ showAdminResult("lb-result","info","Maximum 10 photos."); return; }
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ logbookNativeCamera(); return; }
   let stream;
   try {
@@ -4439,18 +4439,18 @@ async function logbookStartCamera(){
 }
 function logbookShutter(){
   const v = document.getElementById("lb-cam-video");
-  if(!_lbCamStream || !v.videoWidth || _lbPhotos.length >= 4) return;
+  if(!_lbCamStream || !v.videoWidth || _lbPhotos.length >= 10) return;
   const max=1280; let w=v.videoWidth, h=v.videoHeight;
   if(w>max||h>max){ const s=max/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s); }
   const c=document.createElement("canvas"); c.width=w; c.height=h;
   c.getContext("2d").drawImage(v,0,0,w,h);
   _lbPhotos.push({ type:"new", data: c.toDataURL("image/jpeg",0.8) });
   logbookRenderThumbs(); logbookUpdateCamCount();
-  if(_lbPhotos.length >= 4) logbookStopCamera();
+  if(_lbPhotos.length >= 10) logbookStopCamera();
 }
 function logbookUpdateCamCount(){
-  const el=document.getElementById("lb-cam-count"); if(el) el.textContent = _lbPhotos.length+" / 4 photos";
-  const sh=document.getElementById("lb-cam-shutter"); if(sh) sh.disabled = _lbPhotos.length>=4;
+  const el=document.getElementById("lb-cam-count"); if(el) el.textContent = _lbPhotos.length+" / 10 photos";
+  const sh=document.getElementById("lb-cam-shutter"); if(sh) sh.disabled = _lbPhotos.length>=10;
   logbookRenderCamThumbs();
 }
 // Strip of already-taken photos inside the live camera, each removable for a retake.

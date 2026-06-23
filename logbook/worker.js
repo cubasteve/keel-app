@@ -13,7 +13,7 @@ const LEDGER   = "0x5c27f0399C3737a68e0933183609b8a273A98eC0";
 const RPC_URL  = "https://polygon-amoy.g.alchemy.com/v2/tocmMJjVYA0syE3coEuGB";
 const CHAIN_ID = 80002;
 const ALLOW_ORIGIN = "https://cubasteve.github.io";
-const MAX_PHOTOS = 4;
+const MAX_PHOTOS = 10;
 const MAX_PHOTO_BYTES = 1_500_000; // ~1.5MB per photo after client-side resize
 
 const DOMAIN = { name: "KeelLogbook", version: "1", chainId: CHAIN_ID };
