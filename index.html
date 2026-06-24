@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15o";
+    const APP_VERSION = "2025-06-15p";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15o"></script>
+<script src="keel-core.js?v=2025-06-15p"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -577,9 +577,9 @@ select.inp option { background:#0b1d30; }
 /* availability dot */
 .cal-day .av { position:absolute; bottom:4px; left:50%; transform:translateX(-50%); width:5px; height:5px; border-radius:50%; }
 .cal-day .av.part { background:#e0a93f; }
-.cal-day.full { background:rgba(255,122,122,0.10); color:#ff9d9d; cursor:pointer; }
+.cal-day.full { background:rgba(255,122,122,0.10); color:#ff9d9d; cursor:not-allowed; }
 .cal-day.full .av { background:#ff7a7a; }
-.cal-detail { margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
+.cal-detail { margin-top:10px; padding-top:10px; border-top:1px solid var(--border); max-height:180px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
 .cal-detail-title { font-size:12px; font-weight:700; color:var(--foam); margin-bottom:8px; }
 .cal-bk { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:5px 0; font-size:12px; border-bottom:1px solid rgba(255,255,255,0.05); }
 .cal-bk:last-of-type { border-bottom:none; }
@@ -3014,7 +3014,6 @@ function renderCalendar(){
     .toLocaleDateString("en-US",{month:"long",year:"numeric"});
   label.textContent = monthName;
 
-  const det = document.getElementById("cal-detail"); if(det) det.hidden = true; // cleared on (re)render
   const firstDow = new Date(calViewYear, calViewMonth, 1).getDay(); // 0=Sun
   const daysInMonth = new Date(calViewYear, calViewMonth+1, 0).getDate();
   const selKey = document.getElementById("trip-date").value;
@@ -3036,25 +3035,17 @@ function renderCalendar(){
       if(status === "full"){ cls += " full"; dot = '<span class="av"></span>'; }
       else if(status === "part"){ dot = '<span class="av part"></span>'; }
     }
-    const clickable = !isPast; // full days are clickable too — to view who booked them
+    const clickable = !isPast && status !== "full";
     const onclick = clickable ? ' onclick="selectCalDay(\''+key+'\')"' : '';
     html += '<div class="'+cls+'"'+onclick+'>'+d+dot+'</div>';
   }
   grid.innerHTML = html;
+  renderAgenda();
 }
 
-// Tap a day: open days commit immediately; days with bookings show who/when
-// first (and a "Use this day" action for partly-booked days).
-function selectCalDay(key){
-  const bookings = dayBookings(key);
-  const status   = dayStatus(key);
-  if(!bookings.length){ commitCalDay(key); return; }
-  if(status !== "full"){
-    document.getElementById("trip-date").value = key; // tentative selection
-    renderCalendar();                                 // refresh highlight (hides detail)
-  }
-  renderCalDetail(key, bookings, status);             // then show the detail
-}
+// Tap a day to select it for booking (full days aren't clickable). The
+// persistent "Upcoming bookings" agenda below shows who/when at a glance.
+function selectCalDay(key){ commitCalDay(key); }
 
 function commitCalDay(key){
   document.getElementById("trip-date").value = key;
@@ -3082,16 +3073,22 @@ function dayBookings(dayKey){
     .filter(r => r.startTs < winEnd && winStart < r.endTs)
     .sort((a,b) => a.startTs - b.startTs);
 }
-function renderCalDetail(key, bookings, status){
+// Persistent "Upcoming bookings" agenda: every active future reservation across
+// all members — date · time range · who — so availability is readable at a glance.
+function renderAgenda(){
   const el = document.getElementById("cal-detail"); if(!el) return;
-  const dispDate = new Date(key+"T12:00:00").toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"});
-  const rows = bookings.length
-    ? bookings.map(b => `<div class="cal-bk"><span class="cal-bk-time">${fmtTimeET(b.startTs)}–${fmtTimeET(b.endTs)}</span><span class="cal-bk-who">${escapeHtml(memberName(b.member))}</span></div>`).join("")
-    : '<div class="cal-bk-empty">Open all day — no bookings.</div>';
-  const action = (status !== "full")
-    ? `<button type="button" class="btn-continue" style="width:100%;padding:9px;font-size:12px;margin-top:10px" onclick="commitCalDay('${key}')">Use ${dispDate} →</button>`
-    : '<div class="cal-bk-empty" style="color:var(--danger);margin-top:6px">Fully booked — pick another day.</div>';
-  el.innerHTML = `<div class="cal-detail-title">${dispDate}</div>${rows}${action}`;
+  if(!RESERVED_LOADED){ el.hidden = true; return; }
+  const now = Math.floor(Date.now()/1000);
+  const up = RESERVED_RANGES.filter(r => r.endTs > now).sort((a,b) => a.startTs - b.startTs).slice(0, 12);
+  if(!up.length){
+    el.innerHTML = '<div class="cal-detail-title">Upcoming bookings</div><div class="cal-bk-empty">None yet — the calendar is wide open.</div>';
+    el.hidden = false; return;
+  }
+  const rows = up.map(b => {
+    const day = new Date(b.startTs*1000).toLocaleDateString("en-US",{weekday:"short",month:"numeric",day:"numeric",timeZone:"America/New_York"});
+    return `<div class="cal-bk"><span class="cal-bk-time">${day} ${fmtTimeET(b.startTs)}–${fmtTimeET(b.endTs)}</span><span class="cal-bk-who">${escapeHtml(memberName(b.member))}</span></div>`;
+  }).join("");
+  el.innerHTML = `<div class="cal-detail-title">Upcoming bookings</div>${rows}`;
   el.hidden = false;
 }
 
