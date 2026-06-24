@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15n";
+    const APP_VERSION = "2025-06-15o";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15n"></script>
+<script src="keel-core.js?v=2025-06-15o"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -577,8 +577,15 @@ select.inp option { background:#0b1d30; }
 /* availability dot */
 .cal-day .av { position:absolute; bottom:4px; left:50%; transform:translateX(-50%); width:5px; height:5px; border-radius:50%; }
 .cal-day .av.part { background:#e0a93f; }
-.cal-day.full { background:rgba(255,122,122,0.10); color:#ff9d9d; cursor:not-allowed; }
+.cal-day.full { background:rgba(255,122,122,0.10); color:#ff9d9d; cursor:pointer; }
 .cal-day.full .av { background:#ff7a7a; }
+.cal-detail { margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
+.cal-detail-title { font-size:12px; font-weight:700; color:var(--foam); margin-bottom:8px; }
+.cal-bk { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:5px 0; font-size:12px; border-bottom:1px solid rgba(255,255,255,0.05); }
+.cal-bk:last-of-type { border-bottom:none; }
+.cal-bk-time { font-family:var(--mono); color:var(--accent); white-space:nowrap; }
+.cal-bk-who { color:var(--text); text-align:right; overflow:hidden; text-overflow:ellipsis; }
+.cal-bk-empty { font-size:12px; color:var(--muted2); padding:4px 0; }
 .cal-legend { display:flex; gap:12px; margin-top:12px; font-size:10px; color:var(--muted2); }
 .cal-legend span { display:inline-flex; align-items:center; gap:5px; }
 .cal-legend .lg { width:8px; height:8px; border-radius:50%; display:inline-block; }
@@ -1467,6 +1474,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
                 <span><i class="lg part"></i>Partly booked</span>
                 <span><i class="lg full"></i>Fully booked</span>
               </div>
+              <div class="cal-detail" id="cal-detail" hidden></div>
             </div>
           </div>
           <div class="form-group">
@@ -3006,6 +3014,7 @@ function renderCalendar(){
     .toLocaleDateString("en-US",{month:"long",year:"numeric"});
   label.textContent = monthName;
 
+  const det = document.getElementById("cal-detail"); if(det) det.hidden = true; // cleared on (re)render
   const firstDow = new Date(calViewYear, calViewMonth, 1).getDay(); // 0=Sun
   const daysInMonth = new Date(calViewYear, calViewMonth+1, 0).getDate();
   const selKey = document.getElementById("trip-date").value;
@@ -3027,20 +3036,63 @@ function renderCalendar(){
       if(status === "full"){ cls += " full"; dot = '<span class="av"></span>'; }
       else if(status === "part"){ dot = '<span class="av part"></span>'; }
     }
-    const clickable = !isPast && status !== "full";
+    const clickable = !isPast; // full days are clickable too — to view who booked them
     const onclick = clickable ? ' onclick="selectCalDay(\''+key+'\')"' : '';
     html += '<div class="'+cls+'"'+onclick+'>'+d+dot+'</div>';
   }
   grid.innerHTML = html;
 }
 
+// Tap a day: open days commit immediately; days with bookings show who/when
+// first (and a "Use this day" action for partly-booked days).
 function selectCalDay(key){
+  const bookings = dayBookings(key);
+  const status   = dayStatus(key);
+  if(!bookings.length){ commitCalDay(key); return; }
+  if(status !== "full"){
+    document.getElementById("trip-date").value = key; // tentative selection
+    renderCalendar();                                 // refresh highlight (hides detail)
+  }
+  renderCalDetail(key, bookings, status);             // then show the detail
+}
+
+function commitCalDay(key){
   document.getElementById("trip-date").value = key;
   const disp = new Date(key+"T12:00:00").toLocaleDateString("en-US",
     {weekday:"short",month:"short",day:"numeric",year:"numeric"});
   document.getElementById("cal-trigger-text").textContent = disp;
   closeCalendar();
   calculate();
+}
+
+// Display name for a reserver (on-chain profile name, else shortened address).
+function memberName(addr){
+  const p = adminProfileCache[(addr||"").toLowerCase()];
+  return (p && p.displayName) ? p.displayName : (addr ? addr.slice(0,6)+"…"+addr.slice(-4) : "—");
+}
+function fmtTimeET(ts){
+  return new Date(ts*1000).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",timeZone:"America/New_York"});
+}
+// Active bookings overlapping the given ET calendar day, earliest first.
+function dayBookings(dayKey){
+  const [y,m,d] = dayKey.split("-").map(Number);
+  const winStart = easternEpoch(y,m,d,0,0);
+  const winEnd   = easternEpoch(y,m,d,23,59) + 60;
+  return RESERVED_RANGES
+    .filter(r => r.startTs < winEnd && winStart < r.endTs)
+    .sort((a,b) => a.startTs - b.startTs);
+}
+function renderCalDetail(key, bookings, status){
+  const el = document.getElementById("cal-detail"); if(!el) return;
+  const dispDate = new Date(key+"T12:00:00").toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"});
+  const rows = bookings.length
+    ? bookings.map(b => `<div class="cal-bk"><span class="cal-bk-time">${fmtTimeET(b.startTs)}–${fmtTimeET(b.endTs)}</span><span class="cal-bk-who">${escapeHtml(memberName(b.member))}</span></div>`).join("")
+    : '<div class="cal-bk-empty">Open all day — no bookings.</div>';
+  const action = (status !== "full")
+    ? `<button type="button" class="btn-continue" style="width:100%;padding:9px;font-size:12px;margin-top:10px" onclick="commitCalDay('${key}')">Use ${dispDate} →</button>`
+    : '<div class="cal-bk-empty" style="color:var(--danger);margin-top:6px">Fully booked — pick another day.</div>';
+  el.innerHTML = `<div class="cal-detail-title">${dispDate}</div>${rows}${action}`;
+  el.hidden = false;
 }
 
 // ── Scheduler: reserved windows across ALL wallets for a given boat ──
@@ -3075,9 +3127,11 @@ async function loadReservedRanges(){
     }
     const ranges = tripRecords
       .filter(t => t && !t.cancelled)
-      .map(t => ({ startTs: Number(t.startTs), endTs: Number(t.endTs) }));
+      .map(t => ({ startTs: Number(t.startTs), endTs: Number(t.endTs), member: t.member }));
     RESERVED_RANGES = ranges;
     RESERVED_LOADED = true;
+    // Resolve member display names so the calendar can show who booked each slot.
+    try { await prefetchProfiles(ranges.map(r => r.member).filter(Boolean)); } catch(_){}
   } catch(e){
     console.warn("Could not load reserved ranges", e);
     RESERVED_LOADED = false;
