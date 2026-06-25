@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15r";
+    const APP_VERSION = "2025-06-15s";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15r"></script>
+<script src="keel-core.js?v=2025-06-15s"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -2375,6 +2375,7 @@ async function finishConnect(){
   try { await refreshBalance(); }     catch(e){ console.warn("balance load failed", e); }
   try { await loadMonthlyStats(); }   catch(e){ console.warn("monthly stats failed", e); }
   try { await loadOnChainHistory(); } catch(e){ console.warn("history load failed", e); }
+  try { await loadWaitlist(); checkWaitlistOpenings(); } catch(e){ console.warn("waitlist load failed", e); }
   // Leave the gate — reveals the app shell (the gate is display:none when
   // not gated). Also close the modal if it's still up. Then reload the active
   // page after a brief delay so the provider has fully settled (especially on
@@ -2450,7 +2451,7 @@ async function disconnectWallet(e) {
   document.getElementById("settings-addr-display").textContent = "—";
   const spr = document.getElementById("settings-profile-result");
   if(spr){ spr.className = "settings-result"; spr.textContent = ""; }
-  tripsData = []; tripsLoaded = false;
+  tripsData = []; tripsLoaded = false; _waitlist = {};
   resetAdminPage();
   document.getElementById("trips-content").style.display = "none";
   // Reset settle panel to blank state
@@ -3085,11 +3086,66 @@ function renderCalDetail(key, bookings, status){
   const rows = bookings.map(b =>
     `<div class="cal-bk"><span class="cal-bk-time">${fmtTimeET(b.startTs)}–${fmtTimeET(b.endTs)}</span><span class="cal-bk-who">${escapeHtml(memberName(b.member))}</span></div>`
   ).join("");
-  const action = (status !== "full")
-    ? `<button type="button" class="btn-continue" style="width:100%;padding:9px;font-size:12px;margin-top:10px" onclick="commitCalDay('${key}')">Use ${dispDate} →</button>`
-    : '<div class="cal-bk-empty" style="color:var(--danger);margin-top:6px">Fully booked — pick another day.</div>';
+  let action;
+  if(status !== "full"){
+    action = `<button type="button" class="btn-continue" style="width:100%;padding:9px;font-size:12px;margin-top:10px" onclick="commitCalDay('${key}')">Use ${dispDate} →</button>`;
+  } else if(walletAddress && logbookEnabled()){
+    const on = memberOnWaitlist(key);
+    action = `<div class="cal-bk-empty" style="color:var(--danger);margin-top:6px;margin-bottom:6px">Fully booked.</div>`
+      + `<button type="button" class="btn-continue" style="width:100%;padding:9px;font-size:12px" onclick="waitlistToggle('${key}')">${on ? '🔔 On the waitlist — tap to leave' : '🔔 Notify me if a spot opens'}</button>`;
+  } else {
+    action = '<div class="cal-bk-empty" style="color:var(--danger);margin-top:6px">Fully booked — pick another day.</div>';
+  }
   el.innerHTML = `<div class="cal-detail-title">${dispDate}</div>${rows}${action}`;
   el.hidden = false;
+}
+
+// ── Waitlist: alert a member when a day they waitlisted frees up ──
+let _waitlist = {}; // day -> notified(bool), for the connected member
+function memberOnWaitlist(day){ return Object.prototype.hasOwnProperty.call(_waitlist, day); }
+async function loadWaitlist(){
+  _waitlist = {};
+  if(!logbookEnabled() || !walletAddress) return;
+  try {
+    const resp = await fetch(KEEL_LOGBOOK_ENDPOINT + "/waitlist?member=" + walletAddress);
+    const data = await resp.json();
+    (data.days || []).forEach(d => { _waitlist[d.day] = !!d.notified; });
+  } catch(_){}
+}
+async function waitlistToggle(day){
+  if(!walletAddress || !logbookEnabled()) return;
+  const on = memberOnWaitlist(day);
+  try {
+    const resp = await fetch(KEEL_LOGBOOK_ENDPOINT + "/waitlist", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ member: walletAddress, day, action: on ? "leave" : "join" })
+    });
+    const data = await resp.json().catch(()=>({}));
+    if(!resp.ok || !data.ok) throw new Error(data.error || "waitlist failed");
+    if(on) delete _waitlist[day]; else _waitlist[day] = false;
+    showStatus(on ? "Removed from the waitlist." : "✓ You'll be alerted when a spot opens.", "success");
+    setTimeout(clearStatus, 3000);
+    renderCalDetail(day, dayBookings(day), dayStatus(day)); // flip the button
+  } catch(e){ showStatus("Waitlist error: "+(e.reason||e.message||e), "error"); setTimeout(clearStatus, 4000); }
+}
+// If a waitlisted day is no longer full (someone cancelled), alert once.
+function checkWaitlistOpenings(){
+  if(!walletAddress || !RESERVED_LOADED) return;
+  const tKey = todayKey();
+  const opened = [];
+  for(const day in _waitlist){
+    if(day < tKey || _waitlist[day]) continue;     // past, or already alerted
+    if(dayStatus(day) !== "full") opened.push(day);
+  }
+  if(!opened.length) return;
+  const labels = opened.map(d => new Date(d+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"numeric",day:"numeric"}));
+  showStatus("🔔 A spot opened on " + labels.join(", ") + " — open the date picker to book.", "success");
+  setTimeout(clearStatus, 9000);
+  opened.forEach(day => {
+    _waitlist[day] = true; // mark locally so we don't nag again this session
+    fetch(KEEL_LOGBOOK_ENDPOINT + "/waitlist", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ member: walletAddress, day, action:"seen" }) }).catch(()=>{});
+  });
 }
 
 // ── Scheduler: reserved windows across ALL wallets for a given boat ──
@@ -3135,6 +3191,7 @@ async function loadReservedRanges(){
   }
   // Refresh the date field's disabled-state hint if the calendar is in use.
   if(typeof refreshDateAvailability === "function") refreshDateAvailability();
+  try { if(walletAddress) checkWaitlistOpenings(); } catch(_){}
 }
 
 // Does a proposed [s,e) overlap any reserved range? (half-open interval)

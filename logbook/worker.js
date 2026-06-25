@@ -92,6 +92,34 @@ export default {
       return json({ ok: true, locked: !!locked });
     }
 
+    // ── Waitlist: GET this member's waitlisted days ────────────────────────
+    if (request.method === "GET" && url.pathname === "/waitlist") {
+      const member = url.searchParams.get("member");
+      if (!member || !ethers.isAddress(member)) return json({ error: "Bad member" }, 400);
+      const { results } = await env.DB.prepare("SELECT day, notified FROM waitlist WHERE member = ? ORDER BY day").bind(ethers.getAddress(member)).all();
+      return json({ days: (results || []).map(r => ({ day: r.day, notified: !!r.notified })) });
+    }
+    // ── Waitlist: join / leave / mark-seen ─────────────────────────────────
+    if (request.method === "POST" && url.pathname === "/waitlist") {
+      let b; try { b = await request.json(); } catch { return json({ error: "Bad JSON" }, 400); }
+      const { member, day, action } = b || {};
+      if (!member || !ethers.isAddress(member)) return json({ error: "Bad member" }, 400);
+      if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return json({ error: "Bad day" }, 400);
+      const m = ethers.getAddress(member);
+      try {
+        if (action === "leave") {
+          await env.DB.prepare("DELETE FROM waitlist WHERE member=? AND day=?").bind(m, day).run();
+          return json({ ok: true, joined: false });
+        }
+        if (action === "seen") {
+          await env.DB.prepare("UPDATE waitlist SET notified=1 WHERE member=? AND day=?").bind(m, day).run();
+          return json({ ok: true });
+        }
+        await env.DB.prepare("INSERT OR IGNORE INTO waitlist (day, member, created_at, notified) VALUES (?,?,?,0)").bind(day, m, Math.floor(Date.now()/1000)).run();
+        return json({ ok: true, joined: true });
+      } catch (err) { return json({ error: "Waitlist failed: " + (err.message || err) }, 500); }
+    }
+
     if (request.method !== "POST" || url.pathname !== "/entry") return json({ error: "Not found" }, 404);
 
     // ── Create an entry ────────────────────────────────────────────────────

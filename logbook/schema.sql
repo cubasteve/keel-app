@@ -17,3 +17,14 @@ CREATE TABLE IF NOT EXISTS log_entries (
 );
 CREATE INDEX IF NOT EXISTS idx_log_boat ON log_entries(boat_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_log_trip ON log_entries(trip_id);
+
+-- Waitlist: members get an in-app notification when a day they waitlisted frees up.
+CREATE TABLE IF NOT EXISTS waitlist (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  day        TEXT    NOT NULL,            -- "YYYY-MM-DD" (ET calendar day)
+  member     TEXT    NOT NULL,            -- wallet address
+  created_at INTEGER NOT NULL,
+  notified   INTEGER NOT NULL DEFAULT 0   -- 1 = already alerted that it opened
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_wl_unique ON waitlist(member, day);
+CREATE INDEX IF NOT EXISTS idx_wl_member ON waitlist(member);
