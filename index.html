@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15q";
+    const APP_VERSION = "2025-06-15r";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15q"></script>
+<script src="keel-core.js?v=2025-06-15r"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -3043,17 +3043,13 @@ function renderCalendar(){
   grid.innerHTML = html;
 }
 
-// Tap a day: open days commit immediately; a booked day reveals its bookings
-// (who + time ranges), with a "Use this day" action for partly-booked days.
+// Tap a day: open days commit immediately; a booked day just reveals its
+// bookings (who + time ranges) — no auto-select. Partly-booked days still
+// offer a "Use this day" button in the detail for booking around the slots.
 function selectCalDay(key){
   const bookings = dayBookings(key);
-  const status   = dayStatus(key);
   if(!bookings.length){ commitCalDay(key); return; }
-  if(status !== "full"){
-    document.getElementById("trip-date").value = key; // tentative selection
-    renderCalendar();                                 // refresh highlight (hides detail)
-  }
-  renderCalDetail(key, bookings, status);             // then show this day's detail
+  renderCalDetail(key, bookings, dayStatus(key));
 }
 
 function commitCalDay(key){
