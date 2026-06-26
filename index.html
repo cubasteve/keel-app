@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15u";
+    const APP_VERSION = "2025-06-15v";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15u"></script>
+<script src="keel-core.js?v=2025-06-15v"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -1327,6 +1327,13 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
     <div class="lb-field"><label>Destination / area</label><input class="inp" id="fp-dest" maxlength="200" placeholder="e.g. Out to the lighthouse and back"></div>
     <div class="lb-field"><label>Expected return (time)</label><input class="inp" id="fp-eta" type="time"></div>
     <div class="lb-field"><label>Emergency contact (ashore)</label><input class="inp" id="fp-contact" maxlength="60" placeholder="Name · phone"></div>
+    <div class="lb-field"><label>Photos (departure condition, up to 10)</label>
+      <div style="display:flex;gap:8px">
+        <button type="button" class="btn-admin btn-admin-primary" style="flex:1;margin-top:0" onclick="logbookStartCamera()">📷 Take Photos</button>
+        <button type="button" class="btn-admin btn-admin-primary" style="flex:1;margin-top:0" onclick="document.getElementById('lb-photos').click()">🖼 Library</button>
+      </div>
+    </div>
+    <div id="fp-thumbs" class="lb-thumbs"></div>
     <div class="admin-result" id="fp-result" style="margin-top:6px"></div>
     <div class="lb-btn-row">
       <button class="btn-admin btn-admin-primary" onclick="fpClose()">Close</button>
@@ -3208,6 +3215,8 @@ function fpOpen(tripId, boatId){
   const trip = (tripsData||[]).find(t => t.id === tripId);
   const day = trip ? new Date(trip.startTs*1000).toLocaleDateString("en-CA",{timeZone:"America/New_York"}) : todayKey();
   _fpCtx = { tripId, boatId: boatId||0, day, status:"planned" };
+  _photoTarget = "fp-thumbs"; _lbPhotos = []; logbookRenderThumbs();
+  document.getElementById("lb-photos").value = "";
   FP_CHECKS.forEach(k => { const el=document.getElementById("fp-ck-"+k); if(el) el.checked=false; });
   ["fp-souls","fp-dest","fp-eta","fp-contact"].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=""; });
   const res=document.getElementById("fp-result"); res.className="admin-result"; res.textContent="";
@@ -3222,6 +3231,10 @@ function fpOpen(tripId, boatId){
     if(p.destination) document.getElementById("fp-dest").value = p.destination;
     if(p.contact) document.getElementById("fp-contact").value = p.contact;
     if(p.etaReturn) document.getElementById("fp-eta").value = new Date(p.etaReturn*1000).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",timeZone:"America/New_York"});
+    if(Array.isArray(p.photoKeys) && p.photoKeys.length && _photoTarget==="fp-thumbs"){
+      _lbPhotos = p.photoKeys.map((key,i)=>({ type:"existing", key, url:(p.photos&&p.photos[i])||"" }));
+      logbookRenderThumbs();
+    }
     fpRenderStatus();
   }).catch(()=>{});
 }
@@ -3236,9 +3249,12 @@ function fpCollect(){
   const etaVal = document.getElementById("fp-eta").value;
   let etaReturn = "";
   if(etaVal && _fpCtx.day){ const [y,m,d]=_fpCtx.day.split("-").map(Number); const [hh,mm]=etaVal.split(":").map(Number); etaReturn = easternEpoch(y,m,d,hh,mm); }
+  // _lbPhotos holds this float plan's photos while the fp modal is the photo target.
+  const keepKeys  = _lbPhotos.filter(p=>p.type==="existing").map(p=>p.key);
+  const photos    = _lbPhotos.filter(p=>p.type==="new").map(p=>p.data);
   return { member: walletAddress, tripId:_fpCtx.tripId, boatId:_fpCtx.boatId, checklist,
     souls: document.getElementById("fp-souls").value, destination: document.getElementById("fp-dest").value.trim(),
-    etaReturn, contact: document.getElementById("fp-contact").value.trim() };
+    etaReturn, contact: document.getElementById("fp-contact").value.trim(), keepKeys, photos };
 }
 async function fpPost(action){
   const resp = await fetch(KEEL_LOGBOOK_ENDPOINT + "/floatplan", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ ...fpCollect(), action }) });
@@ -3260,7 +3276,11 @@ async function fpPrimary(){
     showAdminResult("fp-result","success", action==="checkin" ? "✓ Checked in — safe sailing!" : "✓ Checked out — welcome back.");
     fpRenderStatus();
     if(currentPage==="trips"){ try{ renderTripsPage(); }catch(_){} }
-    if(action==="checkout") setTimeout(fpClose, 900);
+    if(action==="checkout"){
+      // On return, jump straight into the voyage log.
+      const tripId = _fpCtx.tripId, boatId = _fpCtx.boatId;
+      setTimeout(()=>{ fpClose(); try { logbookOpenTrip(tripId, boatId); } catch(_){} }, 900);
+    }
   } catch(e){ showAdminResult("fp-result","error","Failed: "+(e.message||e)); }
   btn.disabled=false; fpRenderStatus();
 }
@@ -4584,11 +4604,13 @@ function resetAdminPage() {
 function logbookEnabled(){ return typeof KEEL_LOGBOOK_ENDPOINT === "string" && KEEL_LOGBOOK_ENDPOINT.length > 0; }
 let _lbCtx = { kind:"trip", tripId:"", boatId:0, id:null };
 let _lbPhotos = [];        // items: {type:'new',data} | {type:'existing',key,url}
+let _photoTarget = "lb-thumbs"; // which modal's thumb strip the shared camera renders into
 let _lbByTrip = {};        // tripId -> this member's latest trip log (for the trip pill)
 let _lbAdminEntries = {};  // id -> entry (admin list, for editing)
 
 function logbookOpenForm(kind, tripId, boatId, existing){
   if(!signer){ showStatus("Connect your wallet first.","error"); setTimeout(clearStatus,3500); return; }
+  _photoTarget = "lb-thumbs";
   _lbCtx = { kind, tripId: tripId||"", boatId: boatId||0, id: existing?.id ?? null };
   document.getElementById("lb-engine").value = existing?.engineHours ?? "";
   document.getElementById("lb-fuel").value   = existing?.fuelPct ?? "";
@@ -4639,7 +4661,7 @@ async function logbookPhotosPicked(input){
   logbookRenderThumbs();
 }
 function logbookRenderThumbs(){
-  const thumbs = document.getElementById("lb-thumbs");
+  const thumbs = document.getElementById(_photoTarget);
   if(!thumbs) return;
   thumbs.innerHTML = "";
   _lbPhotos.forEach((p, i) => {

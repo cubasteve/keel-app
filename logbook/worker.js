@@ -122,12 +122,18 @@ export default {
 
     // ── Float plan: GET one (?tripId=), a member's (?member=), or who's out (?out=1) ──
     if (request.method === "GET" && url.pathname === "/floatplan") {
-      const fpRow = (r) => ({
-        tripId: r.trip_id, member: r.member, boatId: r.boat_id,
-        checklist: JSON.parse(r.checklist || "{}"), souls: r.souls, destination: r.destination,
-        etaReturn: r.eta_return, contact: r.contact, status: r.status,
-        departedAt: r.departed_at, returnedAt: r.returned_at
-      });
+      const base = url.origin;
+      const fpRow = (r) => {
+        const keys = JSON.parse(r.photo_keys || "[]");
+        return {
+          tripId: r.trip_id, member: r.member, boatId: r.boat_id,
+          checklist: JSON.parse(r.checklist || "{}"), souls: r.souls, destination: r.destination,
+          etaReturn: r.eta_return, contact: r.contact, status: r.status,
+          departedAt: r.departed_at, returnedAt: r.returned_at,
+          photoKeys: keys,
+          photos: keys.map(k => base + "/photo/" + encodeURIComponent(k))
+        };
+      };
       const tripId = url.searchParams.get("tripId");
       const member = url.searchParams.get("member");
       if (tripId) {
@@ -177,13 +183,30 @@ export default {
         const destination = b.destination ? String(b.destination).slice(0, 200) : null;
         const etaReturn = (b.etaReturn === "" || b.etaReturn == null) ? null : Number(b.etaReturn);
         const contact = b.contact ? String(b.contact).slice(0, 60) : null;
+
+        // Photos: keep some existing, delete removed, add new (same as logbook).
+        const existingKeys = existing ? JSON.parse(existing.photo_keys || "[]") : [];
+        const keep = Array.isArray(b.keepKeys) ? b.keepKeys.filter(k => existingKeys.includes(k)) : existingKeys;
+        for (const k of existingKeys) { if (!keep.includes(k)) { try { await env.PHOTOS.delete(k); } catch {} } }
+        const newKeys = [];
+        const arr = Array.isArray(b.photos) ? b.photos.slice(0, Math.max(0, MAX_PHOTOS - keep.length)) : [];
+        for (let i = 0; i < arr.length; i++) {
+          const mm = /^data:(image\/\w+);base64,(.+)$/.exec(arr[i] || ""); if (!mm) continue;
+          const bytes = Uint8Array.from(atob(mm[2]), c => c.charCodeAt(0));
+          if (bytes.length > MAX_PHOTO_BYTES) return json({ error: "Photo too large (max ~1.5MB each)" }, 400);
+          const key = `floatplan/${Date.now()}-${i}-${Math.random().toString(36).slice(2,8)}.jpg`;
+          await env.PHOTOS.put(key, bytes, { httpMetadata: { contentType: mm[1] } });
+          newKeys.push(key);
+        }
+        const photoKeys = JSON.stringify([...keep, ...newKeys]);
+
         await env.DB.prepare(
-          `INSERT INTO floatplan (trip_id, member, boat_id, checklist, souls, destination, eta_return, contact, status, departed_at, returned_at, updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+          `INSERT INTO floatplan (trip_id, member, boat_id, checklist, souls, destination, eta_return, contact, status, departed_at, returned_at, updated_at, photo_keys)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
            ON CONFLICT(trip_id) DO UPDATE SET checklist=excluded.checklist, souls=excluded.souls,
              destination=excluded.destination, eta_return=excluded.eta_return, contact=excluded.contact,
-             status=excluded.status, departed_at=excluded.departed_at, updated_at=excluded.updated_at`
-        ).bind(tripId, who, Number(b.boatId)||0, checklist, souls, destination, etaReturn, contact, status, departedAt, existing?.returned_at || null, now).run();
+             status=excluded.status, departed_at=excluded.departed_at, updated_at=excluded.updated_at, photo_keys=excluded.photo_keys`
+        ).bind(tripId, who, Number(b.boatId)||0, checklist, souls, destination, etaReturn, contact, status, departedAt, existing?.returned_at || null, now, photoKeys).run();
         return json({ ok: true, status });
       } catch (err) { return json({ error: "Save failed: " + (err.message || err) }, 500); }
     }
