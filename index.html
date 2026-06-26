@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15v";
+    const APP_VERSION = "2025-06-15w";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15v"></script>
+<script src="keel-core.js?v=2025-06-15w"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -1654,10 +1654,10 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
           </div>
         </div>
 
-        <!-- Usage + Token facts -->
+        <!-- Usage -->
         <div class="admin-grid">
 
-          <div class="admin-card">
+          <div class="admin-card" style="grid-column:1/-1">
             <div class="admin-card-title">🔥 Your Usage</div>
             <div class="admin-stat-row">
               <span class="admin-stat-label">Total Voyages</span>
@@ -1681,38 +1681,6 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
             </div>
           </div>
 
-          <div class="admin-card">
-            <div class="admin-card-title">◈ Token Facts</div>
-            <div class="admin-stat-row">
-              <span class="admin-stat-label">Wallet Cap</span>
-              <span class="admin-stat-val" id="kt-cap">300 KEEL</span>
-            </div>
-            <div class="admin-stat-row">
-              <span class="admin-stat-label">Monthly Issuance</span>
-              <span class="admin-stat-val" id="kt-monthly">100 KEEL</span>
-            </div>
-            <div class="admin-stat-row">
-              <span class="admin-stat-label">Token Lifetime</span>
-              <span class="admin-stat-val">90 days</span>
-            </div>
-            <div class="admin-stat-row">
-              <span class="admin-stat-label">Transfers</span>
-              <span class="admin-stat-val" style="color:var(--danger)">Disabled</span>
-            </div>
-            <div class="admin-stat-row">
-              <span class="admin-stat-label">Network</span>
-              <span class="admin-stat-val" style="color:var(--teal)">Polygon Amoy</span>
-            </div>
-            <div class="admin-stat-row">
-              <span class="admin-stat-label">Contract</span>
-              <span class="admin-stat-val"><a id="kt-contract-link" href="#" target="_blank" style="color:var(--accent);text-decoration:none;font-size:11px">—</a></span>
-            </div>
-            <p style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.5">
-              KEEL is a usage token, not currency — it can only be minted by the club
-              and burned for voyages. Burns are spent oldest-first; unused tokens expire 90 days
-              after issuance to keep the fleet calendar active.
-            </p>
-          </div>
 
         </div>
 
@@ -3939,11 +3907,6 @@ async function loadKeelTokenPage() {
   const now    = new Date();
   const nowSec = Math.floor(Date.now()/1000);
 
-  // Contract link
-  const link = document.getElementById("kt-contract-link");
-  link.textContent = KEEL_TOKEN_ADDRESS.slice(0,8)+"…"+KEEL_TOKEN_ADDRESS.slice(-6);
-  link.href = "https://amoy.polygonscan.com/address/"+KEEL_TOKEN_ADDRESS;
-
   // Wallet & Network + add-to-wallet fields (moved here from Settings)
   const _wa = document.getElementById("settings-wallet-addr"); if(_wa) _wa.textContent = walletAddress.slice(0,10)+"…"+walletAddress.slice(-6);
   const _la = document.getElementById("settings-ledger-addr"); if(_la) _la.textContent = KEEL_LEDGER_ADDRESS.slice(0,10)+"…"+KEEL_LEDGER_ADDRESS.slice(-6);
@@ -3953,20 +3916,16 @@ async function loadKeelTokenPage() {
   try {
     const mintKey = ethers.utils.solidityKeccak256(
       ["address","uint256","uint256"], [walletAddress, now.getFullYear(), now.getMonth()+1]);
-    const [bal, expWei, minted, capWei, allocWei, tranches] = await Promise.all([
+    const [bal, expWei, minted, tranches] = await Promise.all([
       token.balanceOf(walletAddress),
       token.expiringWithin(walletAddress, 30*24*3600),
       token.monthlyMinted(mintKey),
-      token.capOf(walletAddress),         // this member's wallet cap (share×3)
-      token.allocationOf(walletAddress),  // this member's monthly allocation (their share)
       token.tranchesOf(walletAddress)
     ]);
     const balF = parseFloat(ethers.utils.formatUnits(bal,18));
     document.getElementById("kt-balance").textContent  = balF.toFixed(2);
     document.getElementById("kt-expiring").textContent = parseFloat(ethers.utils.formatUnits(expWei,18)).toFixed(2);
     document.getElementById("kt-issued").textContent   = parseFloat(ethers.utils.formatUnits(minted,18)).toFixed(0);
-    document.getElementById("kt-cap").textContent      = parseFloat(ethers.utils.formatUnits(capWei,18)).toFixed(0)+" KEEL";
-    document.getElementById("kt-monthly").textContent  = parseFloat(ethers.utils.formatUnits(allocWei,18)).toFixed(0)+" KEEL";
     renderKtTranches(tranches, balF, nowSec);
   } catch(e) {
     console.error("keel token stats failed", e);
