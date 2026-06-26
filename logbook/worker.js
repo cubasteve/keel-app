@@ -120,6 +120,74 @@ export default {
       } catch (err) { return json({ error: "Waitlist failed: " + (err.message || err) }, 500); }
     }
 
+    // ── Float plan: GET one (?tripId=), a member's (?member=), or who's out (?out=1) ──
+    if (request.method === "GET" && url.pathname === "/floatplan") {
+      const fpRow = (r) => ({
+        tripId: r.trip_id, member: r.member, boatId: r.boat_id,
+        checklist: JSON.parse(r.checklist || "{}"), souls: r.souls, destination: r.destination,
+        etaReturn: r.eta_return, contact: r.contact, status: r.status,
+        departedAt: r.departed_at, returnedAt: r.returned_at
+      });
+      const tripId = url.searchParams.get("tripId");
+      const member = url.searchParams.get("member");
+      if (tripId) {
+        const r = await env.DB.prepare("SELECT * FROM floatplan WHERE trip_id = ?").bind(tripId).first();
+        return json({ plan: r ? fpRow(r) : null });
+      }
+      if (url.searchParams.get("out")) {
+        const { results } = await env.DB.prepare("SELECT * FROM floatplan WHERE status = 'departed' ORDER BY eta_return").all();
+        return json({ plans: (results || []).map(fpRow) });
+      }
+      if (member) {
+        if (!ethers.isAddress(member)) return json({ error: "Bad member" }, 400);
+        const { results } = await env.DB.prepare("SELECT trip_id, status, eta_return FROM floatplan WHERE member = ?").bind(ethers.getAddress(member)).all();
+        return json({ plans: (results || []).map(r => ({ tripId: r.trip_id, status: r.status, etaReturn: r.eta_return })) });
+      }
+      return json({ error: "Missing query" }, 400);
+    }
+    // ── Float plan: save / check-in / check-out (trip owner or operator) ──
+    if (request.method === "POST" && url.pathname === "/floatplan") {
+      let b; try { b = await request.json(); } catch { return json({ error: "Bad JSON" }, 400); }
+      const { member, tripId, action } = b || {};
+      if (!member || !ethers.isAddress(member)) return json({ error: "Bad member" }, 400);
+      if (!tripId) return json({ error: "tripId required" }, 400);
+      const who = ethers.getAddress(member);
+      // Authorize: trip owner or operator (same on-chain check the logbook uses).
+      try {
+        const provider = new ethers.JsonRpcProvider(RPC_URL, CHAIN_ID, { staticNetwork: true });
+        const ledger = new ethers.Contract(LEDGER, LEDGER_ABI, provider);
+        const t = await ledger.trips(tripId);
+        const isOwner = t.member.toLowerCase() === who.toLowerCase();
+        const isOp = isOwner ? false : await ledger.hasRole(await ledger.OPERATOR_ROLE(), who);
+        if (!isOwner && !isOp) return json({ error: "Not your trip" }, 403);
+      } catch (err) { return json({ error: "Authorization check failed" }, 502); }
+
+      const now = Math.floor(Date.now()/1000);
+      try {
+        const existing = await env.DB.prepare("SELECT * FROM floatplan WHERE trip_id = ?").bind(tripId).first();
+        if (action === "checkout") {
+          if (!existing) return json({ error: "No float plan to check out" }, 404);
+          await env.DB.prepare("UPDATE floatplan SET status='returned', returned_at=?, updated_at=? WHERE trip_id=?").bind(now, now, tripId).run();
+          return json({ ok: true, status: "returned" });
+        }
+        const status = action === "checkin" ? "departed" : (existing?.status === "departed" ? "departed" : "planned");
+        const departedAt = action === "checkin" ? now : (existing?.departed_at || null);
+        const checklist = JSON.stringify(b.checklist || {});
+        const souls = (b.souls === "" || b.souls == null) ? null : Math.max(0, Math.round(Number(b.souls)));
+        const destination = b.destination ? String(b.destination).slice(0, 200) : null;
+        const etaReturn = (b.etaReturn === "" || b.etaReturn == null) ? null : Number(b.etaReturn);
+        const contact = b.contact ? String(b.contact).slice(0, 60) : null;
+        await env.DB.prepare(
+          `INSERT INTO floatplan (trip_id, member, boat_id, checklist, souls, destination, eta_return, contact, status, departed_at, returned_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+           ON CONFLICT(trip_id) DO UPDATE SET checklist=excluded.checklist, souls=excluded.souls,
+             destination=excluded.destination, eta_return=excluded.eta_return, contact=excluded.contact,
+             status=excluded.status, departed_at=excluded.departed_at, updated_at=excluded.updated_at`
+        ).bind(tripId, who, Number(b.boatId)||0, checklist, souls, destination, etaReturn, contact, status, departedAt, existing?.returned_at || null, now).run();
+        return json({ ok: true, status });
+      } catch (err) { return json({ error: "Save failed: " + (err.message || err) }, 500); }
+    }
+
     if (request.method !== "POST" || url.pathname !== "/entry") return json({ error: "Not found" }, 404);
 
     // ── Create an entry ────────────────────────────────────────────────────

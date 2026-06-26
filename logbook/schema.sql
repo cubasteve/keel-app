@@ -28,3 +28,21 @@ CREATE TABLE IF NOT EXISTS waitlist (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_wl_unique ON waitlist(member, day);
 CREATE INDEX IF NOT EXISTS idx_wl_member ON waitlist(member);
+
+-- Float plan + pre-departure checklist + check-in/out, one per trip.
+CREATE TABLE IF NOT EXISTS floatplan (
+  trip_id     TEXT PRIMARY KEY,
+  member      TEXT NOT NULL,
+  boat_id     INTEGER NOT NULL DEFAULT 0,
+  checklist   TEXT,                       -- JSON {lifejackets:true, fuel:true, ...}
+  souls       INTEGER,                    -- people aboard
+  destination TEXT,
+  eta_return  INTEGER,                    -- planned return (unix seconds)
+  contact     TEXT,                       -- emergency contact
+  status      TEXT NOT NULL DEFAULT 'planned', -- planned | departed | returned
+  departed_at INTEGER,
+  returned_at INTEGER,
+  updated_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_fp_member ON floatplan(member);
+CREATE INDEX IF NOT EXISTS idx_fp_status ON floatplan(status);

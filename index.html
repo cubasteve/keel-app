@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15t";
+    const APP_VERSION = "2025-06-15u";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15t"></script>
+<script src="keel-core.js?v=2025-06-15u"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -1307,6 +1307,35 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   </div>
 </div>
 
+<!-- ── FLOAT PLAN + PRE-DEPARTURE CHECKLIST + CHECK-IN/OUT (per trip) ──────── -->
+<div id="fp-modal" class="lb-modal">
+  <div class="lb-modal-inner">
+    <div class="lb-modal-title" id="fp-title">🦺 Float Plan</div>
+    <div class="admin-result" id="fp-status" style="margin-bottom:12px;display:none"></div>
+    <div class="lb-field"><label>Pre-departure checklist</label>
+      <div id="fp-checklist">
+        <label class="lb-check"><input type="checkbox" id="fp-ck-lifejackets"> Life jackets for all aboard</label>
+        <label class="lb-check"><input type="checkbox" id="fp-ck-fuel"> Fuel / battery charge OK</label>
+        <label class="lb-check"><input type="checkbox" id="fp-ck-bilge"> Bilge checked / pumps working</label>
+        <label class="lb-check"><input type="checkbox" id="fp-ck-navlights"> Nav lights working</label>
+        <label class="lb-check"><input type="checkbox" id="fp-ck-vhf"> VHF radio on &amp; working</label>
+        <label class="lb-check"><input type="checkbox" id="fp-ck-weather"> Weather &amp; tides checked</label>
+        <label class="lb-check"><input type="checkbox" id="fp-ck-lines"> Dock lines &amp; fenders stowed</label>
+      </div>
+    </div>
+    <div class="lb-field"><label>People aboard</label><input class="inp" id="fp-souls" type="number" min="1" step="1" placeholder="e.g. 3"></div>
+    <div class="lb-field"><label>Destination / area</label><input class="inp" id="fp-dest" maxlength="200" placeholder="e.g. Out to the lighthouse and back"></div>
+    <div class="lb-field"><label>Expected return (time)</label><input class="inp" id="fp-eta" type="time"></div>
+    <div class="lb-field"><label>Emergency contact (ashore)</label><input class="inp" id="fp-contact" maxlength="60" placeholder="Name · phone"></div>
+    <div class="admin-result" id="fp-result" style="margin-top:6px"></div>
+    <div class="lb-btn-row">
+      <button class="btn-admin btn-admin-primary" onclick="fpClose()">Close</button>
+      <button class="btn-admin btn-admin-primary" id="fp-save" onclick="fpSave()">Save</button>
+      <button class="btn-admin btn-admin-gold" id="fp-action" onclick="fpPrimary()">Check in (depart) →</button>
+    </div>
+  </div>
+</div>
+
 <!-- OCEAN WAVES -->
 <div class="wave-bg">
   <div class="wave"></div>
@@ -1949,6 +1978,17 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
           </div>
         </div>
 
+        <!-- Who's Out (active float plans) -->
+        <div class="admin-card" id="admin-whosout-card" style="margin-bottom:20px;display:none">
+          <div class="admin-card-title" style="justify-content:space-between">
+            <span>🟢 Who's Out</span>
+            <button class="btn-admin btn-admin-primary" style="width:auto;padding:6px 14px;font-size:12px;margin-top:0" onclick="loadWhosOut()">↻ Refresh</button>
+          </div>
+          <div id="admin-whosout-list">
+            <div class="empty-state" style="padding:20px 0"><div class="empty-anchor">⚓</div><div class="empty-title">Loading…</div></div>
+          </div>
+        </div>
+
         <!-- Boat Logbook (admin view) -->
         <div class="admin-card" id="admin-logbook-card" style="margin-bottom:20px;display:none">
           <div class="admin-card-title" style="justify-content:space-between;flex-wrap:wrap;gap:10px">
@@ -2451,7 +2491,7 @@ async function disconnectWallet(e) {
   document.getElementById("settings-addr-display").textContent = "—";
   const spr = document.getElementById("settings-profile-result");
   if(spr){ spr.className = "settings-result"; spr.textContent = ""; }
-  tripsData = []; tripsLoaded = false; _waitlist = {};
+  tripsData = []; tripsLoaded = false; _waitlist = {}; _floatplans = {};
   resetAdminPage();
   document.getElementById("trips-content").style.display = "none";
   // Reset settle panel to blank state
@@ -3148,6 +3188,111 @@ function checkWaitlistOpenings(){
   });
 }
 
+// ── Float plan + pre-departure checklist + check-in/out (per trip) ──
+const FP_CHECKS = ["lifejackets","fuel","bilge","navlights","vhf","weather","lines"];
+let _floatplans = {};                 // tripId -> {status}
+let _fpCtx = { tripId:"", boatId:0, day:null, status:"planned" };
+
+async function loadFloatplans(){
+  _floatplans = {};
+  if(!logbookEnabled() || !walletAddress) return;
+  try {
+    const r = await fetch(KEEL_LOGBOOK_ENDPOINT + "/floatplan?member=" + walletAddress);
+    const d = await r.json();
+    (d.plans||[]).forEach(p => { _floatplans[p.tripId] = { status:p.status }; });
+  } catch(_){}
+}
+function fpClose(){ document.getElementById("fp-modal").classList.remove("show"); }
+function fpOpen(tripId, boatId){
+  if(!walletAddress){ showStatus("Connect your wallet first.","error"); setTimeout(clearStatus,3000); return; }
+  const trip = (tripsData||[]).find(t => t.id === tripId);
+  const day = trip ? new Date(trip.startTs*1000).toLocaleDateString("en-CA",{timeZone:"America/New_York"}) : todayKey();
+  _fpCtx = { tripId, boatId: boatId||0, day, status:"planned" };
+  FP_CHECKS.forEach(k => { const el=document.getElementById("fp-ck-"+k); if(el) el.checked=false; });
+  ["fp-souls","fp-dest","fp-eta","fp-contact"].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=""; });
+  const res=document.getElementById("fp-result"); res.className="admin-result"; res.textContent="";
+  document.getElementById("fp-modal").classList.add("show");
+  fpRenderStatus();
+  fetch(KEEL_LOGBOOK_ENDPOINT + "/floatplan?tripId=" + encodeURIComponent(tripId)).then(r=>r.json()).then(d=>{
+    const p = d.plan; if(!p) return;
+    _fpCtx.status = p.status;
+    const ck = p.checklist || {};
+    FP_CHECKS.forEach(k => { const el=document.getElementById("fp-ck-"+k); if(el) el.checked = !!ck[k]; });
+    if(p.souls!=null) document.getElementById("fp-souls").value = p.souls;
+    if(p.destination) document.getElementById("fp-dest").value = p.destination;
+    if(p.contact) document.getElementById("fp-contact").value = p.contact;
+    if(p.etaReturn) document.getElementById("fp-eta").value = new Date(p.etaReturn*1000).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",timeZone:"America/New_York"});
+    fpRenderStatus();
+  }).catch(()=>{});
+}
+function fpRenderStatus(){
+  const st = document.getElementById("fp-status"), act = document.getElementById("fp-action");
+  if(_fpCtx.status === "departed"){ st.style.display="block"; st.className="admin-result info"; st.textContent="🟢 Underway — check out when you're back."; act.textContent="Check out (returned) ✓"; }
+  else if(_fpCtx.status === "returned"){ st.style.display="block"; st.className="admin-result success"; st.textContent="✅ Returned safely."; act.textContent="Check in again →"; }
+  else { st.style.display="none"; act.textContent="Check in (depart) →"; }
+}
+function fpCollect(){
+  const checklist = {}; FP_CHECKS.forEach(k => { checklist[k] = !!document.getElementById("fp-ck-"+k)?.checked; });
+  const etaVal = document.getElementById("fp-eta").value;
+  let etaReturn = "";
+  if(etaVal && _fpCtx.day){ const [y,m,d]=_fpCtx.day.split("-").map(Number); const [hh,mm]=etaVal.split(":").map(Number); etaReturn = easternEpoch(y,m,d,hh,mm); }
+  return { member: walletAddress, tripId:_fpCtx.tripId, boatId:_fpCtx.boatId, checklist,
+    souls: document.getElementById("fp-souls").value, destination: document.getElementById("fp-dest").value.trim(),
+    etaReturn, contact: document.getElementById("fp-contact").value.trim() };
+}
+async function fpPost(action){
+  const resp = await fetch(KEEL_LOGBOOK_ENDPOINT + "/floatplan", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ ...fpCollect(), action }) });
+  const data = await resp.json().catch(()=>({}));
+  if(!resp.ok || !data.ok) throw new Error(data.error || ("failed ("+resp.status+")"));
+  return data;
+}
+async function fpSave(){
+  const btn=document.getElementById("fp-save"); btn.disabled=true; btn.textContent="Saving…";
+  try { const d=await fpPost("save"); _fpCtx.status=d.status; _floatplans[_fpCtx.tripId]={status:d.status}; showAdminResult("fp-result","success","✓ Float plan saved."); fpRenderStatus(); }
+  catch(e){ showAdminResult("fp-result","error","Failed: "+(e.message||e)); }
+  btn.disabled=false; btn.textContent="Save";
+}
+async function fpPrimary(){
+  const action = _fpCtx.status === "departed" ? "checkout" : "checkin";
+  const btn=document.getElementById("fp-action"); btn.disabled=true; btn.textContent="…";
+  try {
+    const d=await fpPost(action); _fpCtx.status=d.status; _floatplans[_fpCtx.tripId]={status:d.status};
+    showAdminResult("fp-result","success", action==="checkin" ? "✓ Checked in — safe sailing!" : "✓ Checked out — welcome back.");
+    fpRenderStatus();
+    if(currentPage==="trips"){ try{ renderTripsPage(); }catch(_){} }
+    if(action==="checkout") setTimeout(fpClose, 900);
+  } catch(e){ showAdminResult("fp-result","error","Failed: "+(e.message||e)); }
+  btn.disabled=false; fpRenderStatus();
+}
+
+// Admin "Who's Out": boats currently departed (float plan status=departed).
+async function loadWhosOut(){
+  const el = document.getElementById("admin-whosout-list"); if(!el) return;
+  if(!logbookEnabled()){ el.innerHTML='<div class="empty-state" style="padding:18px 0"><div class="empty-title">Not configured</div></div>'; return; }
+  el.innerHTML='<div class="empty-state" style="padding:18px 0"><div class="empty-anchor">🟢</div><div class="empty-title">Loading…</div></div>';
+  try {
+    const r = await fetch(KEEL_LOGBOOK_ENDPOINT + "/floatplan?out=1");
+    const plans = (await r.json()).plans || [];
+    if(!plans.length){ el.innerHTML='<div class="empty-state" style="padding:18px 0"><div class="empty-anchor">⚓</div><div class="empty-title">No boats out right now</div></div>'; return; }
+    try { await prefetchProfiles(plans.map(p=>p.member)); } catch(_){}
+    const now = Math.floor(Date.now()/1000);
+    el.innerHTML = plans.map(p => {
+      const eta = p.etaReturn ? new Date(p.etaReturn*1000).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit",timeZone:"America/New_York"}) : "—";
+      const overdue = p.etaReturn && p.etaReturn < now;
+      const dep = p.departedAt ? new Date(p.departedAt*1000).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",timeZone:"America/New_York"}) : "—";
+      return `<div class="lb-entry ${overdue?'issue':''}">
+        <div class="lb-entry-head">
+          <span class="lb-entry-kind">${escapeHtml(memberName(p.member))}</span>
+          <span class="lb-entry-date">ETA ${eta}${overdue?' · <span class="lb-issue-tag">OVERDUE</span>':''}</span>
+        </div>
+        <div class="lb-entry-stats">${p.souls!=null?`Aboard <b>${p.souls}</b>`:''}${p.destination?` <span style="color:var(--muted2)">${escapeHtml(p.destination)}</span>`:''}</div>
+        ${p.contact?`<div class="lb-entry-notes">Contact: ${escapeHtml(p.contact)}</div>`:''}
+        <div class="lb-entry-author">departed ${dep}</div>
+      </div>`;
+    }).join("");
+  } catch(e){ el.innerHTML='<div class="empty-state" style="padding:18px 0"><div class="empty-title">Failed to load</div></div>'; }
+}
+
 // ── Scheduler: reserved windows across ALL wallets for a given boat ──
 // Reads the per-boat trip list from the contract and returns active (non-
 // cancelled) [startTs, endTs] ranges. Used to grey out the calendar and to
@@ -3582,7 +3727,8 @@ async function loadTripsPage() {
       .sort((a, b) => b.startTs - a.startTs);
 
     tripsLoaded = true;
-    try { await loadTripLogs(); } catch(_){}  // so trip pills show Add vs Edit Log
+    try { await loadTripLogs(); } catch(_){}     // so trip pills show Add vs Edit Log
+    try { await loadFloatplans(); } catch(_){}   // so cards show float-plan status
     renderTripsPage();
   } catch(e) {
     console.error("trips load failed", e);
@@ -3657,6 +3803,12 @@ function tripCardHTML(t) {
       ? `<button class="btn-add-cal" onclick="logbookLockedNote()">🔒 Log Locked</button>`
       : `<button class="btn-add-cal" onclick="logbookOpenTrip('${t.id}',${t.boatId||0})">${lbEntry ? "✎ Edit Log" : "📓 Add Log"}</button>`;
 
+  // Float plan / check-in — for upcoming or active voyages.
+  const fpOn = (typeof logbookEnabled==="function" && logbookEnabled() && !t.cancelled && (t.status==="upcoming" || t.status==="active-now"));
+  const fp   = (typeof _floatplans!=="undefined") ? _floatplans[t.id] : null;
+  const fpLabel = fp && fp.status==="departed" ? "🟢 Underway" : fp && fp.status==="returned" ? "✅ Returned" : "🦺 Float Plan";
+  const fpBtn = fpOn ? `<button class="btn-add-cal" onclick="fpOpen('${t.id}',${t.boatId||0})">${fpLabel}</button>` : "";
+
   return `<div class="trip-card-full ${t.status}" id="tcard-${t.id}">
     <div class="trip-card-icon ${t.status}">${iconMap[t.status]}</div>
     <div class="trip-card-body">
@@ -3671,6 +3823,7 @@ function tripCardHTML(t) {
       <div class="trip-burn-badge">−${t.burn.toFixed(2)} KEEL</div>
       <div class="trip-status-badge ${t.status}">${statusLabel}</div>
       ${canAddCal  ? `<button class="btn-add-cal" onclick="addToCalendar(${t.startTs}, ${t.endTs}, '${typeLabel}', ${t.burn.toFixed(2)})">📅 Add to Calendar</button>` : ""}
+      ${fpBtn}
       ${lbBtn}
       ${canCancel  ? `<button class="btn-cancel-trip" id="cbtn-${t.id}" onclick="cancelTrip('${t.id}', ${t.burn.toFixed(2)})">Cancel & Refund</button>` : ""}
     </div>
@@ -4053,6 +4206,11 @@ async function loadAdminPage() {
   if(lbCard){
     if(logbookEnabled()){ lbCard.style.display = ""; loadBoatLogbook(); }
     else { lbCard.style.display = "none"; }
+  }
+  const woCard = document.getElementById("admin-whosout-card");
+  if(woCard){
+    if(logbookEnabled()){ woCard.style.display = ""; loadWhosOut(); }
+    else { woCard.style.display = "none"; }
   }
 
   await Promise.all([ adminLoadStats(), adminLoadAllTrips(), adminLoadMemberBalances() ]);
