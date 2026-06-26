@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15s";
+    const APP_VERSION = "2025-06-15t";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15s"></script>
+<script src="keel-core.js?v=2025-06-15t"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -3508,7 +3508,7 @@ function showPage(page) {
     // Bump the ?v= number whenever sail-weather.html changes, or the iframe
     // can keep serving a stale cached copy even after a hard refresh.
     const wf = document.getElementById("weather-frame");
-    if(wf && !wf.getAttribute("src")) wf.setAttribute("src", "sail-weather.html?v=28");
+    if(wf && !wf.getAttribute("src")) wf.setAttribute("src", "sail-weather.html?v=29");
   }
   if(page === "trips")     loadTripsPage();
   if(page === "keeltoken") loadKeelTokenPage();

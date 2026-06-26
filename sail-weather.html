@@ -238,7 +238,6 @@ body.embedded .topbar { padding: 10px 16px; }
       <div class="hud-controls">
         <button id="btn-wind" class="layer-btn active" onclick="toggleWind()">≋ Wind</button>
         <button id="btn-rain" class="layer-btn active" onclick="toggleRain()">🌧 Rain</button>
-        <button id="btn-cur" class="layer-btn active" onclick="toggleCurrent()" style="display:none">≈ Current</button>
         <span class="hud-spacer"></span>
         <button class="layer-btn locate-pill" onclick="locateMe()" title="Use my location">⌖</button>
       </div>
@@ -255,7 +254,6 @@ body.embedded .topbar { padding: 10px 16px; }
       <div class="tide-head"><h2 id="tide-title">Tides</h2><span class="tide-state" id="tide-state"></span></div>
       <div class="tide-sub" id="tide-sub"></div>
       <div id="tide-body"><div class="loading">Waiting for a location…</div></div>
-      <div id="current-readout"></div>
     </div>
 
     <div class="card">
@@ -917,7 +915,7 @@ async function loadForecast(lat, lon){
   renderNow(fc, marine);
   renderDays(fc, marine);
   loadTides(lat, lon);    // tide station data uses state.utcOffset, now set above
-  loadCurrents(lat, lon); // tidal-current station, if one is nearby
+  // Tidal-current overlay removed.
   document.getElementById("wave-note").textContent = marine
     ? "Wave data: Open-Meteo Marine (significant wave height)."
     : "No wave data for this point (inland or outside marine model coverage) — windows scored on wind alone.";
