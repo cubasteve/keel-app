@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15ac";
+    const APP_VERSION = "2025-06-15ad";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15ac"></script>
+<script src="keel-core.js?v=2025-06-15ad"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -1385,7 +1385,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   </div>
 
   <div class="nav-section-label">Navigation</div>
-  <div class="nav-item active" onclick="showPage('dashboard')"><span class="nav-icon">⊞</span> Reserve</div>
+  <div class="nav-item active" onclick="showPage('dashboard')"><span class="nav-icon">⚓</span> Reserve</div>
   <div class="nav-item" onclick="showPage('trips')"><span class="nav-icon">⛵</span> Trips</div>
   <div class="nav-item" onclick="showPage('weather')"><span class="nav-icon">🌤</span> Weather</div>
   <div class="nav-item" onclick="showPage('keeltoken')"><span class="nav-icon">◈</span> Keel Token</div>
