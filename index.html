@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15x";
+    const APP_VERSION = "2025-06-15y";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15x"></script>
+<script src="keel-core.js?v=2025-06-15y"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -901,7 +901,15 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   .admin-trips-table td br { display:none; }
   .onb-lbl { display:none; }            /* keep step dots, drop labels to save width */
   .onb-bar { margin:0 6px; }
+  .admin-trips-table tr.month-row { display:block; background:none; border:none; padding:0; margin:14px 0 6px; }
+  .admin-trips-table tr.month-row td { display:block; text-align:left; background:rgba(74,179,255,0.08); border-radius:8px; }
+  .admin-trips-table tr.month-row td::before { content:none; }
 }
+/* ── Month grouping + paging for long lists ──────────────────────────────── */
+.month-head { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--muted2); margin:16px 0 8px; padding-bottom:5px; border-bottom:1px solid var(--border); }
+.month-head:first-child { margin-top:2px; }
+.page-more { width:100%; padding:10px; font-size:12px; margin-top:14px; }
+.admin-trips-table tr.month-row td { background:rgba(74,179,255,0.06); color:var(--accent); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.5px; padding:6px 10px; }
 /* ── Member Onboarding wizard ─────────────────────────────────────────── */
 .onb-steps { display:flex; align-items:center; margin-bottom:20px; }
 .onb-step { display:flex; align-items:center; gap:7px; }
@@ -1938,7 +1946,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
           <div class="admin-card-title" style="margin-bottom:0;justify-content:space-between">
             <span>📋 All Voyages</span>
             <div style="display:flex;gap:8px">
-              <select class="inp" id="admin-trips-filter" onchange="renderAdminTrips()" style="height:34px;padding:0 30px 0 10px;font-size:12px;width:auto">
+              <select class="inp" id="admin-trips-filter" onchange="_pageShown['admin-trips']=undefined; renderAdminTrips()" style="height:34px;padding:0 30px 0 10px;font-size:12px;width:auto">
                 <option value="all">All</option>
                 <option value="upcoming">Upcoming</option>
                 <option value="past">Past</option>
@@ -3715,6 +3723,7 @@ async function loadTripsPage() {
       .sort((a, b) => b.startTs - a.startTs);
 
     tripsLoaded = true;
+    _pageShown["trips-past"] = undefined;         // restart paging on fresh load
     try { await loadTripLogs(); } catch(_){}     // so trip pills show Add vs Edit Log
     try { await loadFloatplans(); } catch(_){}   // so cards show float-plan status
     renderTripsPage();
@@ -3742,6 +3751,31 @@ async function prefetchProfiles(addresses) {
   }
 }
 
+// ── Group-by-month + "Show more" paging for long lists ──
+const _pageShown = {};
+function monthLabel(ts){ return new Date(ts*1000).toLocaleDateString("en-US",{month:"long",year:"numeric",timeZone:"America/New_York"}); }
+function pageMore(key, size){
+  _pageShown[key] = (_pageShown[key]||size) + size;
+  if(key==="trips-past") renderTripsPage();
+  else if(key==="admin-trips") renderAdminTrips();
+  else if(key==="boat-logbook") renderBoatLogbook();
+}
+// items newest-first; getTs->seconds; renderItem->html. opts: {pageSize, headerRow(label), wrap(rowsHtml)}
+function pagedByMonth(key, items, getTs, renderItem, opts){
+  opts = opts || {}; const size = opts.pageSize || 12;
+  if(_pageShown[key] == null) _pageShown[key] = size;
+  const n = Math.min(_pageShown[key], items.length);
+  let body = "", cur = null;
+  for(let i=0;i<n;i++){
+    const it = items[i], m = monthLabel(getTs(it));
+    if(m !== cur){ cur = m; body += opts.headerRow ? opts.headerRow(m) : ('<div class="month-head">'+m+'</div>'); }
+    body += renderItem(it);
+  }
+  let html = opts.wrap ? opts.wrap(body) : body;
+  if(items.length > n){ html += '<button type="button" class="btn-continue page-more" onclick="pageMore(\''+key+'\','+size+')">Show '+Math.min(size, items.length-n)+' more · '+(items.length-n)+' older</button>'; }
+  return html;
+}
+
 function renderTripsPage() {
   if(!tripsLoaded) return;
   const nowTs    = Math.floor(Date.now() / 1000);
@@ -3767,7 +3801,7 @@ function renderTripsPage() {
   // Past tab: completed + cancelled, newest first
   const pastEl = document.getElementById("trips-list-past");
   pastEl.innerHTML = past.length
-    ? past.map(t => tripCardHTML(t)).join("")
+    ? pagedByMonth("trips-past", past, t => t.startTs, t => tripCardHTML(t), { pageSize: 10 })
     : tripEmptyHTML("No past voyages yet", "Completed and cancelled trips will appear here.");
 }
 
@@ -4278,31 +4312,31 @@ function renderAdminTrips() {
     return;
   }
 
-  el.innerHTML = `<table class="admin-trips-table">
-    <thead><tr>
-      <th>Member</th><th>Date</th><th>Duration</th><th>Type</th><th>KEEL Burned</th><th>Status</th>
-    </tr></thead>
-    <tbody>${data.map(t => {
-      const date = new Date(t.startTs*1000).toLocaleDateString("en-US",
-        {month:"short",day:"numeric",year:"numeric",timeZone:"America/New_York"});
-      const p = adminProfileCache[t.member.toLowerCase()];
-      const memberName = p?.displayName || null;
-      const short = t.member.slice(0,6)+"…"+t.member.slice(-4);
-      const memberDisplay = memberName
-        ? `<span style="color:var(--foam);font-weight:600">${memberName}</span><br><span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${short}</span>`
-        : `<span style="font-family:var(--mono);font-size:12px">${short}</span>`;
-      const label = (t.competitive?"Racing ":"")+"Voyage";
-      const statusLabel = {upcoming:"Upcoming","active-now":"Underway",past:"Completed",cancelled:"Cancelled"}[t.status];
-      return `<tr>
-        <td data-label="Member">${memberDisplay}</td>
-        <td data-label="Date">${date}</td>
-        <td data-label="Duration">${t.hrs}h</td>
-        <td data-label="Type">${label}</td>
-        <td data-label="KEEL Burned" style="font-family:var(--mono);color:var(--danger)">−${t.burn.toFixed(2)}</td>
-        <td data-label="Status"><span class="admin-badge ${t.status}">${statusLabel}</span></td>
-      </tr>`;
-    }).join("")}</tbody>
-  </table>`;
+  const rowHTML = (t) => {
+    const date = new Date(t.startTs*1000).toLocaleDateString("en-US",
+      {month:"short",day:"numeric",year:"numeric",timeZone:"America/New_York"});
+    const p = adminProfileCache[t.member.toLowerCase()];
+    const memberName = p?.displayName || null;
+    const short = t.member.slice(0,6)+"…"+t.member.slice(-4);
+    const memberDisplay = memberName
+      ? `<span style="color:var(--foam);font-weight:600">${memberName}</span><br><span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${short}</span>`
+      : `<span style="font-family:var(--mono);font-size:12px">${short}</span>`;
+    const label = (t.competitive?"Racing ":"")+"Voyage";
+    const statusLabel = {upcoming:"Upcoming","active-now":"Underway",past:"Completed",cancelled:"Cancelled"}[t.status];
+    return `<tr>
+      <td data-label="Member">${memberDisplay}</td>
+      <td data-label="Date">${date}</td>
+      <td data-label="Duration">${t.hrs}h</td>
+      <td data-label="Type">${label}</td>
+      <td data-label="KEEL Burned" style="font-family:var(--mono);color:var(--danger)">−${t.burn.toFixed(2)}</td>
+      <td data-label="Status"><span class="admin-badge ${t.status}">${statusLabel}</span></td>
+    </tr>`;
+  };
+  el.innerHTML = pagedByMonth("admin-trips", data, t => t.startTs, rowHTML, {
+    pageSize: 15,
+    headerRow: m => `<tr class="month-row"><td colspan="6">${m}</td></tr>`,
+    wrap: rows => `<table class="admin-trips-table"><thead><tr><th>Member</th><th>Date</th><th>Duration</th><th>Type</th><th>KEEL Burned</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`
+  });
 }
 
 // Load every member into the batch grid with their monthly allocation (share)
@@ -4745,6 +4779,7 @@ async function loadTripLogs(){
   } catch(_){}
 }
 
+let _logbookEntries = [];
 async function loadBoatLogbook(){
   const el = document.getElementById("admin-logbook-list");
   if(!logbookEnabled()){ el.innerHTML = '<div class="empty-state" style="padding:18px 0"><div class="empty-title">Logbook not configured</div></div>'; return; }
@@ -4752,12 +4787,17 @@ async function loadBoatLogbook(){
   try {
     const resp = await fetch(KEEL_LOGBOOK_ENDPOINT + "/entries?boatId=0");
     const data = await resp.json();
-    const entries = data.entries || [];
+    _logbookEntries = data.entries || [];
     _lbAdminEntries = {};
-    entries.forEach(en => { _lbAdminEntries[en.id] = en; });
-    if(!entries.length){ el.innerHTML = '<div class="empty-state" style="padding:18px 0"><div class="empty-anchor">📓</div><div class="empty-title">No log entries yet</div></div>'; return; }
-    el.innerHTML = entries.map(en => renderLogEntry(en, true)).join("");
+    _logbookEntries.forEach(en => { _lbAdminEntries[en.id] = en; });
+    _pageShown["boat-logbook"] = undefined; // restart paging on fresh load
+    renderBoatLogbook();
   } catch(e){ el.innerHTML = '<div class="empty-state" style="padding:18px 0"><div class="empty-title">Failed to load logbook</div></div>'; }
+}
+function renderBoatLogbook(){
+  const el = document.getElementById("admin-logbook-list"); if(!el) return;
+  if(!_logbookEntries.length){ el.innerHTML = '<div class="empty-state" style="padding:18px 0"><div class="empty-anchor">📓</div><div class="empty-title">No log entries yet</div></div>'; return; }
+  el.innerHTML = pagedByMonth("boat-logbook", _logbookEntries, en => en.createdAt, en => renderLogEntry(en, true), { pageSize: 10 });
 }
 
 function renderLogEntry(en, canEdit){
