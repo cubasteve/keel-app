@@ -1,0 +1,39 @@
+<svg width="480" height="480" viewBox="0 0 480 480" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>KEEL mark</title>
+<desc>KEEL token mark: a dark coin with a cyan-to-violet gradient ring and a geometric sail-and-keel symbol, no wordmark — for favicons and small icons.</desc>
+<defs>
+<linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0%" stop-color="#5cf2c9"/>
+<stop offset="45%" stop-color="#2fb8ff"/>
+<stop offset="100%" stop-color="#7a5cff"/>
+</linearGradient>
+<radialGradient id="disc" cx="38%" cy="28%" r="88%">
+<stop offset="0%" stop-color="#10243f"/>
+<stop offset="60%" stop-color="#0a1730"/>
+<stop offset="100%" stop-color="#060d1f"/>
+</radialGradient>
+<linearGradient id="sail" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0%" stop-color="#7df0d4"/>
+<stop offset="100%" stop-color="#28c2ff"/>
+</linearGradient>
+<linearGradient id="sail2" x1="0" y1="1" x2="1" y2="0">
+<stop offset="0%" stop-color="#2f9bff"/>
+<stop offset="100%" stop-color="#7a5cff"/>
+</linearGradient>
+</defs>
+
+<circle cx="240" cy="240" r="224" fill="url(#ring)"/>
+<circle cx="240" cy="240" r="202" fill="url(#disc)"/>
+<circle cx="240" cy="240" r="202" fill="none" stroke="#1b3a63" stroke-width="1.2"/>
+<circle cx="240" cy="240" r="170" fill="none" stroke="#2bd6ff" stroke-width="1.6" stroke-dasharray="2 10" opacity="0.55"/>
+
+<path d="M240 116 L240 318" stroke="#cfe9ff" stroke-width="7" stroke-linecap="round"/>
+<path d="M246 126 L350 314 L246 314 Z" fill="url(#sail)"/>
+<path d="M234 148 L138 314 L234 314 Z" fill="url(#sail2)" opacity="0.92"/>
+<path d="M246 126 L350 314 L246 314 Z" fill="none" stroke="#0a1730" stroke-width="4"/>
+<path d="M234 148 L138 314 L234 314 Z" fill="none" stroke="#0a1730" stroke-width="4"/>
+
+<path d="M138 326 Q240 360 342 326 L316 346 Q240 372 164 346 Z" fill="#9fb6d6"/>
+<path d="M240 346 L240 392 Q240 406 255 408 L225 408 Q240 406 240 392" fill="none" stroke="#28c2ff" stroke-width="9" stroke-linecap="round"/>
+<ellipse cx="240" cy="410" rx="16" ry="8" fill="#7a5cff"/>
+</svg>
