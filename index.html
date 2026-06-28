@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15z";
+    const APP_VERSION = "2025-06-15aa";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15z"></script>
+<script src="keel-core.js?v=2025-06-15aa"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -3809,7 +3809,7 @@ function renderTripsPage() {
   // Past tab: completed + cancelled, newest first
   const pastEl = document.getElementById("trips-list-past");
   pastEl.innerHTML = past.length
-    ? pagedByMonth("trips-past", past, t => t.startTs, t => tripCardHTML(t), { pageSize: 10 })
+    ? pagedByMonth("trips-past", past, t => t.startTs, t => tripCardHTML(t), { pageSize: 4 })
     : tripEmptyHTML("No past voyages yet", "Completed and cancelled trips will appear here.");
 }
 
@@ -4341,7 +4341,7 @@ function renderAdminTrips() {
     </tr>`;
   };
   el.innerHTML = pagedByMonth("admin-trips", data, t => t.startTs, rowHTML, {
-    pageSize: 15,
+    pageSize: 4,
     headerRow: m => `<tr class="month-row"><td colspan="6">${m}</td></tr>`,
     wrap: rows => `<table class="admin-trips-table"><thead><tr><th>Member</th><th>Date</th><th>Duration</th><th>Type</th><th>KEEL Burned</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`
   });
@@ -4805,7 +4805,7 @@ async function loadBoatLogbook(){
 function renderBoatLogbook(){
   const el = document.getElementById("admin-logbook-list"); if(!el) return;
   if(!_logbookEntries.length){ el.innerHTML = '<div class="empty-state" style="padding:18px 0"><div class="empty-anchor">📓</div><div class="empty-title">No log entries yet</div></div>'; return; }
-  el.innerHTML = pagedByMonth("boat-logbook", _logbookEntries, en => en.createdAt, en => renderLogEntry(en, true), { pageSize: 10 });
+  el.innerHTML = pagedByMonth("boat-logbook", _logbookEntries, en => en.createdAt, en => renderLogEntry(en, true), { pageSize: 4 });
 }
 
 function renderLogEntry(en, canEdit){
