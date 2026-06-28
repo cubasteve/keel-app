@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15y";
+    const APP_VERSION = "2025-06-15z";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15y"></script>
+<script src="keel-core.js?v=2025-06-15z"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -908,7 +908,8 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
 /* ── Month grouping + paging for long lists ──────────────────────────────── */
 .month-head { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--muted2); margin:16px 0 8px; padding-bottom:5px; border-bottom:1px solid var(--border); }
 .month-head:first-child { margin-top:2px; }
-.page-more { width:100%; padding:10px; font-size:12px; margin-top:14px; }
+.page-ctrls { display:flex; gap:8px; margin-top:14px; }
+.page-ctrls .btn-continue { flex:1; padding:10px; font-size:12px; }
 .admin-trips-table tr.month-row td { background:rgba(74,179,255,0.06); color:var(--accent); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.5px; padding:6px 10px; }
 /* ── Member Onboarding wizard ─────────────────────────────────────────── */
 .onb-steps { display:flex; align-items:center; margin-bottom:20px; }
@@ -3754,12 +3755,13 @@ async function prefetchProfiles(addresses) {
 // ── Group-by-month + "Show more" paging for long lists ──
 const _pageShown = {};
 function monthLabel(ts){ return new Date(ts*1000).toLocaleDateString("en-US",{month:"long",year:"numeric",timeZone:"America/New_York"}); }
-function pageMore(key, size){
-  _pageShown[key] = (_pageShown[key]||size) + size;
+function _pageRerender(key){
   if(key==="trips-past") renderTripsPage();
   else if(key==="admin-trips") renderAdminTrips();
   else if(key==="boat-logbook") renderBoatLogbook();
 }
+function pageMore(key, size){ _pageShown[key] = (_pageShown[key]||size) + size; _pageRerender(key); }
+function pageLess(key, size){ _pageShown[key] = size; _pageRerender(key); }
 // items newest-first; getTs->seconds; renderItem->html. opts: {pageSize, headerRow(label), wrap(rowsHtml)}
 function pagedByMonth(key, items, getTs, renderItem, opts){
   opts = opts || {}; const size = opts.pageSize || 12;
@@ -3772,7 +3774,13 @@ function pagedByMonth(key, items, getTs, renderItem, opts){
     body += renderItem(it);
   }
   let html = opts.wrap ? opts.wrap(body) : body;
-  if(items.length > n){ html += '<button type="button" class="btn-continue page-more" onclick="pageMore(\''+key+'\','+size+')">Show '+Math.min(size, items.length-n)+' more · '+(items.length-n)+' older</button>'; }
+  const more = items.length > n, expanded = (_pageShown[key]||size) > size;
+  if(more || expanded){
+    html += '<div class="page-ctrls">';
+    if(more)     html += '<button type="button" class="btn-continue" onclick="pageMore(\''+key+'\','+size+')">Show '+Math.min(size, items.length-n)+' more · '+(items.length-n)+' older</button>';
+    if(expanded) html += '<button type="button" class="btn-continue" onclick="pageLess(\''+key+'\','+size+')">Show less ▲</button>';
+    html += '</div>';
+  }
   return html;
 }
 
