@@ -18,7 +18,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15ab";
+    const APP_VERSION = "2025-06-15ac";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -37,7 +37,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15ab"></script>
+<script src="keel-core.js?v=2025-06-15ac"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -1385,7 +1385,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   </div>
 
   <div class="nav-section-label">Navigation</div>
-  <div class="nav-item active" onclick="showPage('dashboard')"><span class="nav-icon">⊞</span> Reservation</div>
+  <div class="nav-item active" onclick="showPage('dashboard')"><span class="nav-icon">⊞</span> Reserve</div>
   <div class="nav-item" onclick="showPage('trips')"><span class="nav-icon">⛵</span> Trips</div>
   <div class="nav-item" onclick="showPage('weather')"><span class="nav-icon">🌤</span> Weather</div>
   <div class="nav-item" onclick="showPage('keeltoken')"><span class="nav-icon">◈</span> Keel Token</div>
@@ -1407,7 +1407,7 @@ body.settle-collapsed .right-panel { margin-right: -320px; transform: translateX
   <!-- TOPBAR -->
   <div class="topbar">
     <button class="hamburger" id="nav-toggle" onclick="toggleNav()" aria-label="Toggle navigation">☰</button>
-    <div class="page-title" id="page-title">⚓ Reservation</div>
+    <div class="page-title" id="page-title">⚓ Reserve</div>
     <div class="topbar-right">
       <div id="wallet-area">
         <button class="btn btn-connect" onclick="connectWallet()">⬡ Connect Wallet</button>
@@ -3635,7 +3635,7 @@ function showPage(page) {
   if(navMap[page] !== undefined) navItems[navMap[page]].classList.add("active");
 
   // Update topbar title + settle toggle visibility
-  const titles = { dashboard: "⚓ Reservation", trips: "⛵ Trips", weather: "🌤 Weather", keeltoken: "◈ Keel Token", settings: "⚙ Settings", admin: "🔑 Admin Panel" };
+  const titles = { dashboard: "⚓ Reserve", trips: "⛵ Trips", weather: "🌤 Weather", keeltoken: "◈ Keel Token", settings: "⚙ Settings", admin: "🔑 Admin Panel" };
   document.getElementById("page-title").textContent = titles[page] || "";
   document.getElementById("settle-toggle").style.display = page === "dashboard" ? "" : "none";
   // Hide the burn bar on non-dashboard pages, restore it on dashboard
@@ -3804,7 +3804,7 @@ function renderTripsPage() {
   const upEl = document.getElementById("trips-list-upcoming");
   upEl.innerHTML = upcomingList.length
     ? upcomingList.map(t => tripCardHTML(t)).join("")
-    : tripEmptyHTML("No upcoming voyages", "Book a voyage from the Reservation page to reserve your next trip.");
+    : tripEmptyHTML("No upcoming voyages", "Book a voyage from the Reserve page to reserve your next trip.");
 
   // Past tab: completed + cancelled, newest first
   const pastEl = document.getElementById("trips-list-past");
