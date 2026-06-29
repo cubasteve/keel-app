@@ -15,9 +15,9 @@
 <meta name="theme-color" content="#0a1730">
 <meta property="og:title" content="KEEL — Fractional Boat Club">
 <meta property="og:description" content="Own your share. Burn KEEL to reserve and pay for voyages on-chain.">
-<meta property="og:image" content="https://cubasteve.github.io/assets/keel-coin-512.png">
+<meta property="og:image" content="https://cubasteve.github.io/keel-app/assets/keel-coin-512.png">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="https://cubasteve.github.io/assets/keel-coin-512.png">
+<meta name="twitter:image" content="https://cubasteve.github.io/keel-app/assets/keel-coin-512.png">
 <script>
   // ── Auto-update guard ──────────────────────────────────────────────────
   // GitHub Pages serves index.html with a ~10-min cache, so normal mobile
@@ -29,7 +29,7 @@
   // ON EVERY DEPLOY: bump APP_VERSION here, the value in version.txt, AND the
   // ?v= on the keel-core.js tag just below — keep all three in lockstep.
   (function(){
-    const APP_VERSION = "2025-06-15ae";
+    const APP_VERSION = "2025-06-15af";
     window.__APP_VERSION = APP_VERSION;
     fetch("version.txt", { cache: "no-store" })
       .then(r => r.ok ? r.text() : null)
@@ -48,7 +48,7 @@
      tag — NOT document.write — so Chrome's slow-network intervention can't
      silently drop it (that would undefine the whole app and dead-click the UI).
      Bump ?v= together with APP_VERSION + version.txt. -->
-<script src="keel-core.js?v=2025-06-15ae"></script>
+<script src="keel-core.js?v=2025-06-15af"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <!-- jsQR: decodes the member's wallet-address QR during in-person onboarding. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -5063,7 +5063,7 @@ async function settingsAddToken(btn){
     btn.textContent = "Adding token…";
     const ok = await eth.request({ method:"wallet_watchAsset", params:{
       type:"ERC20", options:{ address:KEEL_TOKEN_ADDRESS, symbol:"KEEL", decimals:18,
-        image:"https://cubasteve.github.io/assets/keel-coin-256.png" }
+        image:"https://cubasteve.github.io/keel-app/assets/keel-coin-256.png" }
     }});
     showAdminResult("settings-wallet-add-result", ok!==false ? "success" : "info",
       ok!==false ? "✓ KEEL token added to your wallet."
