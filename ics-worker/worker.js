@@ -45,10 +45,31 @@ async function handleTile(request, env, ctx) {
       headers: { "Access-Control-Allow-Origin": "*" }
     });
   }
+  // Edge TTL, and why it is 65 minutes rather than 15.
+  //
+  // A client anchors its forecast to the current half hour and asks for
+  // +1h/+2h/+3h from it, so every absolute time is asked for three times,
+  // an hour apart: the tile for 17:00 is fetched by the 14:00 slot, the
+  // 15:00 slot and the 16:00 slot. At 15 minutes nothing was ever reused
+  // - not even between two devices in the same 30-minute slot - so every
+  // build cost the full 12 calls against a 25/hour free tier.
+  //
+  //   900s   every build pays 12          24 calls/hour
+  //   1800s  a slot is shared aboard      24 calls/hour, one build's worth
+  //   3900s  the hour-later reuse hits    16 calls/hour   <- here
+  //   7800s  both reuses hit               8 calls/hour
+  //
+  // 7800 is cheaper still, but it would serve the +1h frame from a model
+  // run two hours old, and the near hour is the one you are dodging
+  // squalls with. 65 minutes keeps every tile under an hour old and still
+  // takes a third off the bill.
+  //
+  // s-maxage is what the Cloudflare edge reads; max-age is left short so a
+  // browser that lingers on the page still comes back for a fresher tile.
   res = new Response(up.body, {
     headers: {
       "Content-Type": "image/png",
-      "Cache-Control": "public, max-age=900",
+      "Cache-Control": "public, max-age=900, s-maxage=3900",
       "Access-Control-Allow-Origin": "*"
     }
   });
